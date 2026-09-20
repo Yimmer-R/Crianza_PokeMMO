@@ -4,8 +4,11 @@
 // lo detecta.
 import { bloque, prueba, igual, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
-import { planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple, ROL } from '../src/nucleo/planificador.js';
-import { ivsGarantizados, perfectos } from '../src/nucleo/herencia.js';
+import {
+  planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
+  movimientosSoloDeHuevo, medirArbol, ROL,
+} from '../src/nucleo/planificador.js';
+import { ivsGarantizados, naturalezaGarantizada, perfectos } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
 
 const objetivoDe = (o) => ({ especie: 'Larvitar', ivs: ivs(), evs: {}, movimientos: [], ...o });
@@ -36,8 +39,24 @@ function arbolSolido(arbol) {
           `con madre=[${madre.stats}] +${n.objetos.madre} y padre=[${padre.stats}] +${n.objetos.padre}`,
         );
     }
-    if (n.naturaleza && !madre.naturaleza && !padre.naturaleza)
-      throw new Error(`el cruce ${n.id} promete naturaleza pero ningún padre la trae`);
+    if (n.naturaleza) {
+      // Se simulan los padres con la naturaleza que el plan les asigna y se
+      // comprueba con la regla real que la cría la saca garantizada.
+      const nat = 'Audaz';
+      const r2 = naturalezaGarantizada(
+        { naturaleza: madre.naturaleza ? nat : null },
+        { naturaleza: padre.naturaleza ? nat : null },
+        n.objetos.madre, n.objetos.padre,
+      );
+      if (r2.naturaleza !== nat)
+        throw new Error(
+          `el cruce ${n.id} promete naturaleza pero no queda garantizada ` +
+          `(madre naturaleza=${madre.naturaleza}, padre naturaleza=${padre.naturaleza}, ` +
+          `objetos ${n.objetos.madre} / ${n.objetos.padre})`,
+        );
+      if (n.viaNaturaleza && r2.via !== n.viaNaturaleza)
+        throw new Error(`el cruce ${n.id} dice vía ${n.viaNaturaleza} y la regla da ${r2.via}`);
+    }
   }
   return true;
 }
@@ -81,14 +100,55 @@ bloque('planificador: forma del árbol', () => {
     );
   });
 
-  prueba('en un árbol con naturaleza, exactamente una rama la arrastra hasta abajo', () => {
+  prueba('con la estrategia de Piedraeterna, una sola rama arrastra la naturaleza', () => {
     const plan = planear(
       objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
-      datos, { regionesDisponibles: REGIONES },
+      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'piedraeterna' },
     );
+    cierto(arbolSolido(plan.arbol));
     const hojasConNaturaleza = nodos(plan.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza);
     igual(hojasConNaturaleza.length, 1);
     igual(hojasConNaturaleza[0].stats.length, 0, 'la hoja de naturaleza no debería pedir IVs');
+  });
+
+  prueba('con la estrategia compartida, la naturaleza baja por TODAS las ramas', () => {
+    const plan = planear(
+      objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
+      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' },
+    );
+    cierto(arbolSolido(plan.arbol));
+    const hojasNat = nodos(plan.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza);
+    igual(hojasNat.length, 2, 'un 2×31 con naturaleza compartida necesita dos padres con ella');
+    for (const h of hojasNat) igual(h.stats.length, 0);
+  });
+
+  prueba('la compartida no gasta Piedraeterna en los cruces de dos o más IVs', () => {
+    const plan = planear(
+      objetivoDe({ ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
+      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' },
+    );
+    cierto(arbolSolido(plan.arbol));
+    for (const n of nodos(plan.arbol)) {
+      if (n.tipo !== 'cruce' || !n.naturaleza) continue;
+      if (n.stats.length >= 2) {
+        igual(n.viaNaturaleza, 'compartida', `el cruce ${n.id} de ${n.stats.length} IVs`);
+        igual(n.forzados.length, 2, 'debería seguir forzando dos IVs');
+      } else {
+        // Con un solo IV no hay nada que compartir: ahí sí entra la Piedraeterna.
+        igual(n.viaNaturaleza, 'piedraeterna');
+      }
+    }
+  });
+
+  prueba('las dos estrategias necesitan los mismos padres, pero la compartida gasta menos', () => {
+    const base = objetivoDe({ ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }), naturaleza: 'Audaz' });
+    const comp = planear(base, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' });
+    const pied = planear(base, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'piedraeterna' });
+    igual(contar(comp.arbol).conseguir, contar(pied.arbol).conseguir);
+    // La compartida cambia 1×31 por padres de sólo naturaleza, que son más fáciles
+    // de capturar (1 de 25 frente a 1 de 32).
+    const soloNat = (p) => nodos(p.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza && !n.stats.length).length;
+    cierto(soloNat(comp) > soloNat(pied), `compartida ${soloNat(comp)} vs piedraeterna ${soloNat(pied)}`);
   });
 
   prueba('un 1×31 no necesita cruce: es una captura', () => {
@@ -359,5 +419,139 @@ bloque('planificador: reparto de sexos y espina materna', () => {
       nodos(plan.arbol).some((n) => n.tipo === 'inventario' && n.ejemplar.id === 'r'),
       'un Rattata del grupo Campo debería encajar en un hueco libre de Chimchar',
     );
+  });
+});
+
+
+bloque('planificador: movimientos huevo atan al padre final', () => {
+  // Un movimiento que Larvitar SÓLO puede sacar de huevo.
+  const soloHuevo = Object.entries(datos.movimientosHuevo.deHuevo)
+    .filter(([mov, lista]) => lista.some((x) => x.especie === 'Larvitar')
+      && !datos.pokedex.Larvitar.movimientos.nivel.some((m) => m.nombre === mov)
+      && !datos.pokedex.Larvitar.movimientos.mt.includes(mov)
+      && !datos.pokedex.Larvitar.movimientos.tutor.includes(mov))
+    .map(([mov]) => mov);
+
+  prueba('detecta qué movimientos son sólo de huevo y cuáles no tocan la crianza', () => {
+    cierto(soloHuevo.length > 0, 'esperaba algún movimiento exclusivo de huevo en Larvitar');
+    const porNivel = datos.pokedex.Larvitar.movimientos.nivel[0].nombre;
+    igual(movimientosSoloDeHuevo({ especie: 'Larvitar', movimientos: [porNivel] }, datos.pokedex), []);
+    igual(
+      movimientosSoloDeHuevo({ especie: 'Larvitar', movimientos: [soloHuevo[0]] }, datos.pokedex),
+      [soloHuevo[0]],
+    );
+  });
+
+  prueba('el padre del cruce final queda obligado a saberlo, y la espina no', () => {
+    const plan = planear(
+      objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), movimientos: [soloHuevo[0]] }),
+      datos, { regionesDisponibles: REGIONES },
+    );
+    cierto(plan.ok, JSON.stringify(plan.problemas));
+    igual(plan.movimientosDeHuevo, [soloHuevo[0]]);
+    const conMovs = nodos(plan.arbol).filter((n) => (n.movimientosNecesarios ?? []).length);
+    igual(conMovs.length, 1, 'sólo un hueco debería quedar atado');
+    igual(conMovs[0].rol, ROL.LIBRE, 'lo pasa el padre, no la madre');
+    igual(conMovs[0].sexoNecesario, SEXOS.MACHO);
+  });
+
+  prueba('un ejemplar del inventario que no sabe el movimiento no vale para ese hueco', () => {
+    const hueco = { stats: ['ataque'], naturaleza: false, rol: ROL.LIBRE, movimientosNecesarios: [soloHuevo[0]] };
+    const sinEl = cumple(
+      { especie: 'Larvitar', sexo: SEXOS.MACHO, ivs: ivs({ ataque: 31 }), movimientos: [] },
+      hueco, datos, { especie: 'Larvitar' },
+    );
+    falso(sinEl.ok);
+    igual(sinEl.faltanMovimientos, [soloHuevo[0]]);
+
+    const conEl = cumple(
+      { especie: 'Larvitar', sexo: SEXOS.MACHO, ivs: ivs({ ataque: 31 }), movimientos: [soloHuevo[0]] },
+      hueco, datos, { especie: 'Larvitar' },
+    );
+    cierto(conEl.ok, conEl.motivo);
+  });
+
+  prueba('el requisito de captura arrastra el movimiento al texto del paso', () => {
+    const plan = planear(
+      objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), movimientos: [soloHuevo[0]] }),
+      datos, { regionesDisponibles: REGIONES },
+    );
+    const conMov = plan.pasos.conseguir.filter((r) => r.movimientos.length);
+    igual(conMov.length, 1);
+    igual(conMov[0].movimientos, [soloHuevo[0]]);
+  });
+});
+
+bloque('planificador: elegir estrategia de naturaleza automáticamente', () => {
+  const conNat = objetivoDe({
+    ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }),
+    naturaleza: 'Audaz',
+  });
+
+  prueba('en vacío evalúa las dos y se queda con la compartida, que es más barata', () => {
+    const plan = planear(conNat, datos, { regionesDisponibles: REGIONES });
+    cierto(plan.comparativa, 'debería traer la comparación de las dos');
+    igual(plan.comparativa.length, 2);
+    igual(plan.estrategiaNaturaleza, 'compartida');
+    cierto(arbolSolido(plan.arbol));
+
+    const porNombre = Object.fromEntries(plan.comparativa.map((c) => [c.estrategia, c]));
+    cierto(
+      porNombre.compartida.esfuerzo < porNombre.piedraeterna.esfuerzo,
+      `compartida ${porNombre.compartida.esfuerzo} vs piedraeterna ${porNombre.piedraeterna.esfuerzo}`,
+    );
+  });
+
+  prueba('con inventario SIN la naturaleza se pasa a Piedraeterna, que sí lo aprovecha', () => {
+    // Esto es lo que se vio probando en el navegador: la compartida exige la
+    // naturaleza en todos los huecos, así que un 3×31 sin ella no encaja en
+    // ninguno y no ahorra nada.
+    const inventario = [{
+      id: 'a', especie: 'Larvitar', sexo: SEXOS.HEMBRA,
+      ivs: ivs({ ps: 31, ataque: 31, defensa: 31 }), naturaleza: 'Miedosa',
+    }];
+    const plan = planear(conNat, datos, { regionesDisponibles: REGIONES, inventario });
+    igual(plan.estrategiaNaturaleza, 'piedraeterna');
+    cierto(arbolSolido(plan.arbol));
+    igual(contar(plan.arbol).inventario, 1);
+
+    const soloCompartida = planear(conNat, datos, {
+      regionesDisponibles: REGIONES, inventario, estrategiaNaturaleza: 'compartida',
+    });
+    cierto(
+      contar(plan.arbol).conseguir < contar(soloCompartida.arbol).conseguir,
+      `auto pide ${contar(plan.arbol).conseguir} capturas y compartida forzada ${contar(soloCompartida.arbol).conseguir}`,
+    );
+  });
+
+  prueba('forzar una estrategia la respeta y no devuelve comparación', () => {
+    for (const est of ['compartida', 'piedraeterna']) {
+      const plan = planear(conNat, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: est });
+      igual(plan.estrategiaNaturaleza, est);
+      igual(plan.comparativa, null);
+      cierto(arbolSolido(plan.arbol));
+    }
+  });
+
+  prueba('sin naturaleza no hay nada que comparar', () => {
+    const plan = planear(objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }) }), datos, { regionesDisponibles: REGIONES });
+    igual(plan.comparativa, null);
+  });
+
+  prueba('medirArbol cuenta capturas, esfuerzo y objetos de forma coherente', () => {
+    const plan = planear(objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31, defensa: 31 }) }), datos, { regionesDisponibles: REGIONES });
+    const m = medirArbol(plan.arbol);
+    igual(m.capturas, contar(plan.arbol).conseguir);
+    // Cuatro hojas de 1×31: cada una es 1 de 32.
+    igual(m.esfuerzo, 4 * 32);
+    igual(m.objetos.reduce((a, o) => a + o.cuantos, 0), contar(plan.arbol).cruces * 2);
+    cierto(m.dinero > 0);
+  });
+
+  prueba('una hoja de sólo naturaleza cuesta menos esfuerzo que una de 1×31', () => {
+    const soloNat = medirArbol({ tipo: 'conseguir', stats: [], naturaleza: true, hijos: [] });
+    const unIv = medirArbol({ tipo: 'conseguir', stats: ['ataque'], naturaleza: false, hijos: [] });
+    igual(soloNat.esfuerzo, 25);
+    igual(unIv.esfuerzo, 32);
   });
 });

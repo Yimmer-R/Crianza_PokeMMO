@@ -75,10 +75,50 @@ export function vistaObjetivo(datos) {
       nat.neutra ? chip('neutra') : null,
       chip(`en inglés: ${nat.ingles}`),
     ]) : null,
-    objetivo.naturaleza ? aviso(
-      'La Piedraeterna pasa la naturaleza, pero ocupa un hueco de objeto: ese cruce ya sólo puede ' +
-      'forzar UN IV en vez de dos. Por eso pedir naturaleza alarga la cadena un escalón entero.',
-    ) : null,
+    objetivo.naturaleza ? frag([
+      el('h3', { texto: 'Cómo llevar la naturaleza por la cadena' }),
+      el('div.fila', {}, [
+        el('div.crece', {}, [
+          el('label', { for: 'estrategia-nat', texto: 'Estrategia' }),
+          el('select', {
+            id: 'estrategia-nat',
+            onchange: (e) => cambiaObjetivo({ estrategiaNaturaleza: e.target.value }),
+          }, [
+            el('option', {
+              value: 'auto',
+              selected: (objetivo.estrategiaNaturaleza ?? 'auto') === 'auto',
+            }, ['Automática: la más barata de las dos (recomendada)']),
+            el('option', {
+              value: 'compartida',
+              selected: objetivo.estrategiaNaturaleza === 'compartida',
+            }, ['Los dos padres la comparten']),
+            el('option', {
+              value: 'piedraeterna',
+              selected: objetivo.estrategiaNaturaleza === 'piedraeterna',
+            }, ['Piedraeterna en cada cruce']),
+          ]),
+        ]),
+      ]),
+      el('div.nota', {}, [
+        el('p', { style: 'margin:0 0 6px' }, [
+          el('strong', { texto: 'Compartida: ' }),
+          'si los dos padres tienen la misma naturaleza, la cría la saca sola y no se gasta ningún ',
+          'hueco de objeto, así que el cruce sigue forzando dos IVs.',
+        ]),
+        el('p', { style: 'margin:0 0 6px' }, [
+          el('strong', { texto: 'Piedraeterna: ' }),
+          'la lleva un padre y la pasa, pero ocupa su hueco de objeto, así que ese cruce sólo ',
+          'fuerza un IV.',
+        ]),
+        el('p', { style: 'margin:0' }, [
+          'Ninguna gana siempre. La compartida sale más barata en vacío; la Piedraeterna gana ',
+          'en cuanto tienes inventario, porque deja media cadena sin naturaleza y ahí sí encajan ',
+          'los Pokémon que ya tienes. Con ',
+          el('strong', { texto: 'Automática' }),
+          ' se calculan las dos y se enseña la comparación en la pestaña Plan.',
+        ]),
+      ]),
+    ]) : null,
   ]);
 
   // ----------------------------------------------------------------- EVs

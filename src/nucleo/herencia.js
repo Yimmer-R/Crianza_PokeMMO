@@ -82,11 +82,29 @@ export function ivsGarantizados(ivsA, ivsB, objetoA = null, objetoB = null) {
   };
 }
 
-/** Naturaleza que pasa la cría, si algún padre lleva Piedraeterna. */
+/**
+ * Naturaleza que saca la cría segura, y por qué vía.
+ *
+ * Dos formas, y la segunda es la que abarata las cadenas:
+ *
+ * 1. **Piedraeterna**: la pasa quien la lleve. Está en wiki/mecanicas/Crianza.md.
+ * 2. **Los dos padres comparten la naturaleza**: la cría sale con ella, igual que
+ *    pasa con un IV que los dos tienen a 31.
+ *    (experiencia propia del usuario, 20-09-2026 — la wiki NO documenta qué pasa
+ *    con la naturaleza cuando no hay Piedraeterna, así que este dato es más
+ *    débil que uno de `raw/` y conviene meterlo en la wiki como fuente nueva.)
+ *
+ * La segunda vía importa porque **no gasta hueco de objeto**: un cruce cuyos dos
+ * padres ya traen la naturaleza puede seguir forzando DOS IVs con Recios.
+ */
 export function naturalezaGarantizada(padreA, padreB, objetoA, objetoB) {
-  if (objetoA === PIEDRAETERNA) return padreA?.naturaleza ?? null;
-  if (objetoB === PIEDRAETERNA) return padreB?.naturaleza ?? null;
-  return null;
+  if (objetoA === PIEDRAETERNA && padreA?.naturaleza)
+    return { naturaleza: padreA.naturaleza, via: 'piedraeterna' };
+  if (objetoB === PIEDRAETERNA && padreB?.naturaleza)
+    return { naturaleza: padreB.naturaleza, via: 'piedraeterna' };
+  if (padreA?.naturaleza && padreA.naturaleza === padreB?.naturaleza)
+    return { naturaleza: padreA.naturaleza, via: 'compartida' };
+  return { naturaleza: null, via: null };
 }
 
 /** Cuántos objetos "cuentan" para la tabla de reparto (la Piedraeterna también ocupa hueco). */
@@ -152,9 +170,15 @@ export function tablaShiny(numObjetos) {
 }
 
 /**
- * Cuántos 31 puede garantizar un cruce como máximo: los que compartan los padres
- * más uno por objeto Recio disponible. La Piedraeterna gasta uno de los dos huecos,
- * y por eso pedir naturaleza encarece la cadena un escalón entero.
+ * Cuántos 31 puede garantizar un cruce como máximo.
+ *
+ * Son los que compartan los padres más uno por cada hueco de objeto libre. Y aquí
+ * está la diferencia entre las dos vías de la naturaleza: con Piedraeterna sólo
+ * queda un Recio, mientras que si los dos padres ya comparten la naturaleza los
+ * dos huecos siguen libres y el cruce rinde igual que uno sin naturaleza.
+ *
+ * @param {number} compartidos IVs a 31 que tienen los dos padres
+ * @param {'piedraeterna'|'compartida'|null} viaNaturaleza cómo llega la naturaleza
  */
-export const topeGarantizable = (compartidos, conNaturaleza) =>
-  compartidos + (conNaturaleza ? 1 : 2);
+export const topeGarantizable = (compartidos, viaNaturaleza = null) =>
+  compartidos + (viaNaturaleza === 'piedraeterna' ? 1 : 2);

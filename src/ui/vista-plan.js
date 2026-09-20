@@ -69,6 +69,37 @@ export function vistaPlan(datos) {
       : null,
   ]);
 
+  // ------------------------------------------------- comparativa de estrategias
+  const ESTRATEGIA = {
+    compartida: 'los dos padres comparten la naturaleza',
+    piedraeterna: 'Piedraeterna en cada cruce',
+  };
+  const comparativa = plan.comparativa
+    ? tarjeta('Cómo se lleva la naturaleza', [
+        el('p.nota', {}, [
+          'He construido las dos cadenas posibles y me he quedado con la de menos esfuerzo. ',
+          'El esfuerzo son encuentros salvajes esperados: cada IV a 31 es 1 de 32 y la ',
+          'naturaleza 1 de 25.',
+        ]),
+        tabla(
+          ['Estrategia', 'Capturas', 'Encuentros esperados', 'Objetos', ''],
+          [...plan.comparativa]
+            .sort((a, b) => a.esfuerzo - b.esfuerzo)
+            .map((c) => [
+              ESTRATEGIA[c.estrategia] ?? c.estrategia,
+              numero(c.capturas),
+              numero(c.esfuerzo),
+              `${numero(c.dinero)} PokéYen`,
+              c.estrategia === plan.estrategiaNaturaleza ? chip('elegida', 'bien') : '',
+            ]),
+          [1, 2],
+        ),
+        el('p.nota', {}, [
+          'Puedes forzar una de las dos en la pestaña Objetivo si prefieres otra cosa.',
+        ]),
+      ])
+    : null;
+
   // ---------------------------------------------------------------- pasos
   const pasos = tarjeta('Pasos, en orden', [
     el('p.nota', {}, [
@@ -143,7 +174,7 @@ export function vistaPlan(datos) {
     el('div.nota', {}, [pres.sinPrecio.nota]),
   ]);
 
-  return frag([resumen, pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
+  return frag([resumen, comparativa, pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
 }
 
 function irAObjetivo(e) {

@@ -163,10 +163,19 @@ export function evaluar(ejemplar, plan, datos) {
   // es lo que hay que buscar en la siguiente captura.
   const soloSexo = rechazos.length > 0 && rechazos.every((r) => r.sexoIncorrecto);
   const soloEspecie = rechazos.length > 0 && rechazos.every((r) => r.especieIncompatible);
+  const soloNaturaleza = rechazos.length > 0 && rechazos.every((r) => r.faltanNaturaleza);
+  const faltanMovs = [...new Set(rechazos.flatMap((r) => r.faltanMovimientos ?? []))];
   const ivsQueSalvarian = [...new Set(rechazos.flatMap((r) => r.faltanIvs ?? []))];
 
   let mensaje;
-  if (soloSexo) {
+  if (soloNaturaleza) {
+    mensaje = `Los IVs valen, pero todos los huecos libres piden naturaleza ${plan.objetivo.naturaleza}. ` +
+      'En la pestaña Objetivo puedes cambiar a la estrategia de Piedraeterna: deja media cadena ' +
+      'sin naturaleza y ahí este sí entraría.';
+  } else if (faltanMovs.length && rechazos.every((r) => r.faltanMovimientos)) {
+    mensaje = `No sirve: los huecos libres tienen que pasar ${faltanMovs.join(', ')} y este no lo sabe. ` +
+      'Anótale los movimientos si de verdad los tiene.';
+  } else if (soloSexo) {
     mensaje = 'Los IVs valen, pero todos los huecos libres piden el otro sexo. ' +
       'Sirve si lo cruzas pagando por el sexo de la cría, o guárdalo para un hueco futuro.';
   } else if (soloEspecie) {

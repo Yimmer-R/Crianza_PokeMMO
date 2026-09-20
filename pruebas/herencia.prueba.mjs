@@ -2,7 +2,8 @@
 import { bloque, prueba, igual, cerca, cierto, falso } from './marco.mjs';
 import {
   ivsGarantizados, distribucionDe, probabilidadDe, probabilidadDelCruce,
-  tablaShiny, topeGarantizable, RECIO_DE, PIEDRAETERNA, statQueFuerza, perfectos,
+  tablaShiny, topeGarantizable, naturalezaGarantizada,
+  RECIO_DE, PIEDRAETERNA, statQueFuerza, perfectos,
 } from '../src/nucleo/herencia.js';
 
 const ivs = (o = {}) => ({ ps: 0, ataque: 0, defensa: 0, 'at-esp': 0, 'def-esp': 0, velocidad: 0, ...o });
@@ -60,9 +61,12 @@ bloque('herencia: IVs garantizados', () => {
     igual([...r.garantizados], ['velocidad']); // el 31 en Ataque de la madre se pierde
   });
 
-  prueba('el tope garantizable es compartidos + 2, y + 1 si hay naturaleza', () => {
-    igual(topeGarantizable(3, false), 5);
-    igual(topeGarantizable(3, true), 4);
+  prueba('el tope garantizable baja a compartidos + 1 sólo con Piedraeterna', () => {
+    igual(topeGarantizable(3, null), 5);
+    igual(topeGarantizable(3, 'piedraeterna'), 4);
+    // Si la naturaleza viene de que los dos padres la comparten, no gasta objeto
+    // y el cruce rinde igual que uno sin naturaleza.
+    igual(topeGarantizable(3, 'compartida'), 5);
   });
 });
 
@@ -126,5 +130,55 @@ bloque('herencia: utilidades', () => {
   });
   prueba('cada IV tiene su Recio y no se repiten', () => {
     igual(new Set(Object.values(RECIO_DE)).size, 6);
+  });
+});
+
+
+bloque('herencia: naturaleza', () => {
+  const conNat = (nat) => ({ naturaleza: nat });
+
+  prueba('la Piedraeterna pasa la naturaleza de quien la lleve', () => {
+    igual(
+      naturalezaGarantizada(conNat('Audaz'), conNat('Miedosa'), PIEDRAETERNA, RECIO_DE.ataque),
+      { naturaleza: 'Audaz', via: 'piedraeterna' },
+    );
+    igual(
+      naturalezaGarantizada(conNat('Audaz'), conNat('Miedosa'), RECIO_DE.ataque, PIEDRAETERNA),
+      { naturaleza: 'Miedosa', via: 'piedraeterna' },
+    );
+  });
+
+  prueba('si los dos padres comparten naturaleza, la cría la saca sin Piedraeterna', () => {
+    igual(
+      naturalezaGarantizada(conNat('Audaz'), conNat('Audaz'), RECIO_DE.ataque, RECIO_DE.velocidad),
+      { naturaleza: 'Audaz', via: 'compartida' },
+    );
+  });
+
+  prueba('con naturalezas distintas y sin Piedraeterna no hay nada garantizado', () => {
+    igual(
+      naturalezaGarantizada(conNat('Audaz'), conNat('Miedosa'), RECIO_DE.ataque, RECIO_DE.velocidad),
+      { naturaleza: null, via: null },
+    );
+  });
+
+  prueba('un padre sin naturaleza anotada no garantiza nada', () => {
+    igual(naturalezaGarantizada(conNat('Audaz'), {}, null, null), { naturaleza: null, via: null });
+    igual(naturalezaGarantizada({}, {}, PIEDRAETERNA, null), { naturaleza: null, via: null });
+  });
+
+  prueba('la vía compartida deja los dos huecos de objeto libres; la Piedraeterna sólo uno', () => {
+    const a = ivs({ ps: 31, ataque: 31 });
+    const b = ivs({ ps: 31, velocidad: 31 });
+    // Compartida: los dos Recios funcionan, salen 3×31.
+    igual(
+      [...ivsGarantizados(a, b, RECIO_DE.ataque, RECIO_DE.velocidad).garantizados].sort(),
+      ['ataque', 'ps', 'velocidad'],
+    );
+    // Piedraeterna: uno de los dos IVs forzados se pierde, salen 2×31.
+    igual(
+      [...ivsGarantizados(a, b, PIEDRAETERNA, RECIO_DE.velocidad).garantizados].sort(),
+      ['ps', 'velocidad'],
+    );
   });
 });

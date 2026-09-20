@@ -1,0 +1,56 @@
+# Publica la app en GitHub Pages en cada push, después de pasar las pruebas.
+#
+# Para que funcione hay que hacer UNA cosa a mano, una sola vez:
+#   Settings -> Pages -> Build and deployment -> Source = "GitHub Actions"
+# Está explicado paso a paso, también desde el móvil, en docs/despliegue.md.
+
+name: Publicar en GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/crianza-pokemmo-structure-vt8lto
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez, y sin cancelar el que ya esté en marcha.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  probar:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # El proyecto no tiene dependencias: no hay nada que instalar.
+      - name: Pruebas unitarias
+        run: node pruebas/ejecutar.mjs
+      - name: Comprobar que los datos siguen cuadrando con la wiki
+        run: node herramientas/comprobar-datos.mjs
+
+  publicar:
+    name: Publicar
+    needs: probar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.desplegar.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      # La app es estática y vive en la raíz: se sube tal cual, sin compilar.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: desplegar
+        uses: actions/deploy-pages@v4

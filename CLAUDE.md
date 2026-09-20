@@ -14,6 +14,19 @@ archivos son a ciegas.
 El resumen de una línea: **un cruce garantiza los 31 que comparten los dos padres,
 más uno forzado por cada objeto Recio**. Todo lo demás sale de ahí.
 
+Y lo mismo con la naturaleza: **la pasa la Piedraeterna, o el que los dos padres la
+compartan**. La segunda vía no gasta hueco de objeto, así que el cruce sigue
+forzando dos IVs. Ese dato viene de la experiencia del usuario jugando
+(20-09-2026), **no** de la wiki, que no documenta qué pasa sin Piedraeterna: está
+marcado como tal en `herencia.js` y convendría subirlo a la wiki como fuente
+nueva.
+
+Ninguna de las dos vías gana siempre, así que el planificador construye las dos y
+se queda con la de menos esfuerzo (`estrategiaNaturaleza: 'auto'`). No vuelvas a
+poner un defecto fijo: la compartida es más barata en vacío pero la Piedraeterna
+gana en cuanto hay inventario, porque deja huecos sin naturaleza que el inventario
+sí puede rellenar.
+
 ## Reglas de este repositorio
 
 1. **`datos/*.json` no se edita a mano.** Se regenera con
@@ -25,7 +38,9 @@ más uno forzado por cada objeto Recio**. Todo lo demás sale de ahí.
    estimación disfrazada de dato. Lo que sí sea estimación va marcado
    (`confianza: 'estimado'`) y se muestra en su propia línea.
 3. **`src/nucleo/` no toca el DOM y `src/ui/` no contiene reglas del juego.** Es
-   lo que permite probar la lógica en Node sin navegador.
+   lo que permite probar la lógica en Node sin navegador. Por eso el OCR vive en
+   `src/ui/ocr.js` (necesita canvas) pero sólo produce texto: interpretarlo es de
+   `src/nucleo/importar.js`, el mismo parser que usa el pegado a mano.
 4. **Las pruebas corren contra los JSON reales**, no contra dobles. Si la
    extracción rompe algo, tienen que verlo.
 5. **Toda constante del juego cita su fuente** en un comentario, como en
@@ -34,6 +49,13 @@ más uno forzado por cada objeto Recio**. Todo lo demás sale de ahí.
    porque es como los muestra el juego.
 7. **Nada de datos de cuenta.** Ni usuarios, ni contraseñas, ni nombres de otros
    jugadores.
+8. **Nada importado se guarda sin revisión.** Imagen, texto y archivo pasan por
+   la tabla de confirmación. Un IV mal leído produce un árbol plausible y
+   equivocado, y eso es peor que un error visible.
+9. **Los nombres se resuelven, no se comparan.** El cliente del juego dice
+   «Desenrollar» y la wiki «Rodar». Todo lo que venga de fuera pasa por
+   `src/nucleo/nombres.js`, que además dice por qué vía resolvió. Lo que no
+   reconozca se avisa, nunca se inventa.
 
 ## Al parsear la wiki
 
@@ -55,13 +77,17 @@ el único que trae los grupos huevo. Ver
 ```
 node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
-node pruebas/ejecutar.mjs             # 102 pruebas unitarias
+node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
+node herramientas/generar-iconos.mjs  # regenera iconos/
+node pruebas/ejecutar.mjs             # 158 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
+OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```
 
 Antes de dar por bueno un cambio en el núcleo: las unitarias **y** la de
-navegador. La de navegador falla ante cualquier error de consola, y los tres
-fallos más caros de este proyecto sólo se veían ahí.
+navegador. La de navegador falla ante cualquier error de consola, y los fallos
+más caros de este proyecto sólo se veían ahí — incluido que el defecto fijo de
+estrategia de naturaleza dejaba el inventario inservible.
 
 ## Contexto del juego
 

@@ -61,6 +61,50 @@ Construir el árbol, colocar el inventario encima y repartir los sexos al final,
 en ese orden. La versión de una sola pasada gastaba un 3×31 en la primera hoja de
 1×31 del recorrido. Está explicado en [modelo-de-crianza.md](modelo-de-crianza.md).
 
+## La estrategia de naturaleza se elige sola, no por decreto
+
+Había un defecto fijo («la compartida es más barata») que resultó ser falso en
+cuanto hay inventario: la compartida exige la naturaleza en todos los huecos, así
+que un 3×31 que ya tengas y no la lleve no encaja en ninguno. La Piedraeterna deja
+media cadena sin naturaleza y ahí sí entra.
+
+Se construyen las dos cadenas y se elige la de menos esfuerzo, midiéndolo en
+encuentros salvajes esperados. La comparación se enseña en la pestaña Plan, y se
+puede forzar una de las dos. Construir el árbol dos veces cuesta microsegundos;
+equivocarse de estrategia cuesta decenas de capturas.
+
+## Tesseract.js es la única excepción a «sin dependencias»
+
+El OCR necesita un motor, y escribirlo no es razonable. Se carga desde CDN, **sólo
+cuando el usuario sube una imagen**, y si falla la app sigue entera y te manda a
+la vía de texto. No hay `package.json` ni instalación: sigue siendo una web
+estática.
+
+El modelo de español pesa unos 8 MB. Por eso el OCR no es la vía principal sino
+una de tres, y las otras dos no descargan nada.
+
+## Nada importado se guarda sin revisión
+
+El OCR se equivoca, y un IV mal leído rompe el plan entero **sin que se note**: el
+árbol sale plausible y está mal. Así que las tres vías automáticas (imagen, texto,
+archivo) pasan por una tabla de revisión con los IVs destacados, y hay que
+confirmar. Cuando el OCR falla, el texto que leyó se deja en la pestaña de texto
+para corregirlo, que es más rápido que reescribir la ficha.
+
+## Un resolutor de nombres, no comparación literal
+
+El cliente del juego y la wiki no llaman igual a todo: la ficha dice
+«Desenrollar» y la wiki lo tiene como «Rodar». Comparar cadenas habría descartado
+el dato como movimiento inexistente.
+
+El resolutor intenta, en este orden: exacto → sin tildes → nombre en inglés →
+tabla de alias del cliente → aproximado por distancia de edición. Y **siempre dice
+por qué vía resolvió**, para que la interfaz pueda enseñar «he interpretado X como
+Y» en vez de decidir en silencio. Lo que no reconoce no se inventa: se avisa.
+
+La tabla de alias del cliente no puede estar completa y no se pretende: se llena
+cuando aparece un caso, con un comentario de dónde salió.
+
 ## Se marca lo estimado en vez de redondearlo
 
 La wiki publica el pago por sexo sólo en los extremos (5.000 y 25.000). El tramo
@@ -77,6 +121,16 @@ Es la decisión de la wiki y se hereda: un precio del GTL apuntado miente a los 
 meses. Los padres de partida quedan **fuera** del total, con una nota que dice que
 ese número lo pone el usuario. Preferible a un presupuesto que parece completo y
 no lo es.
+
+## GitHub Pages con las pruebas por delante
+
+El flujo de publicación corre las pruebas unitarias y una comprobación de
+coherencia de `datos/` **antes** de publicar. Si algo falla, no se publica: es
+mejor una app vieja que funciona que una nueva con el planificador roto.
+
+Se publica el repositorio tal cual, sin compilar, porque no hay nada que
+compilar. El único paso manual es decirle a GitHub que la fuente de Pages son las
+Actions, y eso no se puede automatizar desde un flujo.
 
 ## El inventario vive en el navegador
 
