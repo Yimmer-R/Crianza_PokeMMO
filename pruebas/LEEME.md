@@ -50,6 +50,29 @@ scroll horizontal.
 **Falla ante cualquier error de consola.** Los fallos más caros de este proyecto
 sólo se veían aquí.
 
+### Probarla también desde un subdirectorio
+
+En GitHub Pages la app no vive en la raíz del dominio sino en
+`/Crianza_PokeMMO/`, así que una ruta absoluta funciona en local y se rompe en
+producción. Conviene correr la batería en las dos formas:
+
+```
+# como en local
+node herramientas/servir.mjs 8099 & node pruebas/navegador.mjs
+
+# como en Pages: la app dentro de un subdirectorio
+mkdir -p /tmp/sim && ln -sfn "$PWD" /tmp/sim/Crianza_PokeMMO
+(cd /tmp/sim && python3 -m http.server 8098 &)
+BASE=http://localhost:8098/Crianza_PokeMMO/ node pruebas/navegador.mjs
+```
+
+Esto ya pilló una ruta absoluta escrita en la propia prueba. Dentro de
+`page.evaluate`, resuelve siempre contra `document.baseURI`:
+
+```js
+const desdeLaPagina = (ruta) => new URL(ruta, document.baseURI).href;
+```
+
 ### Sobre el OCR
 
 Está partido en tres, a propósito:

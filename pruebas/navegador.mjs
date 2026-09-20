@@ -229,8 +229,11 @@ await paso('un texto que no se entiende se avisa y no se guarda nada', async () 
 // siempre. Lo único que queda fuera es Tesseract, que es de terceros.
 await paso('prepararImagen escala la captura e invierte el fondo oscuro', async () => {
   const r = await pagina.evaluate(async () => {
-    const { prepararImagen } = await import('/src/ui/ocr.js');
-    const blob = await fetch('/pruebas/fixtures/ficha-chimchar.png').then((x) => x.blob());
+    // Relativo a la página, NO absoluto: en GitHub Pages la app vive en un
+    // subdirectorio (/Crianza_PokeMMO/) y una ruta absoluta se sale de él.
+    const desdeLaPagina = (ruta) => new URL(ruta, document.baseURI).href;
+    const { prepararImagen } = await import(desdeLaPagina('src/ui/ocr.js'));
+    const blob = await fetch(desdeLaPagina('pruebas/fixtures/ficha-chimchar.png')).then((x) => x.blob());
     const lienzo = await prepararImagen(blob);
     const ctx = lienzo.getContext('2d');
     // Media de luminosidad después del tratamiento: si ha invertido bien, el
