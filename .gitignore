@@ -1,0 +1,14 @@
+# No hay dependencias: si aparece node_modules es de una herramienta suelta.
+node_modules/
+package-lock.json
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Salidas de pruebas y capturas
+capturas/
+*.log
