@@ -16,6 +16,18 @@ pagina.on('console', (m) => {
   errores.push(`console: ${m.text()}`);
 });
 
+/**
+ * Confirma un campo con autocompletado.
+ *
+ * El componente propio confirma al SALIR del campo o con Enter, que es lo que
+ * hace una persona; no escucha 'change'. Por eso las pruebas tienen que salir
+ * del campo, igual que el usuario.
+ */
+const confirmarCampo = async (selector) => {
+  await pagina.dispatchEvent(selector, 'blur');
+  await pagina.waitForTimeout(120);
+};
+
 const paso = async (nombre, fn) => {
   try { await fn(); console.log(`  ok  ${nombre}`); }
   catch (e) { console.log(`  FALLA  ${nombre}: ${e.message}`); errores.push(`${nombre}: ${e.message}`); }
@@ -34,14 +46,14 @@ await paso('el pie muestra los recuentos extraídos', async () => {
 
 await paso('escribir la especie muestra su grupo huevo', async () => {
   await pagina.fill('#especie', 'Larvitar');
-  await pagina.dispatchEvent('#especie', 'change');
+  await confirmarCampo('#especie');
   await pagina.waitForSelector('text=Grupo huevo: Monstruo', { timeout: 5000 });
 });
 
 await paso('marcar 4 IVs y una naturaleza', async () => {
   for (const s of ['ps', 'ataque', 'defensa', 'velocidad']) await pagina.check(`#iv-${s}`);
   await pagina.fill('#naturaleza', 'Audaz');
-  await pagina.dispatchEvent('#naturaleza', 'change');
+  await confirmarCampo('#naturaleza');
   await pagina.waitForSelector('text=+10 % Ataque', { timeout: 5000 });
 });
 
@@ -77,7 +89,7 @@ await paso('Inventario: anotar una captura que NO encaja lo dice', async () => {
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('#b-especie');
   await pagina.fill('#b-especie', 'Larvitar');
-  await pagina.dispatchEvent('#b-especie', 'change');
+  await confirmarCampo('#b-especie');
   await pagina.selectOption('#b-sexo', '♀');
   await pagina.fill('#b-iv-at-esp', '31');
   await pagina.dispatchEvent('#b-iv-at-esp', 'change');
@@ -93,7 +105,7 @@ await paso('Inventario: una captura que SÍ encaja se acepta y recorta el plan',
 
   await pagina.click('button[data-vista="inventario"]');
   await pagina.fill('#b-especie', 'Larvitar');
-  await pagina.dispatchEvent('#b-especie', 'change');
+  await confirmarCampo('#b-especie');
   await pagina.selectOption('#b-sexo', '♀');
   for (const s of ['ps', 'ataque', 'defensa']) {
     await pagina.fill(`#b-iv-${s}`, '31');
@@ -175,10 +187,10 @@ await paso('el registro manual acepta movimientos y traduce el nombre del juego'
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('#b-especie');
   await pagina.fill('#b-especie', 'Chimchar');
-  await pagina.dispatchEvent('#b-especie', 'change');
+  await confirmarCampo('#b-especie');
   await pagina.waitForSelector('#b-mov-0');
   await pagina.fill('#b-mov-0', 'Desenrollar');
-  await pagina.dispatchEvent('#b-mov-0', 'change');
+  await confirmarCampo('#b-mov-0');
   await pagina.waitForSelector('text=He interpretado "Desenrollar" como Rodar', { timeout: 5000 });
   const puesto = await pagina.inputValue('#b-mov-0');
   if (puesto !== 'Rodar') throw new Error(`el campo debería quedar en Rodar, está en "${puesto}"`);
@@ -187,8 +199,8 @@ await paso('el registro manual acepta movimientos y traduce el nombre del juego'
 await paso('importar por texto rellena la revisión y guarda tras confirmar', async () => {
   await pagina.click('button[data-vista="inventario"]');
   await pagina.click('text=📋 Texto');
-  await pagina.waitForSelector('#texto-importar');
-  await pagina.fill('#texto-importar', [
+  await pagina.waitForSelector('#texto-importar-inventario');
+  await pagina.fill('#texto-importar-inventario', [
     'Nv. 1 Chimchar ♀',
     'IVs: 19/30/15/23/21/31',
     'Naturaleza: agitada',
@@ -218,7 +230,7 @@ await paso('importar por texto rellena la revisión y guarda tras confirmar', as
 
 await paso('un texto que no se entiende se avisa y no se guarda nada', async () => {
   await pagina.click('text=📋 Texto');
-  await pagina.fill('#texto-importar', 'Pikachurin ♂\nIVs: 31/0/0/0/0/0');
+  await pagina.fill('#texto-importar-inventario', 'Pikachurin ♂\nIVs: 31/0/0/0/0/0');
   await pagina.click('text=Leer el texto');
   await pagina.waitForSelector('text=Cosas que no he entendido', { timeout: 5000 });
   await pagina.click('text=Descartar');
@@ -227,6 +239,123 @@ await paso('un texto que no se entiende se avisa y no se guarda nada', async () 
 
 // El preprocesado de la imagen es código propio y no necesita red: se prueba
 // siempre. Lo único que queda fuera es Tesseract, que es de terceros.
+await paso('al tocar el campo sale la lista completa, aunque ya tenga valor', async () => {
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('#b-especie');
+  // Se le deja un valor puesto a propósito: tocar un campo que ya dice algo es
+  // justo cuando enseñar sólo ese valor no sirve de nada.
+  await pagina.fill('#b-especie', 'Larvitar');
+  await confirmarCampo('#b-especie');
+  if (await pagina.inputValue('#b-especie') !== 'Larvitar')
+    throw new Error('el valor previo no se ha quedado puesto');
+
+  await pagina.click('#b-especie');
+  await pagina.waitForSelector('#b-especie ~ .sug-lista .sug-opcion', { timeout: 5000 });
+  const cuantas = await pagina.locator('#b-especie ~ .sug-lista .sug-opcion').count();
+  if (cuantas < 5) throw new Error(`sólo ${cuantas} opciones al tocar un campo con valor`);
+  console.log(`       ${cuantas} opciones con "Larvitar" ya escrito`);
+});
+
+await paso('filtra al escribir y al tocar una opción la confirma', async () => {
+  await pagina.fill('#b-especie', 'Ra');
+  await pagina.waitForSelector('#b-especie ~ .sug-lista .sug-opcion', { timeout: 5000 });
+  const textos = await pagina.locator('#b-especie ~ .sug-lista .sug-opcion').allTextContents();
+  if (!textos.length) throw new Error('no ha filtrado nada con "Ra"');
+  for (const t of textos.slice(0, 5)) {
+    if (!/ra/i.test(t)) throw new Error(`"${t}" no contiene "ra"`);
+  }
+  const elegida = textos.find((t) => t === 'Rattata') ?? textos[0];
+  await pagina.click(`#b-especie ~ .sug-lista .sug-opcion:text-is("${elegida}")`);
+  const valor = await pagina.inputValue('#b-especie');
+  if (valor !== elegida) throw new Error(`el campo quedó en "${valor}" y esperaba "${elegida}"`);
+  // Al confirmar, la lista se cierra y el estado se ha enterado.
+  if (await pagina.locator('#b-especie ~ .sug-lista .sug-opcion').count())
+    throw new Error('la lista debería cerrarse al elegir');
+  console.log(`       "Ra" -> ${textos.length} opciones -> elegida ${elegida}`);
+});
+
+await paso('filtra sin tildes, que es como se escribe en el móvil', async () => {
+  await pagina.fill('#b-especie', 'Chimchar');
+  await confirmarCampo('#b-especie');
+  await pagina.click('#b-mov-0');
+  await pagina.fill('#b-mov-0', 'maquinacion');
+  await pagina.waitForSelector('#b-mov-0 ~ .sug-lista .sug-opcion', { timeout: 5000 });
+  const textos = await pagina.locator('#b-mov-0 ~ .sug-lista .sug-opcion').allTextContents();
+  if (!textos.includes('Maquinación'))
+    throw new Error(`esperaba Maquinación entre [${textos.slice(0, 6)}]`);
+  console.log('       "maquinacion" encuentra Maquinación');
+});
+
+await paso('escribir a mano sigue valiendo: se confirma al salir del campo', async () => {
+  await pagina.fill('#b-mov-1', 'Desenrollar');
+  await confirmarCampo('#b-mov-1');
+  await pagina.waitForSelector('text=He interpretado "Desenrollar" como Rodar', { timeout: 5000 });
+  const puesto = await pagina.inputValue('#b-mov-1');
+  if (puesto !== 'Rodar') throw new Error(`el campo debería quedar en Rodar, está en "${puesto}"`);
+});
+
+await paso('la página NO salta al principio al cambiar algo', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#iv-ps');
+  await pagina.evaluate(() => window.scrollTo(0, 500));
+  await pagina.waitForTimeout(200);
+  const antes = await pagina.evaluate(() => window.scrollY);
+  if (antes < 100) throw new Error(`no he podido bajar la página (scrollY=${antes})`);
+
+  // Marcar un IV recalcula el plan y repinta la vista entera.
+  await pagina.check('#iv-defensa');
+  await pagina.waitForTimeout(400);
+  const despues = await pagina.evaluate(() => window.scrollY);
+  if (Math.abs(despues - antes) > 60)
+    throw new Error(`la página ha saltado: ${antes} -> ${despues}`);
+  console.log(`       scrollY ${antes} -> ${despues} tras repintar`);
+  await pagina.uncheck('#iv-defensa');
+});
+
+await paso('cambiar de pestaña SÍ lleva al principio', async () => {
+  await pagina.evaluate(() => window.scrollTo(0, 400));
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(400);
+  const y = await pagina.evaluate(() => window.scrollY);
+  if (y > 40) throw new Error(`debería ir arriba al cambiar de pestaña, está en ${y}`);
+});
+
+await paso('Objetivo tiene su propio importador y aplica la ficha al objetivo', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('.tarjeta:has-text("Importar el objetivo de una ficha")');
+  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=📋 Texto');
+  await pagina.waitForSelector('#texto-importar-objetivo');
+  await pagina.fill('#texto-importar-objetivo', [
+    'Nv. 1 Chimchar ♀',
+    'IVs: 19/30/15/23/21/31',
+    'EVs: 252/0/0/0/0/252',
+    'Naturaleza: agitada',
+    'Habilidad: Mar Llamas',
+    'Movimientos: Placaje, Maquinación, Tormento, Desenrollar',
+  ].join('\n'));
+  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=Leer el texto');
+  await pagina.waitForSelector('text=Revisar antes de aplicar', { timeout: 5000 });
+
+  const rev = await pagina.textContent('.tarjeta:has-text("Revisar antes de aplicar")');
+  for (const esperado of ['Chimchar', 'Velocidad', 'Agitada', 'Mar Llamas', 'Rodar']) {
+    if (!rev.includes(esperado)) throw new Error(`la revisión no menciona "${esperado}"`);
+  }
+
+  // La casilla de los seis IVs cambia lo que se va a aplicar.
+  await pagina.check('#importar-todos-ivs');
+  await pagina.waitForTimeout(300);
+  const conSeis = await pagina.textContent('.tarjeta:has-text("Revisar antes de aplicar")');
+  if (!conSeis.includes('6×31')) throw new Error('con la casilla marcada debería ofrecer 6×31');
+  await pagina.uncheck('#importar-todos-ivs');
+  await pagina.waitForTimeout(300);
+
+  await pagina.click('text=Usar como objetivo y ver el plan');
+  await pagina.waitForSelector('.pasos li', { timeout: 5000 });
+  const plan = await pagina.textContent('.tarjeta:has-text("Chimchar")');
+  if (!/Agitada/.test(plan)) throw new Error('el plan no ha cogido la naturaleza importada');
+  console.log(`       ${plan.replace(/\s+/g, ' ').slice(0, 110)}`);
+});
+
 await paso('prepararImagen escala la captura e invierte el fondo oscuro', async () => {
   const r = await pagina.evaluate(async () => {
     // Relativo a la página, NO absoluto: en GitHub Pages la app vive en un
@@ -262,8 +391,8 @@ await paso('si Tesseract no se puede descargar, lo dice y manda a la vía de tex
   await pagina.route('**/tesseract*', (ruta) => ruta.abort());
   await pagina.click('button[data-vista="inventario"]');
   await pagina.click('text=📷 Imagen');
-  await pagina.waitForSelector('#ocr-archivo', { state: 'attached' });
-  await pagina.setInputFiles('#ocr-archivo', new URL('./fixtures/ficha-chimchar.png', import.meta.url).pathname);
+  await pagina.waitForSelector('#ocr-archivo-inventario', { state: 'attached' });
+  await pagina.setInputFiles('#ocr-archivo-inventario', new URL('./fixtures/ficha-chimchar.png', import.meta.url).pathname);
   await pagina.waitForSelector('text=Usa la pestaña «Texto»', { timeout: 30000 });
   await pagina.unroute('**/tesseract*');
   esperandoFalloDeRed = false;
@@ -277,8 +406,8 @@ if (process.env.OCR === '1') {
     await pagina.click('button[data-vista="inventario"]');
     await pagina.click('text=📷 Imagen');
     // El input de archivo va oculto a propósito: se espera a que exista, no a que se vea.
-    await pagina.waitForSelector('#ocr-archivo', { state: 'attached' });
-    await pagina.setInputFiles('#ocr-archivo', new URL('./fixtures/ficha-chimchar.png', import.meta.url).pathname);
+    await pagina.waitForSelector('#ocr-archivo-inventario', { state: 'attached' });
+    await pagina.setInputFiles('#ocr-archivo-inventario', new URL('./fixtures/ficha-chimchar.png', import.meta.url).pathname);
     // Descargar el modelo de español la primera vez tarda: se le da margen.
     await pagina.waitForSelector('text=Revisar antes de guardar', { timeout: 240000 });
     const revision = await pagina.textContent('.tarjeta:has-text("Revisar antes de guardar")');

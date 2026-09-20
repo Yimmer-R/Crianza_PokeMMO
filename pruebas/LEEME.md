@@ -48,7 +48,22 @@ hordas, recargar y comprobar que el inventario sigue ahí, y que a 390 px no hay
 scroll horizontal.
 
 **Falla ante cualquier error de consola.** Los fallos más caros de este proyecto
-sólo se veían aquí.
+sólo se veían aquí, y el peor de todos no daba error: la app entraba en un bucle
+de repintado y se quedaba colgada, que desde fuera parece «no carga».
+
+### Los campos con autocompletado se confirman saliendo del campo
+
+El autocompletado es propio (`campoConSugerencias`), no `<datalist>`, y **no
+escucha `change`**: confirma al salir del campo o con Enter, que es lo que hace
+una persona. En las pruebas hay que usar el ayudante:
+
+```js
+await pagina.fill('#especie', 'Larvitar');
+await confirmarCampo('#especie');   // dispara blur, como tocar fuera
+```
+
+Si una prueba dispara `change`, el valor no se confirma y el fallo aparece dos
+pasos más allá, donde no está la causa.
 
 ### Probarla también desde un subdirectorio
 

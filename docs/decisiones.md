@@ -48,6 +48,67 @@ propio evento, el elemento que lo está disparando se queda huérfano y
 posición del cursor se restauran por `id` después de cada pintado, o escribir en
 un campo te echaría de él.
 
+## El autocompletado es propio, no `<datalist>`
+
+La primera versión usaba `<datalist>`, que es el control nativo del navegador y
+no cuesta nada. **En el móvil no servía.** Probándolo en Android Chrome, el campo
+pintaba su flecha —el navegador reconoce el datalist— pero no listaba ni una
+opción, ni al tocar ni al escribir. Con 667 especies y 559 movimientos, eso
+significa escribir cada nombre entero a mano.
+
+Dos causas, y las dos apuntan a lo mismo:
+
+- el soporte de `<datalist>` en Android Chrome es irregular, más aún con cientos
+  de opciones;
+- el campo llevaba `autocomplete="off"`, que **en varios navegadores suprime
+  precisamente las sugerencias del datalist**. Estaba puesto para que el
+  navegador no ofreciera valores guardados, y de paso mataba la lista.
+
+Así que la lista se pinta a mano (`campoConSugerencias` en
+`src/ui/componentes.js`). Dos detalles que no son adorno:
+
+- **filtra sin tocar el estado global**: escribir sólo mueve DOM del propio
+  componente, y `onChange` se llama al confirmar. Si cada tecla repintara la
+  vista, el campo perdería el foco en cada letra;
+- **al enfocar ya enseña opciones**, sin escribir nada. En el móvil es la
+  diferencia entre descubrir que hay lista y creer que está roto.
+
+Se sigue aceptando texto escrito a mano: al salir del campo se confirma lo
+escrito, y pasa por el resolutor de nombres. Así «Desenrollar» acaba en «Rodar»
+aunque no se toque la lista.
+
+## Un cambio que no cambia nada no repinta
+
+Esto no es una optimización, es la defensa contra un bucle que congelaba la app.
+
+Al repintar, la vista entera se reemplaza y el navegador dispara eventos —`blur`,
+`change`— sobre los elementos que se están **quitando** del DOM. Si el manejador
+de uno de ellos llama a `fijar()` con el valor que ya tenía, se repinta otra vez,
+se vuelve a disparar el evento, y la página se queda colgada en un bucle
+síncrono. Desde fuera parecía que la app no cargaba: el campo de especie
+desaparecía y nada respondía.
+
+Se ataca en dos capas:
+
+- **en `fijar()`**: si todas las claves del cambio son iguales a lo que ya había,
+  no se emite. Corta la clase entera de bug, para cualquier campo presente o
+  futuro. `fijar({})` sigue forzando un repintado, que es como se pide a propósito.
+- **en el campo de autocompletado**: no confirma si el elemento ya no está en el
+  documento, ni si el valor no ha cambiado, y como mucho una vez por instancia.
+
+Dos capas porque la de abajo es barata y la de arriba explica el porqué. El fallo
+sólo se vio en la prueba de navegador, y como un cuelgue, no como un error.
+
+## Repintar no mueve la página
+
+El repintado completo llevaba un `scrollTo(0)`. En el ordenador apenas se nota;
+en el móvil, con el formulario del objetivo largo, **cada cambio te devolvía al
+principio** y había que bajar otra vez. Inusable.
+
+Ahora `pintar()` guarda `scrollY` y el foco antes de repintar y los devuelve
+después, y sólo va arriba cuando **cambia la pestaña**, que es el único caso en
+que el usuario espera empezar desde el principio.
+
 ## El estado se lee siempre fresco, nunca del cierre del render
 
 `cambiaObjetivo()` acepta una función del objetivo **actual**, no un objeto
@@ -131,6 +192,22 @@ mejor una app vieja que funciona que una nueva con el planificador roto.
 Se publica el repositorio tal cual, sin compilar, porque no hay nada que
 compilar. El único paso manual es decirle a GitHub que la fuente de Pages son las
 Actions, y eso no se puede automatizar desde un flujo.
+
+## Importar está en las dos pestañas, con el mismo parser
+
+Importar una ficha sirve para dos cosas distintas: registrar un Pokémon que
+tienes, o describir el que quieres criar. Estaba sólo en Inventario, y rellenar
+siete bloques a mano para decir «quiero este competitivo» no tiene sentido si ya
+tienes la ficha.
+
+La interfaz vive en `src/ui/importador.js` y se comparte, con un `destino` que
+decide dónde acaba el resultado. No duplicada en las dos vistas: si el formato
+cambia, no hay dos sitios que puedan quedarse desincronizados.
+
+Al pasar una ficha a objetivo se toman **los IVs que ya están a 31**, no los
+valores tal cual: un objetivo es «quiero estos IVs perfectos». Como eso no es lo
+que se quiere cuando la ficha se usa como plantilla de un competitivo, hay una
+casilla para marcar los seis.
 
 ## El inventario vive en el navegador
 
