@@ -66,17 +66,25 @@ function programarPintado() {
   queueMicrotask(() => { pintadoPedido = false; pintar(); });
 }
 
+// Qué vista se pintó la última vez. Sirve para decidir si hay que ir arriba:
+// cambiar de pestaña sí, repintar por un cambio de estado no.
+let vistaPintada = null;
+
 function pintar() {
   const { vista } = obtener();
+  const cambioDeVista = vista !== vistaPintada;
 
-  // Qué estaba enfocado, para devolverlo después del repintado: si no, escribir
-  // en un campo y que el plan se recalcule te echa fuera del campo.
+  for (const b of pestanas.querySelectorAll('button'))
+    b.classList.toggle('activa', b.dataset.vista === vista);
+
+  // Qué estaba enfocado y dónde estaba el scroll, para devolverlo después. Sin
+  // esto, escribir en un campo te echaba del campo y mandaba la página al
+  // principio: en el móvil, con el formulario largo, era inusable.
   const activo = document.activeElement;
   const enfocadoId = activo && activo !== document.body ? activo.id : null;
   const seleccion = enfocadoId && 'selectionStart' in activo
     ? [activo.selectionStart, activo.selectionEnd] : null;
-  for (const b of pestanas.querySelectorAll('button'))
-    b.classList.toggle('activa', b.dataset.vista === vista);
+  const scroll = window.scrollY;
 
   const render = VISTAS[vista] ?? vistaObjetivo;
   contenedor.replaceChildren();
@@ -89,6 +97,15 @@ function pintar() {
     ]));
     console.error(e);
   }
+
+  if (cambioDeVista) {
+    vistaPintada = vista;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    return;
+  }
+
+  // Mismo sitio donde estabas, y con el foco puesto otra vez.
+  window.scrollTo({ top: scroll, behavior: 'instant' });
   if (enfocadoId) {
     const vuelve = document.getElementById(enfocadoId);
     if (vuelve) {
@@ -96,9 +113,9 @@ function pintar() {
       if (seleccion && 'setSelectionRange' in vuelve) {
         try { vuelve.setSelectionRange(seleccion[0], seleccion[1]); } catch { /* type sin selección */ }
       }
+      // focus() puede haber movido el scroll otra vez: se vuelve a fijar.
+      window.scrollTo({ top: scroll, behavior: 'instant' });
     }
-  } else {
-    window.scrollTo({ top: 0, behavior: 'instant' });
   }
 }
 

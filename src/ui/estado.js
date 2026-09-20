@@ -40,6 +40,13 @@ const inicial = {
   importacion: null,
   ocr: null,
   vistaImportar: 'imagen',
+  // Al importar al objetivo: marcar los seis IVs a 31 en vez de sólo los que la
+  // ficha ya trae perfectos.
+  importarTodosLosIvs: false,
+  // Ejemplar que la revisión manda al formulario manual para corregirlo.
+  alFormulario: null,
+  // Por qué no se ha podido añadir un movimiento al objetivo.
+  avisoMovimiento: null,
 };
 
 let estado = { ...inicial };
@@ -56,9 +63,38 @@ function emitir() {
   for (const fn of oyentes) fn(estado);
 }
 
-/** Cambia el estado y repinta. `parcial` puede ser objeto o función. */
+/**
+ * ¿Son el mismo valor? Para primitivos, identidad; para objetos, comparación por
+ * contenido. Se usa para no repintar cuando un cambio no cambia nada.
+ */
+function mismoValor(a, b) {
+  if (Object.is(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false; // estructuras raras: mejor repintar de más que de menos
+  }
+}
+
+/**
+ * Cambia el estado y repinta. `parcial` puede ser objeto o función.
+ *
+ * **Si el cambio no cambia nada, no se repinta.** No es una optimización: es la
+ * defensa contra un bucle real. Al repintar, el navegador dispara eventos
+ * (`blur`, `change`) sobre los elementos que se están QUITANDO del DOM; si el
+ * manejador de uno de ellos llama aquí con el valor que ya tenía, se repinta
+ * otra vez, se vuelve a disparar el evento, y la página se congela. Pasó con el
+ * campo de especie y desde fuera parecía que la app no cargaba.
+ */
 export function fijar(parcial) {
   const siguiente = typeof parcial === 'function' ? parcial(estado) : parcial;
+  if (!siguiente) return;
+
+  const claves = Object.keys(siguiente);
+  if (claves.length && claves.every((k) => mismoValor(estado[k], siguiente[k]))) return;
+
   estado = { ...estado, ...siguiente };
   emitir();
 }

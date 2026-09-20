@@ -185,3 +185,45 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .vista { padding: 16px 16px 40px; }
   .pestanas button { padding: 8px 10px; font-size: 0.9rem; }
 }
+
+/* --------------------------------------------------- autocompletado propio */
+/* El <datalist> nativo no lista nada en Android Chrome, así que la lista se
+   pinta a mano. Ver campoConSugerencias() en src/ui/componentes.js. */
+
+.campo-sug { position: relative; }
+.sug-caja { position: relative; }
+
+.sug-lista {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 44vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--fondo-alt);
+  border: 1px solid var(--acento);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  -webkit-overflow-scrolling: touch;
+}
+.sug-lista[hidden] { display: none; }
+
+.sug-opcion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  /* Alto cómodo para el dedo: en el móvil una lista apretada es inusable. */
+  padding: 10px 12px;
+  color: var(--texto);
+  cursor: pointer;
+  font: inherit;
+}
+.sug-opcion:hover, .sug-opcion.resaltada { background: var(--acento-suave); }

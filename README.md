@@ -59,12 +59,20 @@ Velocidad y te ha salido hembra con 31 en Ataque. Lo anotas y la app te dice si
 encaja en otro hueco, en cuál conviene más, o si no sirve para esta cadena y hay
 que volver a capturar — con el motivo, no sólo el «no».
 
-**Tres formas de anotar un Pokémon.** A mano, pegando la ficha como texto, o
-**subiendo una captura de la ficha del juego**, que se lee con OCR. Las tres
-acaban en el mismo parser, así que no pueden interpretar un valor de forma
-distinta, y ninguna de las automáticas guarda nada sin pasar por una pantalla de
-revisión: un IV mal leído rompe el plan sin que se note. El formato de texto y
-CSV está en [docs/formato-de-importacion.md](docs/formato-de-importacion.md).
+**Tres formas de anotar un Pokémon, en las dos pestañas.** A mano, pegando la
+ficha como texto, o **subiendo una captura de la ficha del juego**, que se lee con
+OCR. Están tanto en **Inventario** (para registrar lo que tienes) como en
+**Objetivo** (para decir «quiero criar este», sin rellenar siete bloques a mano).
+Las tres vías acaban en el mismo parser, así que no pueden interpretar un valor de
+forma distinta, y ninguna de las automáticas guarda nada sin pasar por una
+pantalla de revisión: un IV mal leído rompe el plan sin que se note. El formato de
+texto y CSV está en
+[docs/formato-de-importacion.md](docs/formato-de-importacion.md).
+
+Al pasar una ficha a objetivo se toman **los IVs que ya están a 31**, porque un
+objetivo es «quiero estos IVs perfectos» y no los valores del ejemplar. Hay una
+casilla para marcar los seis cuando la ficha se usa como plantilla de un
+competitivo.
 
 **Nombres del juego traducidos, diciéndolo.** La ficha del juego dice
 «Desenrollar» y la wiki lo llama «Rodar». El resolutor prueba el nombre exacto,
@@ -108,6 +116,8 @@ src/nucleo/             la lógica, sin nada del DOM
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
   habilidades.js          normal, oculta, y qué objeto hace falta
 src/ui/                 vistas y estado; nada de reglas del juego
+  componentes.js          helpers de render, y el autocompletado propio
+  importador.js           la interfaz de importar, compartida por dos pestañas
   ocr.js                  lee una captura con Tesseract.js (necesita canvas)
 src/datos/cargador.js   carga los JSON
 datos/*.json            generados desde la wiki — no se editan a mano

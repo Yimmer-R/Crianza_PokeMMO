@@ -5,6 +5,11 @@ import { STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SE
 import { obtener, fijarYGuardar } from './estado.js';
 import { validarObjetivo } from '../nucleo/planificador.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
+import { crearResolutores } from '../nucleo/nombres.js';
+import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
+
+let resolutores = null;
+const res = (datos) => (resolutores ??= crearResolutores(datos));
 
 export function vistaObjetivo(datos) {
   const { objetivo, regionesDisponibles } = obtener();
@@ -23,8 +28,12 @@ export function vistaObjetivo(datos) {
     el('div.fila', {}, [
       campoConSugerencias(
         'especie', 'Especie', objetivo.especie, datos.especies,
-        (v) => cambiaObjetivo({ especie: v, habilidad: null, movimientos: [] }),
-        'Larvitar, Chimchar…',
+        (v) => {
+          const especie = v ? (res(datos).especie(v).valor ?? v) : '';
+          // Al cambiar de especie, habilidad y movimientos dejan de valer.
+          cambiaObjetivo((o) => (o.especie === especie ? {} : { especie, habilidad: null, movimientos: [] }));
+        },
+        { placeholder: 'Larvitar, Chimchar…' },
       ),
       el('div', { style: 'flex:0 0 150px' }, [
         el('label', { for: 'sexo', texto: 'Sexo que quieres' }),
@@ -66,7 +75,8 @@ export function vistaObjetivo(datos) {
     el('div.fila', {}, [
       campoConSugerencias(
         'naturaleza', 'Naturaleza (opcional)', objetivo.naturaleza ?? '', datos.nombresNaturaleza,
-        (v) => cambiaObjetivo({ naturaleza: v || null }), 'Audaz, Miedoso…',
+        (v) => cambiaObjetivo({ naturaleza: v ? (res(datos).naturaleza(v).valor ?? v) : null }),
+        { placeholder: 'Agitada, Miedosa…' },
       ),
     ]),
     nat ? el('div.etiquetas', { style: 'margin-top:10px' }, [
@@ -199,14 +209,33 @@ export function vistaObjetivo(datos) {
               title: 'quitar',
             }, [`${m} ✕`]))),
           objetivo.movimientos.length < 4
-            ? el('div.fila', {}, [campoConSugerencias(
-                'nuevo-mov', 'Añadir movimiento', '', movsPosibles.filter((m) => !objetivo.movimientos.includes(m)),
-                (v) => cambiaObjetivo((o) =>
-                  (v && !o.movimientos.includes(v) && o.movimientos.length < 4
-                    ? { movimientos: [...o.movimientos, v] }
-                    : {})),
-                'escribe y pulsa Enter',
-              )])
+            ? frag([
+                el('div.fila', {}, [campoConSugerencias(
+                  'nuevo-mov', 'Añadir movimiento', '',
+                  movsPosibles.filter((m) => !objetivo.movimientos.includes(m)),
+                  (v) => {
+                    if (!v) return;
+                    // Se resuelve igual que en el importador, así que escribir
+                    // "Desenrollar" añade Rodar. Lo que no aprende la especie no
+                    // entra: se dice, no se cuela.
+                    const r = res(datos).movimiento(v);
+                    const nombre = r.valor;
+                    if (!nombre || !movsPosibles.includes(nombre)) {
+                      fijarYGuardar({ avisoMovimiento:
+                        `${objetivo.especie} no aprende "${v}"` +
+                        (nombre && nombre !== v ? ` (lo he leído como ${nombre})` : '') + '.' });
+                      return;
+                    }
+                    fijarYGuardar({ avisoMovimiento: null });
+                    cambiaObjetivo((o) =>
+                      (!o.movimientos.includes(nombre) && o.movimientos.length < 4
+                        ? { movimientos: [...o.movimientos, nombre] }
+                        : {}));
+                  },
+                  { placeholder: 'toca para ver la lista' },
+                )]),
+                obtener().avisoMovimiento ? aviso(obtener().avisoMovimiento) : null,
+              ])
             : el('p.nota', { texto: 'Ya tienes cuatro: quita uno para cambiarlo.' }),
         ])
       : el('p.vacio', { texto: 'Elige una especie primero.' }),
@@ -251,6 +280,10 @@ export function vistaObjetivo(datos) {
   }
 
   return frag([
+    // La importación va primero: si ya tienes la ficha del competitivo que
+    // quieres criar, es más rápido pegarla que rellenar siete bloques.
+    seccionImportar(datos, DESTINOS.OBJETIVO),
+    seccionRevisar(datos, DESTINOS.OBJETIVO),
     bloqueEspecie, bloqueIvs, bloqueNaturaleza, bloqueHabilidad,
     bloqueMovimientos, bloqueEvs, bloqueRegiones,
     validacion ? tarjeta(null, [validacion]) : null,

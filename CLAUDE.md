@@ -57,6 +57,23 @@ sí puede rellenar.
    `src/nucleo/nombres.js`, que además dice por qué vía resolvió. Lo que no
    reconozca se avisa, nunca se inventa.
 
+## Al tocar la interfaz
+
+Dos trampas que ya han costado caro y que no se ven en las pruebas unitarias:
+
+- **Un cambio de estado que no cambia nada no debe repintar.** Al repintar, el
+  navegador dispara `blur` y `change` sobre los elementos que se están quitando
+  del DOM; si ese manejador llama a `fijar()` con el mismo valor, se repinta otra
+  vez y la página entra en bucle síncrono y se cuelga. `fijar()` compara antes de
+  emitir, y `campoConSugerencias` comprueba `isConnected` y el valor previo. No
+  quites ninguna de las dos guardas.
+- **`<datalist>` no sirve en el móvil.** En Android Chrome no lista nada, y
+  `autocomplete="off"` lo remata. El autocompletado es propio
+  (`campoConSugerencias`), abre la lista con `pointerdown` —no con `focus`, que lo
+  dispara el propio repintado al devolver el foco— y confirma al salir del campo
+  o con Enter, no con `change`. Las pruebas tienen que salir del campo para
+  confirmar, igual que una persona.
+
 ## Al parsear la wiki
 
 Dos cosas que rompen en silencio y ya han roto una vez:

@@ -7,22 +7,22 @@
 //   texto   -> src/nucleo/importar.js
 //   imagen  -> src/ui/ocr.js -> el MISMO importar.js
 //
-// Y ninguna de las dos automáticas guarda nada sin pasar por la pantalla de
-// revisión: un OCR que se equivoque en un IV rompería el plan entero en silencio.
+// La parte de importar está en src/ui/importador.js, compartida con la pestaña
+// de Objetivo. Ninguna de las dos vías automáticas guarda nada sin pasar por la
+// pantalla de revisión: un OCR que se equivoque en un IV rompería el plan entero
+// en silencio.
 
 import { el, tarjeta, chip, aviso, frag, tabla, campoConSugerencias } from './componentes.js';
-import { STATS, NOMBRE_STAT, IV_MAX, EV_MAX_POR_STAT, SEXOS } from '../nucleo/constantes.js';
+import { STATS, NOMBRE_STAT, IV_MAX, SEXOS } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar, fijar } from './estado.js';
 import {
-  ejemplarNuevo, normalizar, resumen, cuantosPerfectos, totalIvs,
+  ejemplarNuevo, normalizar, cuantosPerfectos, totalIvs,
   evaluar, loQueFalta, exportar, importar as importarJson,
 } from '../nucleo/inventario.js';
-import { importar as importarTexto, PLANTILLA } from '../nucleo/importar.js';
 import { crearResolutores } from '../nucleo/nombres.js';
-import { reconocer, PESO_MODELO_MB } from './ocr.js';
+import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
 
 let borrador = ejemplarNuevo();
-let textoPegado = '';
 let resolutores = null;
 
 const res = (datos) => (resolutores ??= crearResolutores(datos));
@@ -39,12 +39,18 @@ function learnsetDe(especie, datos) {
 }
 
 export function vistaInventario(datos) {
-  const { inventario, plan, ultimaEvaluacion, importacion, ocr, vistaImportar, avisoPersistencia } = obtener();
+  const { inventario, plan, ultimaEvaluacion, avisoPersistencia, alFormulario } = obtener();
+
+  // La revisión puede mandar un ejemplar al formulario para corregirlo a mano.
+  if (alFormulario) {
+    borrador = { ...alFormulario };
+    fijar({ alFormulario: null });
+  }
 
   return frag([
     bloqueFaltan(plan),
-    bloqueImportar(datos, vistaImportar ?? 'imagen', ocr),
-    importacion ? bloqueRevisar(datos, importacion) : null,
+    seccionImportar(datos, DESTINOS.INVENTARIO),
+    seccionRevisar(datos, DESTINOS.INVENTARIO),
     bloqueManual(datos),
     ultimaEvaluacion ? bloqueEvaluacion(ultimaEvaluacion) : null,
     bloqueLista(inventario),
@@ -75,146 +81,6 @@ function bloqueFaltan(plan) {
   ]);
 }
 
-// ------------------------------------------------------------- importación
-
-function bloqueImportar(datos, sub, ocr) {
-  const pestana = (clave, etiqueta) =>
-    el(`button.boton.mini${sub === clave ? '' : '.secundario'}`, {
-      onclick: () => fijar({ vistaImportar: clave }),
-    }, [etiqueta]);
-
-  const cuerpo = {
-    imagen: () => frag([
-      el('p.nota', {}, [
-        'Sube una captura de la ficha del juego (menú del equipo → Datos) y la leo para ',
-        'rellenarte los campos. Siempre te la enseño antes de guardar: el OCR se equivoca, ',
-        'y un IV mal leído rompería el plan sin que se note.',
-      ]),
-      el('div.fila', {}, [
-        el('label.boton', { for: 'ocr-archivo', style: 'cursor:pointer;text-align:center' }, ['Elegir imagen…']),
-        el('input', {
-          id: 'ocr-archivo', type: 'file', accept: 'image/*', style: 'display:none',
-          onchange: (ev) => leerImagen(ev.target.files?.[0], datos),
-        }),
-      ]),
-      ocr?.activo
-        ? el('div.nota', {}, [
-            el('strong', { texto: `${ocr.fase}… ${ocr.porcentaje}%` }),
-            el('div', { style: 'margin-top:6px;height:6px;background:var(--fondo-alt2);border-radius:3px;overflow:hidden' }, [
-              el('div', { style: `height:100%;width:${ocr.porcentaje}%;background:var(--acento);transition:width .2s` }),
-            ]),
-          ])
-        : null,
-      ocr?.error ? aviso(ocr.error, 'error') : null,
-      el('p.nota', {}, [
-        `La primera vez descarga el modelo de español (~${PESO_MODELO_MB} MB) y se queda guardado. `,
-        'Si estás con datos del móvil, mejor la vía de texto.',
-      ]),
-    ]),
-
-    texto: () => frag([
-      el('p.nota', {}, [
-        'Pega la ficha tal cual, o varios Pokémon separados por una línea en blanco. ',
-        'El orden de las líneas da igual y los dos puntos son opcionales.',
-      ]),
-      el('textarea', {
-        id: 'texto-importar', value: textoPegado, placeholder: PLANTILLA,
-        oninput: (ev) => { textoPegado = ev.target.value; },
-        style: 'min-height:170px',
-      }),
-      el('div.fila', { style: 'margin-top:10px' }, [
-        el('button.boton', { onclick: () => procesarTexto(textoPegado, datos) }, ['Leer el texto']),
-        el('button.boton.secundario', {
-          onclick: () => { textoPegado = PLANTILLA; fijar({}); },
-        }, ['Rellenar con el ejemplo']),
-      ]),
-    ]),
-
-    archivo: () => frag([
-      el('p.nota', {}, [
-        'Vale un ',
-        el('code', { texto: '.txt' }), ' con el formato de arriba, un ',
-        el('code', { texto: '.csv' }), ' con cabecera (', el('code', { texto: 'especie,sexo,ivs,naturaleza,movimientos' }),
-        ') o un ', el('code', { texto: '.json' }), ' exportado por esta misma app.',
-      ]),
-      el('div.fila', {}, [
-        el('label.boton', { for: 'archivo-importar', style: 'cursor:pointer;text-align:center' }, ['Elegir archivo…']),
-        el('input', {
-          id: 'archivo-importar', type: 'file', accept: '.txt,.csv,.json,text/plain', style: 'display:none',
-          onchange: (ev) => leerArchivoTexto(ev.target.files?.[0], datos),
-        }),
-      ]),
-      el('p.nota', {}, ['El formato completo está en ', el('code', { texto: 'docs/formato-de-importacion.md' }), '.']),
-    ]),
-  }[sub] ?? (() => null);
-
-  return tarjeta('Importar', [
-    el('div.fila', { style: 'margin-bottom:12px' }, [
-      pestana('imagen', '📷 Imagen'),
-      pestana('texto', '📋 Texto'),
-      pestana('archivo', '📄 Archivo'),
-    ]),
-    cuerpo(),
-  ]);
-}
-
-function bloqueRevisar(datos, imp) {
-  const utiles = imp.ejemplares.filter((e) => e.especie);
-  return tarjeta(`Revisar antes de guardar · ${utiles.length} Pokémon`, [
-    el('p.nota', {}, ['Comprueba los IVs uno por uno: es lo que más cuesta de leer y lo que más daño hace si está mal.']),
-
-    imp.resoluciones.length
-      ? el('div.nota', {}, [
-          el('strong', { texto: 'Nombres que he interpretado:' }),
-          el('ul', {}, imp.resoluciones.map((r) => el('li', {}, [
-            `${r.campo}: "${r.entrada}" → `, el('strong', { texto: r.valor }),
-            ' ', chip(r.via === 'alias-cliente' ? 'nombre del juego' : r.via, r.via === 'aproximado' ? 'ojo' : 'si'),
-          ]))),
-        ])
-      : null,
-
-    imp.avisos.length
-      ? el('div.aviso', {}, [
-          el('strong', { texto: 'Cosas que no he entendido:' }),
-          el('ul', {}, imp.avisos.map((a) => el('li', { texto: a }))),
-        ])
-      : null,
-
-    utiles.length
-      ? tabla(
-          ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]), 'Movimientos'],
-          utiles.map((e) => [
-            e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
-            ...STATS.map((s) => el('span', {
-              texto: String(e.ivs[s]),
-              style: e.ivs[s] >= IV_MAX ? 'color:var(--bien);font-weight:700' : '',
-            })),
-            (e.movimientos ?? []).join(', ') || '—',
-          ]),
-          [4, 5, 6, 7, 8, 9],
-        )
-      : aviso('No he sacado ningún Pokémon con especie reconocible. Prueba con la vía de texto.', 'error'),
-
-    el('div.fila', { style: 'margin-top:12px' }, [
-      utiles.length
-        ? el('button.boton', {
-            onclick: () => fijarYGuardar((st) => ({
-              inventario: [...st.inventario, ...utiles],
-              importacion: null,
-              ultimaEvaluacion: null,
-            })),
-          }, [`Guardar ${utiles.length} en el inventario`])
-        : null,
-      utiles.length === 1
-        ? el('button.boton.secundario', {
-            onclick: () => { borrador = { ...utiles[0] }; fijar({ importacion: null }); },
-          }, ['Pasarlo al formulario para corregirlo'])
-        : null,
-      el('button.boton.secundario', { onclick: () => fijar({ importacion: null }) }, ['Descartar']),
-    ]),
-  ]);
-}
-
 // ----------------------------------------------------------- registro manual
 
 function bloqueManual(datos) {
@@ -223,32 +89,30 @@ function bloqueManual(datos) {
   const camposIv = el('div.ivs', {}, STATS.map((s) => el('div', {}, [
     el('label', { for: `b-iv-${s}`, texto: NOMBRE_STAT[s] }),
     el('input', {
-      id: `b-iv-${s}`, type: 'number', min: 0, max: IV_MAX, value: borrador.ivs[s],
+      id: `b-iv-${s}`, type: 'number', inputmode: 'numeric', min: 0, max: IV_MAX,
+      value: borrador.ivs[s],
       onchange: (e) => { borrador.ivs[s] = Math.max(0, Math.min(IV_MAX, Number(e.target.value) || 0)); },
     }),
   ])));
 
   // Cuatro huecos de movimiento. Hacen falta para los movimientos huevo: sin
   // saber qué sabe un padre, la app no puede decidir si sirve para pasarlo.
-  const camposMovimiento = el('div.rejilla', {}, [0, 1, 2, 3].map((i) => el('div', {}, [
-    el('label', { for: `b-mov-${i}`, texto: `Movimiento ${i + 1}` }),
-    el('input', {
-      id: `b-mov-${i}`, value: borrador.movimientos[i] ?? '', list: 'b-mov-opciones',
-      autocomplete: 'off', placeholder: i === 0 ? 'opcional' : '',
-      onchange: (e) => {
-        const bruto = e.target.value.trim();
-        if (!bruto) { borrador.movimientos[i] = undefined; limpiarMovimientos(); fijar({}); return; }
+  const camposMovimiento = el('div.rejilla', {}, [0, 1, 2, 3].map((i) =>
+    campoConSugerencias(
+      `b-mov-${i}`, `Movimiento ${i + 1}`, borrador.movimientos[i] ?? '', learnset,
+      (bruto) => {
+        if (!bruto) { borrador.movimientos[i] = undefined; limpiar(); fijar({}); return; }
         // El mismo resolutor que el importador: escribir "Desenrollar" funciona.
         const r = res(datos).movimiento(bruto);
         borrador.movimientos[i] = r.valor ?? bruto;
         borrador._avisoMov = r.valor
           ? (r.via === 'exacto' ? null : `He interpretado "${bruto}" como ${r.valor}.`)
           : `No reconozco "${bruto}"${r.candidatos.length ? ` (¿${r.candidatos.join(' o ')}?)` : ''}; lo guardo tal cual.`;
-        limpiarMovimientos();
+        limpiar();
         fijar({});
       },
-    }),
-  ])));
+      { placeholder: i === 0 ? 'opcional' : '' },
+    )));
 
   return tarjeta('Anotar una captura a mano', [
     el('p.nota', {}, [
@@ -258,10 +122,9 @@ function bloqueManual(datos) {
     el('div.fila', {}, [
       campoConSugerencias('b-especie', 'Especie', borrador.especie, datos.especies,
         (v) => {
-          const r = res(datos).especie(v);
-          borrador.especie = r.valor ?? v;
+          borrador.especie = v ? (res(datos).especie(v).valor ?? v) : '';
           fijar({}); // repinta para actualizar las sugerencias de movimientos
-        }, 'Rattata, Larvitar…'),
+        }, { placeholder: 'Rattata, Larvitar…' }),
       el('div', { style: 'flex:0 0 130px' }, [
         el('label', { for: 'b-sexo', texto: 'Sexo' }),
         el('select', { id: 'b-sexo', onchange: (e) => { borrador.sexo = e.target.value; } }, [
@@ -271,7 +134,8 @@ function bloqueManual(datos) {
         ]),
       ]),
       campoConSugerencias('b-nat', 'Naturaleza', borrador.naturaleza ?? '', datos.nombresNaturaleza,
-        (v) => { borrador.naturaleza = v ? (res(datos).naturaleza(v).valor ?? v) : null; }, 'opcional'),
+        (v) => { borrador.naturaleza = v ? (res(datos).naturaleza(v).valor ?? v) : null; },
+        { placeholder: 'opcional' }),
     ]),
 
     el('h3', { texto: 'IVs' }),
@@ -285,7 +149,6 @@ function bloqueManual(datos) {
       ' Hacen falta para los movimientos huevo: un padre sólo pasa lo que sabe.',
     ]),
     camposMovimiento,
-    el('datalist', { id: 'b-mov-opciones' }, learnset.map((m) => el('option', { value: m }))),
     borrador._avisoMov ? aviso(borrador._avisoMov) : null,
 
     el('div.fila', { style: 'margin-top:12px' }, [
@@ -295,7 +158,7 @@ function bloqueManual(datos) {
     ]),
   ]);
 
-  function limpiarMovimientos() {
+  function limpiar() {
     borrador.movimientos = borrador.movimientos.filter(Boolean);
   }
 }
@@ -375,53 +238,6 @@ function anadir(datos) {
   const evaluacion = plan?.ok ? evaluar(e, plan, datos) : null;
   borrador = ejemplarNuevo();
   fijarYGuardar((st) => ({ inventario: [...st.inventario, e], ultimaEvaluacion: evaluacion }));
-}
-
-function procesarTexto(texto, datos) {
-  const imp = importarTexto(texto, datos);
-  fijar({ importacion: imp, ocr: null });
-}
-
-async function leerImagen(archivo, datos) {
-  if (!archivo) return;
-  fijar({ ocr: { activo: true, fase: 'Empezando', porcentaje: 0 } });
-  try {
-    const r = await reconocer(archivo, {
-      onProgreso: (p) => fijar({ ocr: { activo: true, ...p } }),
-    });
-    const imp = importarTexto(r.texto, datos);
-    // El texto crudo se guarda para que el usuario pueda corregirlo a mano si el
-    // OCR ha leído mal: es más rápido que volver a escribir la ficha entera.
-    textoPegado = r.texto;
-    if (!imp.ejemplares.some((e) => e.especie)) {
-      fijar({
-        ocr: {
-          activo: false,
-          error: `He leído la imagen (confianza ${Math.round(r.confianza)} %) pero no he reconocido ninguna ficha. ` +
-            'Te he dejado el texto en la pestaña «Texto» para que lo corrijas a mano.',
-        },
-        vistaImportar: 'texto',
-        importacion: imp,
-      });
-      return;
-    }
-    fijar({ ocr: null, importacion: imp });
-  } catch (e) {
-    fijar({
-      ocr: {
-        activo: false,
-        error: `${e.message}. Usa la pestaña «Texto» y pega la ficha a mano: funciona sin descargar nada.`,
-      },
-    });
-  }
-}
-
-function leerArchivoTexto(archivo, datos) {
-  if (!archivo) return;
-  const lector = new FileReader();
-  lector.onload = () => procesarTexto(String(lector.result), datos);
-  lector.onerror = () => fijar({ ocr: { activo: false, error: 'no he podido leer el archivo' } });
-  lector.readAsText(archivo);
 }
 
 function descargar(inventario) {

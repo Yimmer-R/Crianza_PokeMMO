@@ -351,3 +351,70 @@ Movimientos: Placaje, Maquinación, Tormento, Desenrollar
 Rattata ♂ Nv. 5
 IVs: 31/12/8/4/20/17
 Naturaleza: Miedosa`;
+
+// --------------------------------------------- de ejemplar a Pokémon objetivo
+
+/**
+ * Convierte un ejemplar leído (de una ficha, un texto o una imagen) en el
+ * objetivo que quiere criar el usuario.
+ *
+ * Hay una decisión que conviene explicar porque no es obvia: de los IVs de la
+ * ficha se toman **los que ya están a 31**, no los valores tal cual. Un objetivo
+ * es «quiero estos IVs perfectos», así que importar una ficha con 19/30/15/23/21/31
+ * pide un 1×31 en Velocidad. Con `todosLosIvs` se marcan los seis, que es lo que
+ * se quiere cuando la ficha se usa como plantilla de un competitivo.
+ *
+ * @param {Object} ejemplar lo que devuelve importar()
+ * @param {Object} datos los JSON
+ * @param {{todosLosIvs?: boolean}} opciones
+ */
+export function aObjetivo(ejemplar, datos, { todosLosIvs = false } = {}) {
+  const avisos = [];
+  const p = datos.pokedex[ejemplar.especie];
+  if (!p) return { objetivo: null, avisos: [`no conozco la especie "${ejemplar.especie}"`] };
+
+  const ivs = {};
+  for (const s of STATS) ivs[s] = todosLosIvs || (ejemplar.ivs?.[s] ?? 0) >= IV_MAX ? IV_MAX : 0;
+  const marcados = STATS.filter((s) => ivs[s] === IV_MAX);
+  if (!marcados.length && !todosLosIvs)
+    avisos.push('la ficha no trae ningún IV a 31, así que el objetivo sale sin IVs perfectos; márcalos a mano o usa la casilla de los seis');
+
+  // La habilidad sólo vale si la especie puede tenerla.
+  let habilidad = null;
+  if (ejemplar.habilidad) {
+    const puede = (p.habilidades ?? []).some((h) => h.nombre === ejemplar.habilidad);
+    if (puede) habilidad = ejemplar.habilidad;
+    else avisos.push(`${ejemplar.especie} no puede tener ${ejemplar.habilidad}: lo dejo sin habilidad`);
+  }
+
+  // Los movimientos, sólo los que la especie aprende por alguna vía.
+  const learnset = new Set([
+    ...(p.movimientos?.nivel ?? []).map((m) => m.nombre),
+    ...(p.movimientos?.mt ?? []), ...(p.movimientos?.tutor ?? []),
+    ...(p.movimientos?.huevo ?? []), ...(p.movimientos?.huevoEspecial ?? []),
+    ...(p.movimientos?.especial ?? []), ...(p.movimientos?.alEvolucionar ?? []),
+    ...(p.movimientos?.dePreevolucion ?? []),
+  ]);
+  const movimientos = [];
+  for (const m of ejemplar.movimientos ?? []) {
+    if (learnset.has(m)) { if (movimientos.length < 4) movimientos.push(m); }
+    else avisos.push(`${ejemplar.especie} no aprende ${m} según la wiki: lo dejo fuera`);
+  }
+
+  const evs = {};
+  for (const s of STATS) evs[s] = Math.max(0, Math.min(EV_MAX_POR_STAT, ejemplar.evs?.[s] ?? 0));
+
+  return {
+    objetivo: {
+      especie: ejemplar.especie,
+      ivs,
+      evs,
+      naturaleza: ejemplar.naturaleza ?? null,
+      habilidad,
+      movimientos,
+      sexo: null, // el sexo de la ficha es del ejemplar, no lo que se quiere criar
+    },
+    marcados,
+    avisos,
+  };
+}
