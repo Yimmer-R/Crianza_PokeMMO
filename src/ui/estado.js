@@ -20,6 +20,9 @@ function objetivoVacio() {
     sexo: null,
     nivel: 50,
     objetoEntrenamiento: 'Vínculo de Entrenamiento',
+    // 'auto' construye las dos formas de llevar la naturaleza y se queda con la
+    // de menos esfuerzo. Ninguna gana siempre: depende del inventario.
+    estrategiaNaturaleza: 'auto',
   };
 }
 
@@ -32,6 +35,11 @@ const inicial = {
   plan: null,
   ultimaEvaluacion: null,
   avisoPersistencia: null,
+  // Importación pendiente de revisar, y estado del OCR mientras trabaja. No se
+  // persisten: son de un solo uso.
+  importacion: null,
+  ocr: null,
+  vistaImportar: 'imagen',
 };
 
 let estado = { ...inicial };

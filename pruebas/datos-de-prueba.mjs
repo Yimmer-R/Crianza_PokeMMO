@@ -13,6 +13,7 @@ export const datos = {
   pokedex: leer('pokemon.json'),
   encuentros: leer('encuentros.json'),
   naturalezas: leer('naturalezas.json'),
+  movimientos: leer('movimientos.json'),
   objetos: leer('objetos.json'),
   movimientosHuevo: leer('movimientos-huevo.json'),
   habilidades: leer('habilidades.json'),
