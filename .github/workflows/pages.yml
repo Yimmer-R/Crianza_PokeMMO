@@ -1,8 +1,13 @@
-# Publica la app en GitHub Pages en cada push, después de pasar las pruebas.
+# Publica la app en GitHub Pages, después de pasar las pruebas.
 #
-# Para que funcione hay que hacer UNA cosa a mano, una sola vez:
-#   Settings -> Pages -> Build and deployment -> Source = "GitHub Actions"
-# Está explicado paso a paso, también desde el móvil, en docs/despliegue.md.
+# `enablement: true` en configure-pages hace que el propio flujo active Pages y lo
+# ponga en modo "GitHub Actions". Es lo que evita tener que tocar
+# Settings -> Pages a mano, que es justo donde uno se atasca desde el móvil (la
+# app de GitHub no tiene esa pantalla). También es el remedio que sugiere el
+# error "Get Pages site failed" cuando Pages no está configurado para Actions.
+#
+# Las pruebas van delante del despliegue a propósito: es mejor una app vieja que
+# funciona que una nueva con el planificador roto.
 
 name: Publicar en GitHub Pages
 
@@ -11,6 +16,7 @@ on:
     branches:
       - main
       - claude/crianza-pokemmo-structure-vt8lto
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -41,6 +47,10 @@ jobs:
   publicar:
     name: Publicar
     needs: probar
+    # Sólo se publica desde la rama principal. Un push a una rama de trabajo corre
+    # las pruebas pero no toca el sitio publicado, y así tampoco choca con la
+    # regla del entorno github-pages, que suele aceptar sólo la rama por defecto.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -48,6 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       # La app es estática y vive en la raíz: se sube tal cual, sin compilar.
       - uses: actions/upload-pages-artifact@v3
         with:

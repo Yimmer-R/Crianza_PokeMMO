@@ -9,42 +9,40 @@ Cuando esté publicada, la URL será:
 https://yimmer-r.github.io/Crianza_PokeMMO/
 ```
 
-## Lo único que hay que hacer a mano (una vez)
+## No hay que tocar nada a mano
 
-El repositorio ya trae el flujo de publicación en
-[`.github/workflows/pages.yml`](../.github/workflows/pages.yml): pasa las pruebas
-y publica en cada push. Pero GitHub **no** deja que un flujo active Pages por su
-cuenta: hay que decírselo una vez desde los ajustes.
+El flujo de [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) pasa
+las pruebas y publica en cada push a `main`. Lleva `enablement: true` en
+`configure-pages`, así que **activa Pages él mismo** y lo pone en modo «GitHub
+Actions» la primera vez que corre. No hace falta entrar en los ajustes.
 
-### Desde el ordenador
+Si alguna vez quieres comprobarlo o cambiarlo:
+`https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`. Desde el móvil, esa
+pantalla **sólo existe en el navegador**: la app de GitHub no la trae. Pide la
+versión de escritorio si se ve apretada (Chrome: ⋮ → *Sitio para ordenadores*;
+Safari: `ᴀA` → *Solicitar sitio web para ordenadores*).
 
-1. Abre `https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`
-2. En **Build and deployment → Source**, elige **GitHub Actions**.
-3. Ya está. En la pestaña **Actions** verás el despliegue en marcha.
+### Qué corre y en qué orden
 
-### Desde el móvil
+1. **Pruebas unitarias** (`node pruebas/ejecutar.mjs`).
+2. **Comprobación de datos** (`node herramientas/comprobar-datos.mjs`): que los
+   JSON sigan cuadrando, que no falte ningún objeto de crianza y que los
+   recuentos no se hayan desplomado. Si alguien edita un JSON a mano y lo rompe,
+   el despliegue se para antes de publicarlo.
+3. **Publicación** del repositorio tal cual, sin compilar nada.
 
-Aquí está el motivo de que no lo encontraras: **la app de GitHub para móvil no
-tiene la pantalla de Pages**. Sólo sale en la web.
+Si las pruebas fallan, no se publica. Eso es a propósito: es mejor una app vieja
+que funciona que una nueva con el planificador roto.
 
-1. Abre el **navegador** del móvil (Chrome, Safari…), no la app de GitHub.
-2. Ve directo a esta dirección, que salta al ajuste sin buscar nada:
-   `https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`
-3. Si la página se ve apretada, pide la versión de escritorio:
-   - **Chrome (Android)**: ⋮ arriba a la derecha → *Sitio para ordenadores*
-   - **Safari (iPhone)**: el icono `ᴀA` en la barra → *Solicitar sitio web para ordenadores*
-4. En **Source**, elige **GitHub Actions**.
-5. Espera un par de minutos y abre `https://yimmer-r.github.io/Crianza_PokeMMO/`
+Un push a una rama de trabajo **corre las pruebas pero no publica**: sólo se
+publica desde `main`. Así una rama a medias no puede tumbar el sitio, y tampoco
+choca con la regla del entorno `github-pages`, que suele aceptar sólo la rama por
+defecto.
 
-### Si te dice que la rama no puede desplegar
+### La primera vez tarda unos minutos
 
-Si en Actions sale algo como *«Branch is not allowed to deploy to github-pages
-due to environment protection rules»*, es que el entorno `github-pages` sólo
-acepta la rama principal. Dos salidas:
-
-- **la fácil**: fusiona la rama de trabajo en `main`, y Pages se publica desde ahí;
-- **la otra**: `Settings → Environments → github-pages → Deployment branches` y
-  añade la rama.
+Publicar por primera vez tarda en propagarse: es normal que la URL dé 404 durante
+unos minutos después de que el flujo termine en verde.
 
 ## Tenerla como app en el móvil
 
@@ -67,18 +65,6 @@ node herramientas/servir.mjs
 
 y abre <http://localhost:8000>. Con doble clic en `index.html` **no** funciona:
 el navegador bloquea leer los JSON de `datos/` desde `file://`.
-
-## Qué hace el flujo de publicación
-
-1. **Pruebas unitarias** (`node pruebas/ejecutar.mjs`).
-2. **Comprobación de datos** (`node herramientas/comprobar-datos.mjs`): que los
-   JSON sigan cuadrando, que no falte ningún objeto de crianza y que los
-   recuentos no se hayan desplomado. Si alguien edita un JSON a mano y lo rompe,
-   el despliegue se para antes de publicarlo.
-3. **Publicación** del repositorio tal cual, sin compilar nada.
-
-Si las pruebas fallan, no se publica. Eso es a propósito: es mejor una app vieja
-que funciona que una nueva con el planificador roto.
 
 ## El OCR y la conexión
 

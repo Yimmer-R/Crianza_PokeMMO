@@ -17,9 +17,9 @@ Publicada en GitHub Pages, desde el móvil o el ordenador:
 https://yimmer-r.github.io/Crianza_PokeMMO/
 ```
 
-Hay que activar Pages una vez desde los ajustes del repositorio. Los pasos, y
-cómo hacerlo **desde el móvil** (la app de GitHub no tiene esa pantalla; hay que
-usar el navegador), están en [docs/despliegue.md](docs/despliegue.md).
+El flujo de publicación activa Pages él mismo y publica en cada push a `main`,
+después de pasar las pruebas. No hay que tocar ningún ajuste a mano. Los detalles
+están en [docs/despliegue.md](docs/despliegue.md).
 
 En local:
 
