@@ -1,0 +1,97 @@
+# Decisiones
+
+Por qué está hecho así y no de otra forma. Sirve para no volver a discutirlo.
+
+## Web estática, sin dependencias ni build
+
+No hay `package.json`, ni npm, ni paso de compilación. Módulos ES nativos y una
+hoja de CSS. Motivos:
+
+- se publica en GitHub Pages tal cual;
+- se puede abrir dentro de cinco años y seguirá funcionando, porque no hay
+  ninguna versión de nada que caducar;
+- el corredor de pruebas son 40 líneas y corre con `node`, sin instalar nada.
+
+El coste es que no hay tipos ni tree-shaking. Con 10 módulos de lógica no compensa.
+
+## Hace falta un servidor local, aunque sea estática
+
+Los navegadores bloquean `fetch()` sobre `file://`, así que con doble clic los
+JSON de `datos/` no se pueden leer. Las alternativas eran:
+
+- **incrustar los datos en el HTML** como script clásico: funcionaría con doble
+  clic, pero mete 3,5 MB en el propio `index.html`, se recarga entero en cada
+  visita y no se puede cachear aparte;
+- **pedir un servidor**, que es una línea: `node herramientas/servir.mjs`.
+
+Se eligió lo segundo y se incluye el servidor en el repo para que sea una línea de
+verdad. El mensaje de error de la app explica el motivo si alguien lo abre con
+doble clic.
+
+## La lógica no toca el DOM
+
+`src/nucleo/` no sabe que existe un navegador y `src/ui/` no contiene ninguna
+regla del juego. Por eso las 102 pruebas corren en Node en menos de un segundo,
+sin navegador ni jsdom, y por eso la prueba de solidez del árbol puede simular
+cruces sin pintar nada.
+
+## Repintado completo en cada cambio, aplazado a un microtask
+
+Cualquier cambio de estado recalcula el plan y repinta la vista entera. Con estos
+volúmenes va sobrado, y a cambio es imposible que el plan se quede desincronizado
+del inventario — que es el fallo que más dolería aquí.
+
+El aplazamiento a `queueMicrotask` no es un detalle de rendimiento: sin él, un
+cambio disparado desde el `change` de un input repinta el DOM **dentro** del
+propio evento, el elemento que lo está disparando se queda huérfano y
+`replaceChildren()` revienta. Pasó, y se ve en el historial. De paso, el foco y la
+posición del cursor se restauran por `id` después de cada pintado, o escribir en
+un campo te echaría de él.
+
+## El estado se lee siempre fresco, nunca del cierre del render
+
+`cambiaObjetivo()` acepta una función del objetivo **actual**, no un objeto
+calculado con el `objetivo` que capturó el render. Si se encadenan dos cambios sin
+repintar en medio —marcar dos IVs seguidos—, la forma con objeto hace que el
+segundo pise al primero.
+
+## Emparejado del inventario en tres pasadas
+
+Construir el árbol, colocar el inventario encima y repartir los sexos al final,
+en ese orden. La versión de una sola pasada gastaba un 3×31 en la primera hoja de
+1×31 del recorrido. Está explicado en [modelo-de-crianza.md](modelo-de-crianza.md).
+
+## Se marca lo estimado en vez de redondearlo
+
+La wiki publica el pago por sexo sólo en los extremos (5.000 y 25.000). El tramo
+de en medio va en su **propia línea** del presupuesto, marcado «estimado», en vez
+de sumarse callando al total. Lo mismo con los huecos: cada vista tiene su nota de
+«lo que no sé», con el motivo.
+
+La alternativa —dar un número redondo y quedar bien— convierte la app en algo en
+lo que no se puede confiar para gastar 300.000 PokéYen.
+
+## No se guardan precios de mercado
+
+Es la decisión de la wiki y se hereda: un precio del GTL apuntado miente a los dos
+meses. Los padres de partida quedan **fuera** del total, con una nota que dice que
+ese número lo pone el usuario. Preferible a un presupuesto que parece completo y
+no lo es.
+
+## El inventario vive en el navegador
+
+`localStorage`, con exportación e importación a JSON. No hay backend, así que no
+hay nada que mantener ni ninguna cuenta que crear, y los datos no salen del
+equipo. Si el almacenamiento está bloqueado (ventana privada) la app funciona
+igual en memoria y avisa de que no sobrevivirá al recargar.
+
+Tampoco se guarda ni se pide nada que identifique a otros jugadores, igual que en
+la wiki.
+
+## Todo en español, incluido el código
+
+Nombres de funciones, variables y archivos en español. El dominio está en
+español, la wiki está en español y quien lo va a mantener escribe en español;
+traducir a medias (`planear()` pero `getIvs()`) es peor que no traducir. La única
+excepción son los nombres de especie, que van en inglés porque es como los muestra
+el juego — igual que en la wiki.
