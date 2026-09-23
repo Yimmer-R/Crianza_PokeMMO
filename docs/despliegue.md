@@ -9,18 +9,51 @@ Cuando esté publicada, la URL será:
 https://yimmer-r.github.io/Crianza_PokeMMO/
 ```
 
-## No hay que tocar nada a mano
+## Un paso manual, una sola vez
 
-El flujo de [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) pasa
-las pruebas y publica en cada push a `main`. Lleva `enablement: true` en
-`configure-pages`, así que **activa Pages él mismo** y lo pone en modo «GitHub
-Actions» la primera vez que corre. No hace falta entrar en los ajustes.
+El repositorio trae el flujo de publicación en
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml): pasa las pruebas
+y publica en cada push a `main`. Pero **hay que activar Pages a mano la primera
+vez**, y no se puede automatizar.
 
-Si alguna vez quieres comprobarlo o cambiarlo:
-`https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`. Desde el móvil, esa
-pantalla **sólo existe en el navegador**: la app de GitHub no la trae. Pide la
-versión de escritorio si se ve apretada (Chrome: ⋮ → *Sitio para ordenadores*;
-Safari: `ᴀA` → *Solicitar sitio web para ordenadores*).
+El motivo, para no volver a investigarlo: el `GITHUB_TOKEN` del flujo tiene
+`pages: write`, que permite **desplegar** en un sitio de Pages que ya exista y
+cambiarle el modo de construcción, pero **no crearlo**. Crear el sitio necesita
+permisos de administración del repositorio, que ese token no tiene. Por eso
+`enablement: true` falla con `Create Pages site failed: Resource not accessible
+by integration` cuando no hay sitio previo.
+
+### Desde el ordenador
+
+1. Abre `https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`
+2. En **Build and deployment → Source**, elige **GitHub Actions**.
+3. Lanza el flujo desde la pestaña **Actions** (botón *Run workflow*) o haz un
+   push a `main`.
+
+### Desde el móvil
+
+La app de GitHub **no tiene la pantalla de Pages**, ni la de ajustes del
+repositorio. Hay que ir por el navegador.
+
+1. Abre el **navegador**, no la app de GitHub.
+2. Ve directo a `https://github.com/Yimmer-R/Crianza_PokeMMO/settings/pages`
+3. Si se ve apretado, pide la versión de escritorio:
+   - **Chrome (Android)**: ⋮ → *Sitio para ordenadores*
+   - **Safari (iPhone)**: `ᴀA` en la barra → *Solicitar sitio web para ordenadores*
+4. En **Source**, elige **GitHub Actions**.
+
+## El repositorio tiene que ser público
+
+Con plan gratuito, **Pages no funciona en repositorios privados**. Si el repo
+pasa a privado, GitHub **despublica el sitio al instante** y la URL empieza a
+responder *«There isn't a GitHub Pages site here»* — que parece un fallo de la
+app pero no lo es.
+
+Al volver a hacerlo público, el sitio **no vuelve solo**: hay que repetir el paso
+manual de arriba, porque la configuración de Pages se perdió.
+
+Si quieres mantenerlo privado sin pagar, Cloudflare Pages y Netlify sí sirven
+desde repositorios privados en su plan gratuito.
 
 ### Qué corre y en qué orden
 
