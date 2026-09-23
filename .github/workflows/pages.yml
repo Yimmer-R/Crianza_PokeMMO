@@ -1,10 +1,18 @@
 # Publica la app en GitHub Pages, después de pasar las pruebas.
 #
-# `enablement: true` en configure-pages hace que el propio flujo active Pages y lo
-# ponga en modo "GitHub Actions". Es lo que evita tener que tocar
-# Settings -> Pages a mano, que es justo donde uno se atasca desde el móvil (la
-# app de GitHub no tiene esa pantalla). También es el remedio que sugiere el
-# error "Get Pages site failed" cuando Pages no está configurado para Actions.
+# HAY UN PASO MANUAL, UNA SOLA VEZ:
+#   Settings -> Pages -> Build and deployment -> Source = "GitHub Actions"
+#
+# No se puede automatizar, y conviene saber por qué: el GITHUB_TOKEN del flujo
+# tiene `pages: write`, que permite DESPLEGAR en un sitio de Pages que ya exista
+# y cambiarle el modo de construcción, pero **no crearlo** — crear el sitio
+# necesita permisos de administración del repositorio, que el token no tiene.
+# Por eso `enablement: true` falla con "Create Pages site failed: Resource not
+# accessible by integration" cuando no hay sitio previo. Se deja puesto porque
+# sí sirve para pasar un sitio existente al modo Actions.
+#
+# Ojo también: si el repositorio pasa a **privado** con plan gratuito, GitHub
+# despublica el sitio y hay que repetir el paso manual al volverlo público.
 #
 # Las pruebas van delante del despliegue a propósito: es mejor una app vieja que
 # funciona que una nueva con el planificador roto.
@@ -57,9 +65,29 @@ jobs:
       url: ${{ steps.desplegar.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - id: configurar
+        uses: actions/configure-pages@v5
         with:
           enablement: true
+
+      # Si lo de arriba falla es casi siempre por lo mismo, y el error de GitHub
+      # no lo dice. Mejor dejarlo escrito aquí que volver a investigarlo.
+      - name: Explicar el fallo si Pages no está configurado
+        if: failure() && steps.configurar.outcome == 'failure'
+        run: |
+          echo "::error title=Falta activar Pages::Pages no está configurado en este repositorio."
+          echo ""
+          echo "El flujo puede desplegar, pero no puede CREAR el sitio: eso necesita"
+          echo "permisos de administración que el GITHUB_TOKEN no tiene."
+          echo ""
+          echo "Arréglalo una sola vez, desde el navegador (la app de GitHub no"
+          echo "tiene esta pantalla):"
+          echo "  https://github.com/${{ github.repository }}/settings/pages"
+          echo "  Build and deployment -> Source = GitHub Actions"
+          echo ""
+          echo "Y comprueba que el repositorio sea PÚBLICO: con plan gratuito,"
+          echo "Pages no funciona en repositorios privados."
+          exit 1
       # La app es estática y vive en la raíz: se sube tal cual, sin compilar.
       - uses: actions/upload-pages-artifact@v3
         with:
