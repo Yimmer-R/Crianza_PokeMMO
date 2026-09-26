@@ -138,6 +138,33 @@ await paso('Entrenamiento calcula hordas', async () => {
   console.log(`       ${(t.match(/\d+ hordas/g) ?? []).slice(0, 3).join(' · ')}`);
 });
 
+await paso('Entrenamiento avisa de los EVs que caen entre escalones', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#ev-ataque');
+  await pagina.fill('#ev-ataque', '252');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.fill('#ev-ps', '6');
+  await pagina.dispatchEvent('#ev-ps', 'change');
+
+  await pagina.click('button[data-vista="entrenamiento"]');
+  await pagina.waitForSelector('.tarjeta:has-text("Optimizar el reparto")', { timeout: 5000 });
+  const t = await pagina.textContent('.tarjeta:has-text("Optimizar el reparto")');
+  if (!t.includes('2 EVs')) throw new Error(`esperaba recuperar 2 EVs: "${t.slice(0, 120)}"`);
+
+  await pagina.click('#aplicar-optimizacion');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#ev-ps');
+  const ps = await pagina.inputValue('#ev-ps');
+  if (ps !== '4') throw new Error(`los PS deberían haber bajado a 4 y están en ${ps}`);
+  console.log('       PS 6 -> 4: los 2 de más no daban ni un punto');
+
+  // Se deja como estaba para no descolocar las pruebas de más abajo.
+  await pagina.fill('#ev-ataque', '0');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.fill('#ev-ps', '0');
+  await pagina.dispatchEvent('#ev-ps', 'change');
+});
+
 await paso('el estado sobrevive a un recargado', async () => {
   await pagina.reload({ waitUntil: 'networkidle' });
   await pagina.waitForSelector('.tarjeta', { timeout: 10000 });
