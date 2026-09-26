@@ -83,29 +83,33 @@ export function ivsGarantizados(ivsA, ivsB, objetoA = null, objetoB = null) {
 }
 
 /**
- * Naturaleza que saca la cría segura, y por qué vía.
+ * Naturaleza que saca la cría garantizada.
  *
- * Dos formas, y la segunda es la que abarata las cadenas:
+ * **Sólo la Piedraeterna.** La lleva un padre y pasa su naturaleza, y lo hace
+ * siempre: la descripción del objeto en el juego es tajante, y la wiki desmiente
+ * expresamente el rumor de que funcione al 50 %.
+ * (wiki/mecanicas/Crianza.md, 23-09-2026)
  *
- * 1. **Piedraeterna**: la pasa quien la lleve. Está en wiki/mecanicas/Crianza.md.
- * 2. **Los dos padres comparten la naturaleza**: la cría sale con ella, igual que
- *    pasa con un IV que los dos tienen a 31.
- *    (experiencia propia del usuario, 20-09-2026 — la wiki NO documenta qué pasa
- *    con la naturaleza cuando no hay Piedraeterna, así que este dato es más
- *    débil que uno de `raw/` y conviene meterlo en la wiki como fuente nueva.)
+ * **Dos padres con la misma naturaleza NO la transmiten.** Aunque los dos la
+ * tengan, la cría la saca al azar entre las 25. Es la trampa de esta mecánica,
+ * porque con los IVs sí funciona —dos padres con 31 en la misma característica
+ * dan 31— y es natural suponer que la naturaleza va igual. No va: los IVs se
+ * promedian, la naturaleza se sortea salvo que haya Piedraeterna.
  *
- * La segunda vía importa porque **no gasta hueco de objeto**: un cruce cuyos dos
- * padres ya traen la naturaleza puede seguir forzando DOS IVs con Recios.
+ * Esta app llegó a implementarlo al revés, sobre un reporte de juego que resultó
+ * ser un error de observación. La wiki lo dejó escrito en negativo para que no se
+ * rehaga; esto es lo mismo, en código.
  */
 export function naturalezaGarantizada(padreA, padreB, objetoA, objetoB) {
   if (objetoA === PIEDRAETERNA && padreA?.naturaleza)
     return { naturaleza: padreA.naturaleza, via: 'piedraeterna' };
   if (objetoB === PIEDRAETERNA && padreB?.naturaleza)
     return { naturaleza: padreB.naturaleza, via: 'piedraeterna' };
-  if (padreA?.naturaleza && padreA.naturaleza === padreB?.naturaleza)
-    return { naturaleza: padreA.naturaleza, via: 'compartida' };
   return { naturaleza: null, via: null };
 }
+
+/** 1 de 25: lo que sale si nadie lleva Piedraeterna. */
+export const P_NATURALEZA_AL_AZAR = 1 / 25;
 
 /** Cuántos objetos "cuentan" para la tabla de reparto (la Piedraeterna también ocupa hueco). */
 export const objetosEnJuego = (objetoA, objetoB) => [objetoA, objetoB].filter(Boolean).length;
@@ -170,15 +174,11 @@ export function tablaShiny(numObjetos) {
 }
 
 /**
- * Cuántos 31 puede garantizar un cruce como máximo.
+ * Cuántos 31 puede garantizar un cruce como máximo: los que compartan los padres
+ * más uno por cada hueco de objeto libre.
  *
- * Son los que compartan los padres más uno por cada hueco de objeto libre. Y aquí
- * está la diferencia entre las dos vías de la naturaleza: con Piedraeterna sólo
- * queda un Recio, mientras que si los dos padres ya comparten la naturaleza los
- * dos huecos siguen libres y el cruce rinde igual que uno sin naturaleza.
- *
- * @param {number} compartidos IVs a 31 que tienen los dos padres
- * @param {'piedraeterna'|'compartida'|null} viaNaturaleza cómo llega la naturaleza
+ * Pedir naturaleza cuesta un hueco **siempre**, porque la única forma de pasarla
+ * es la Piedraeterna y ocupa el sitio de un Recio.
  */
-export const topeGarantizable = (compartidos, viaNaturaleza = null) =>
-  compartidos + (viaNaturaleza === 'piedraeterna' ? 1 : 2);
+export const topeGarantizable = (compartidos, conNaturaleza = false) =>
+  compartidos + (conNaturaleza ? 1 : 2);

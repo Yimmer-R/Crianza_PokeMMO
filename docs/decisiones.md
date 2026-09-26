@@ -122,17 +122,22 @@ Construir el árbol, colocar el inventario encima y repartir los sexos al final,
 en ese orden. La versión de una sola pasada gastaba un 3×31 en la primera hoja de
 1×31 del recorrido. Está explicado en [modelo-de-crianza.md](modelo-de-crianza.md).
 
-## La estrategia de naturaleza se elige sola, no por decreto
+## La naturaleza sólo viaja con Piedraeterna (corrección del 23-09-2026)
 
-Había un defecto fijo («la compartida es más barata») que resultó ser falso en
-cuanto hay inventario: la compartida exige la naturaleza en todos los huecos, así
-que un 3×31 que ya tengas y no la lleve no encaja en ninguno. La Piedraeterna deja
-media cadena sin naturaleza y ahí sí entra.
+Durante unos días la app creyó que dos padres de la misma naturaleza la
+transmitían, y encima elegía entre esa vía y la Piedraeterna comparando esfuerzo.
+El dato venía de una observación del usuario jugando; `wiki/mecanicas/Crianza.md`
+de la wiki nueva lo desmiente en una sección expresa: **la cría no la hereda, la
+sortea entre las 25, y la Piedraeterna hace falta siempre**.
 
-Se construyen las dos cadenas y se elige la de menos esfuerzo, midiéndolo en
-encuentros salvajes esperados. La comparación se enseña en la pestaña Plan, y se
-puede forzar una de las dos. Construir el árbol dos veces cuesta microsegundos;
-equivocarse de estrategia cuesta decenas de capturas.
+Se ha quitado entero: la vía compartida, el selector de estrategia, la
+comparativa de la pestaña Plan y el `estrategiaNaturaleza` del estado. Queda una
+sola cadena, la de Piedraeterna.
+
+Lección, y por eso está escrito aquí: **una observación al jugar es una fuente
+débil**. Un cruce que salió con la naturaleza buena sin Piedraeterna es 1 de 25,
+no una prueba. Cuando la wiki calle sobre algo, el hueco se declara; no se rellena
+con una partida.
 
 ## Tesseract.js es la única excepción a «sin dependencias»
 

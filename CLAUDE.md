@@ -2,7 +2,9 @@
 
 App web para planificar crianza y entrenamiento en PokeMMO. **No** es una wiki:
 el conocimiento del juego vive en el repo hermano
-[Yimmer-R/PokeMMO](https://github.com/Yimmer-R/PokeMMO) y aquí sólo se consume.
+[Yimmer-R/Wiki-PokeMMO](https://github.com/Yimmer-R/Wiki-PokeMMO) y aquí sólo se
+consume. (Hasta el 24-09-2026 la wiki era `Yimmer-R/PokeMMO`; el extractor
+todavía la acepta como respaldo, pero la buena es la nueva.)
 
 ## Lo primero que hay que saber
 
@@ -14,18 +16,15 @@ archivos son a ciegas.
 El resumen de una línea: **un cruce garantiza los 31 que comparten los dos padres,
 más uno forzado por cada objeto Recio**. Todo lo demás sale de ahí.
 
-Y lo mismo con la naturaleza: **la pasa la Piedraeterna, o el que los dos padres la
-compartan**. La segunda vía no gasta hueco de objeto, así que el cruce sigue
-forzando dos IVs. Ese dato viene de la experiencia del usuario jugando
-(20-09-2026), **no** de la wiki, que no documenta qué pasa sin Piedraeterna: está
-marcado como tal en `herencia.js` y convendría subirlo a la wiki como fuente
-nueva.
+La naturaleza va por otro camino: **sólo la pasa la Piedraeterna, y la pasa
+siempre**. Que los dos padres la compartan **no** la transmite — la cría la
+sortea igual entre las 25 (`wiki/mecanicas/Crianza.md`). La app tuvo esto al
+revés hasta el 23-09-2026, con una vía «compartida» y un selector de estrategia
+que ya no existen; si ves rastros de eso en algún sitio, es código viejo.
 
-Ninguna de las dos vías gana siempre, así que el planificador construye las dos y
-se queda con la de menos esfuerzo (`estrategiaNaturaleza: 'auto'`). No vuelvas a
-poner un defecto fijo: la compartida es más barata en vacío pero la Piedraeterna
-gana en cuanto hay inventario, porque deja huecos sin naturaleza que el inventario
-sí puede rellenar.
+Lo único que hay que recordar: la Piedraeterna **ocupa el hueco de objeto**, así
+que un cruce que prometa naturaleza sólo fuerza **un** IV con Recio en vez de
+dos, y la hoja de sólo naturaleza entra por abajo de la espina.
 
 ## Reglas de este repositorio
 

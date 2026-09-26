@@ -37,11 +37,7 @@ function recalcular() {
 
   let plan;
   try {
-    plan = planear(objetivo, datos, {
-      inventario,
-      regionesDisponibles,
-      estrategiaNaturaleza: objetivo.estrategiaNaturaleza ?? 'auto',
-    });
+    plan = planear(objetivo, datos, { inventario, regionesDisponibles });
   } catch (e) {
     plan = { ok: false, problemas: [`error al planear: ${e.message}`], avisos: [] };
   }

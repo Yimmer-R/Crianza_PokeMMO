@@ -44,13 +44,12 @@ padre. De ahí sale todo: un n×31 necesita dos padres de n-1 que compartan n-2,
 eso baja hasta padres de 1×31, que son los que se capturan. Un 5×31 son 16 padres,
 y en PokeMMO **los padres se consumen**.
 
-**La naturaleza, por la vía más barata de las dos.** Se hereda de dos formas: con
-Piedraeterna, que la pasa pero ocupa un hueco de objeto y deja el cruce forzando
-un solo IV; o porque **los dos padres la comparten**, que no gasta nada. Ninguna
-gana siempre — la compartida es más barata en vacío, y la Piedraeterna gana en
-cuanto tienes inventario, porque deja media cadena sin naturaleza y ahí sí encajan
-los Pokémon que ya tienes. La app construye las dos, se queda con la de menos
-esfuerzo y te enseña la comparación.
+**La naturaleza, siempre con Piedraeterna.** Es la única forma de heredarla: que
+los dos padres la compartan **no** la transmite, la cría la sortea igual entre
+las 25. La Piedraeterna ocupa un hueco de objeto, así que el cruce que la lleva
+sólo fuerza un IV en vez de dos, y la hoja de sólo naturaleza entra por abajo del
+árbol. El lado bueno: media cadena queda sin naturaleza, y ahí encaja cualquier
+Pokémon que ya tengas aunque la suya no sea la buena.
 
 **Tu inventario.** Cada vez que anotas un Pokémon, el plan se recalcula entero y
 se recorta por donde puede. El emparejado busca el hueco que **más capturas
@@ -178,10 +177,6 @@ No es una lista de pendientes: son huecos con motivo.
   marcado como estimado en la propia tabla del presupuesto.
 - **Cómo se hereda la habilidad al criar.** No está documentado, así que el plan
   cuenta con la Píldora o el Parche y no con la suerte.
-- **Que la naturaleza compartida se herede** viene de tu propia experiencia
-  jugando, no de la wiki, que no dice qué pasa sin Piedraeterna. Vale como fuente,
-  pero es más débil que un dato del volcado: convendría meterlo en la wiki.
 - **Si las vitaminas tienen tope de EVs** en PokeMMO. El número sale de dividir.
-- **Incubadoras.** El volcado de la wiki es de agosto de 2025 y no las lleva.
 
 Mecánicas de 5ª generación: ni tipo Hada ni Megaevoluciones.

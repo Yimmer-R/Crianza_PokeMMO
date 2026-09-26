@@ -100,10 +100,10 @@ bloque('planificador: forma del árbol', () => {
     );
   });
 
-  prueba('con la estrategia de Piedraeterna, una sola rama arrastra la naturaleza', () => {
+  prueba('una sola rama arrastra la naturaleza: la de la Piedraeterna', () => {
     const plan = planear(
       objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
-      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'piedraeterna' },
+      datos, { regionesDisponibles: REGIONES },
     );
     cierto(arbolSolido(plan.arbol));
     const hojasConNaturaleza = nodos(plan.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza);
@@ -111,45 +111,8 @@ bloque('planificador: forma del árbol', () => {
     igual(hojasConNaturaleza[0].stats.length, 0, 'la hoja de naturaleza no debería pedir IVs');
   });
 
-  prueba('con la estrategia compartida, la naturaleza baja por TODAS las ramas', () => {
-    const plan = planear(
-      objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
-      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' },
-    );
-    cierto(arbolSolido(plan.arbol));
-    const hojasNat = nodos(plan.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza);
-    igual(hojasNat.length, 2, 'un 2×31 con naturaleza compartida necesita dos padres con ella');
-    for (const h of hojasNat) igual(h.stats.length, 0);
-  });
 
-  prueba('la compartida no gasta Piedraeterna en los cruces de dos o más IVs', () => {
-    const plan = planear(
-      objetivoDe({ ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }), naturaleza: 'Audaz' }),
-      datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' },
-    );
-    cierto(arbolSolido(plan.arbol));
-    for (const n of nodos(plan.arbol)) {
-      if (n.tipo !== 'cruce' || !n.naturaleza) continue;
-      if (n.stats.length >= 2) {
-        igual(n.viaNaturaleza, 'compartida', `el cruce ${n.id} de ${n.stats.length} IVs`);
-        igual(n.forzados.length, 2, 'debería seguir forzando dos IVs');
-      } else {
-        // Con un solo IV no hay nada que compartir: ahí sí entra la Piedraeterna.
-        igual(n.viaNaturaleza, 'piedraeterna');
-      }
-    }
-  });
 
-  prueba('las dos estrategias necesitan los mismos padres, pero la compartida gasta menos', () => {
-    const base = objetivoDe({ ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }), naturaleza: 'Audaz' });
-    const comp = planear(base, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'compartida' });
-    const pied = planear(base, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: 'piedraeterna' });
-    igual(contar(comp.arbol).conseguir, contar(pied.arbol).conseguir);
-    // La compartida cambia 1×31 por padres de sólo naturaleza, que son más fáciles
-    // de capturar (1 de 25 frente a 1 de 32).
-    const soloNat = (p) => nodos(p.arbol).filter((n) => n.tipo === 'conseguir' && n.naturaleza && !n.stats.length).length;
-    cierto(soloNat(comp) > soloNat(pied), `compartida ${soloNat(comp)} vs piedraeterna ${soloNat(pied)}`);
-  });
 
   prueba('un 1×31 no necesita cruce: es una captura', () => {
     const plan = planear(objetivoDe({ ivs: ivs({ ataque: 31 }) }), datos, { regionesDisponibles: REGIONES });
@@ -482,76 +445,46 @@ bloque('planificador: movimientos huevo atan al padre final', () => {
   });
 });
 
-bloque('planificador: elegir estrategia de naturaleza automáticamente', () => {
+
+bloque('planificador: la naturaleza sólo viaja con Piedraeterna', () => {
   const conNat = objetivoDe({
     ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }),
-    naturaleza: 'Audaz',
+    naturaleza: 'Agitada',
   });
 
-  prueba('en vacío evalúa las dos y se queda con la compartida, que es más barata', () => {
+  prueba('todos los cruces que prometen naturaleza llevan Piedraeterna', () => {
     const plan = planear(conNat, datos, { regionesDisponibles: REGIONES });
-    cierto(plan.comparativa, 'debería traer la comparación de las dos');
-    igual(plan.comparativa.length, 2);
-    igual(plan.estrategiaNaturaleza, 'compartida');
     cierto(arbolSolido(plan.arbol));
-
-    const porNombre = Object.fromEntries(plan.comparativa.map((c) => [c.estrategia, c]));
-    cierto(
-      porNombre.compartida.esfuerzo < porNombre.piedraeterna.esfuerzo,
-      `compartida ${porNombre.compartida.esfuerzo} vs piedraeterna ${porNombre.piedraeterna.esfuerzo}`,
-    );
-  });
-
-  prueba('con inventario SIN la naturaleza se pasa a Piedraeterna, que sí lo aprovecha', () => {
-    // Esto es lo que se vio probando en el navegador: la compartida exige la
-    // naturaleza en todos los huecos, así que un 3×31 sin ella no encaja en
-    // ninguno y no ahorra nada.
-    const inventario = [{
-      id: 'a', especie: 'Larvitar', sexo: SEXOS.HEMBRA,
-      ivs: ivs({ ps: 31, ataque: 31, defensa: 31 }), naturaleza: 'Miedosa',
-    }];
-    const plan = planear(conNat, datos, { regionesDisponibles: REGIONES, inventario });
-    igual(plan.estrategiaNaturaleza, 'piedraeterna');
-    cierto(arbolSolido(plan.arbol));
-    igual(contar(plan.arbol).inventario, 1);
-
-    const soloCompartida = planear(conNat, datos, {
-      regionesDisponibles: REGIONES, inventario, estrategiaNaturaleza: 'compartida',
-    });
-    cierto(
-      contar(plan.arbol).conseguir < contar(soloCompartida.arbol).conseguir,
-      `auto pide ${contar(plan.arbol).conseguir} capturas y compartida forzada ${contar(soloCompartida.arbol).conseguir}`,
-    );
-  });
-
-  prueba('forzar una estrategia la respeta y no devuelve comparación', () => {
-    for (const est of ['compartida', 'piedraeterna']) {
-      const plan = planear(conNat, datos, { regionesDisponibles: REGIONES, estrategiaNaturaleza: est });
-      igual(plan.estrategiaNaturaleza, est);
-      igual(plan.comparativa, null);
-      cierto(arbolSolido(plan.arbol));
+    const conNaturaleza = nodos(plan.arbol).filter((n) => n.tipo === 'cruce' && n.naturaleza);
+    cierto(conNaturaleza.length > 0);
+    for (const n of conNaturaleza) {
+      cierto(
+        n.objetos.madre === 'Piedraeterna' || n.objetos.padre === 'Piedraeterna',
+        `el cruce ${n.id} promete naturaleza sin Piedraeterna`,
+      );
+      igual(n.forzados.length, 1, 'con Piedraeterna sólo se puede forzar un IV');
     }
   });
 
-  prueba('sin naturaleza no hay nada que comparar', () => {
-    const plan = planear(objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }) }), datos, { regionesDisponibles: REGIONES });
-    igual(plan.comparativa, null);
+  prueba('hay exactamente una hoja de sólo naturaleza, la de abajo de la espina', () => {
+    const plan = planear(conNat, datos, { regionesDisponibles: REGIONES });
+    const soloNat = nodos(plan.arbol).filter(
+      (n) => n.tipo === 'conseguir' && n.naturaleza && !n.stats.length,
+    );
+    igual(soloNat.length, 1);
   });
 
-  prueba('medirArbol cuenta capturas, esfuerzo y objetos de forma coherente', () => {
+  prueba('ya no existe la vía compartida: planear() no acepta estrategias', () => {
+    const plan = planear(conNat, datos, { regionesDisponibles: REGIONES });
+    igual(plan.comparativa, undefined);
+    igual(plan.estrategiaNaturaleza, undefined);
+  });
+
+  prueba('medirArbol sigue midiendo esfuerzo, capturas y objetos', () => {
     const plan = planear(objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31, defensa: 31 }) }), datos, { regionesDisponibles: REGIONES });
     const m = medirArbol(plan.arbol);
     igual(m.capturas, contar(plan.arbol).conseguir);
-    // Cuatro hojas de 1×31: cada una es 1 de 32.
     igual(m.esfuerzo, 4 * 32);
     igual(m.objetos.reduce((a, o) => a + o.cuantos, 0), contar(plan.arbol).cruces * 2);
-    cierto(m.dinero > 0);
-  });
-
-  prueba('una hoja de sólo naturaleza cuesta menos esfuerzo que una de 1×31', () => {
-    const soloNat = medirArbol({ tipo: 'conseguir', stats: [], naturaleza: true, hijos: [] });
-    const unIv = medirArbol({ tipo: 'conseguir', stats: ['ataque'], naturaleza: false, hijos: [] });
-    igual(soloNat.esfuerzo, 25);
-    igual(unIv.esfuerzo, 32);
   });
 });

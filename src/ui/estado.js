@@ -20,9 +20,6 @@ function objetivoVacio() {
     sexo: null,
     nivel: 50,
     objetoEntrenamiento: 'Vínculo de Entrenamiento',
-    // 'auto' construye las dos formas de llevar la naturaleza y se queda con la
-    // de menos esfuerzo. Ninguna gana siempre: depende del inventario.
-    estrategiaNaturaleza: 'auto',
   };
 }
 

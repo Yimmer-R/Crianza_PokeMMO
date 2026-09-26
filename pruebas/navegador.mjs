@@ -151,36 +151,15 @@ await paso('móvil: 390px de ancho sin scroll horizontal', async () => {
   if (desborda) throw new Error('hay scroll horizontal');
 });
 
-await paso('la estrategia de naturaleza es automática y enseña la comparación', async () => {
-  await pagina.click('button[data-vista="objetivo"]');
-  await pagina.waitForSelector('#estrategia-nat');
-  const valor = await pagina.inputValue('#estrategia-nat');
-  if (valor !== 'auto') throw new Error(`por defecto debería ser auto, es ${valor}`);
-
-  await pagina.click('button[data-vista="plan"]');
-  await pagina.waitForSelector('.tarjeta:has-text("Cómo se lleva la naturaleza")');
-  const comp = await pagina.textContent('.tarjeta:has-text("Cómo se lleva la naturaleza")');
-  for (const esperado of ['Piedraeterna', 'comparten', 'elegida']) {
-    if (!comp.includes(esperado)) throw new Error(`la comparativa no menciona "${esperado}"`);
-  }
-  console.log(`       ${comp.replace(/\s+/g, ' ').slice(120, 330)}`);
-});
-
-await paso('forzar una estrategia cambia el presupuesto y quita la comparativa', async () => {
-  await pagina.click('button[data-vista="plan"]');
-  const auto = await pagina.textContent('.total');
-
-  await pagina.click('button[data-vista="objetivo"]');
-  await pagina.selectOption('#estrategia-nat', 'piedraeterna');
+await paso('todos los cruces con naturaleza llevan Piedraeterna', async () => {
   await pagina.click('button[data-vista="plan"]');
   await pagina.waitForSelector('.pasos li');
-  if (await pagina.locator('.tarjeta:has-text("Cómo se lleva la naturaleza")').count())
-    throw new Error('con una estrategia forzada no debería haber comparativa');
-  const forzada = await pagina.textContent('.total');
-  console.log(`       auto ${auto.trim()} · piedraeterna forzada ${forzada.trim()}`);
-
-  await pagina.click('button[data-vista="objetivo"]');
-  await pagina.selectOption('#estrategia-nat', 'auto');
+  const texto = await pagina.textContent('.pasos');
+  if (!texto.includes('Piedraeterna'))
+    throw new Error('el plan con naturaleza debería pedir Piedraeterna');
+  if (await pagina.locator('#estrategia-nat').count())
+    throw new Error('ya no hay estrategias de naturaleza que elegir');
+  console.log(`       ${(await pagina.textContent('.total')).trim()}`);
 });
 
 await paso('el registro manual acepta movimientos y traduce el nombre del juego', async () => {

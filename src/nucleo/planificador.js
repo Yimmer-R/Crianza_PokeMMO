@@ -293,39 +293,12 @@ function construir(nodoPedido, ctx, profundidad = 0) {
   if (nodo.naturaleza) {
     const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol);
 
-    // Vía A — los dos padres traen ya la naturaleza, así que la cría la saca sola
-    // y NINGÚN hueco de objeto se gasta en ella: el cruce sigue forzando dos IVs,
-    // igual que uno sin naturaleza. Es la estrategia por defecto porque sale más
-    // barata en capturas y en objetos que la de Piedraeterna.
+    // La naturaleza sólo la pasa la Piedraeterna, y ocupa el hueco de objeto de
+    // quien la lleva: el cruce se queda con un solo Recio, así que sólo fuerza un
+    // IV y el otro padre tiene que traer YA todos los pedidos.
     //
-    // No sirve cuando sólo queda un IV por cubrir: dos padres de 0×31 con la
-    // naturaleza no tienen ningún 31 que forzar, así que ese caso cae a la vía B.
-    if (ctx.estrategiaNaturaleza === 'compartida' && n >= 2) {
-      const [f1, f2] = orden;
-      const compartidos = nodo.stats.filter((st) => st !== f1 && st !== f2);
-      nodo.tipo = 'cruce';
-      nodo.objetos = { madre: RECIO_DE[f1], padre: RECIO_DE[f2] };
-      nodo.forzados = [f1, f2];
-      nodo.compartidos = compartidos;
-      nodo.viaNaturaleza = 'compartida';
-      nodo.explicacion =
-        `Los dos padres ya traen la naturaleza, así que la cría la saca sola y no hace falta ` +
-        `Piedraeterna: los dos huecos de objeto quedan libres para forzar ${NOMBRE_STAT[f1]} y ` +
-        `${NOMBRE_STAT[f2]}. ` +
-        (compartidos.length
-          ? `${compartidos.map((st) => NOMBRE_STAT[st]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''} porque los dos lo tienen a 31.`
-          : 'No hay IVs compartidos: los dos forzados son todo el objetivo.');
-
-      nodo.hijos = [
-        construir({ stats: [...compartidos, f1], naturaleza: true, objeto: RECIO_DE[f1], ...hijoA }, ctx, profundidad + 1),
-        construir({ stats: [...compartidos, f2], naturaleza: true, objeto: RECIO_DE[f2], ...hijoB }, ctx, profundidad + 1),
-      ];
-      return nodo;
-    }
-
-    // Vía B — Piedraeterna. La lleva un padre y pasa su naturaleza, pero ocupa su
-    // hueco de objeto, así que el cruce sólo puede forzar un IV y el otro padre
-    // tiene que traer YA todos los pedidos.
+    // Dos padres con la misma naturaleza NO la transmiten, por mucho que con los
+    // IVs sí funcione. Ver naturalezaGarantizada() en herencia.js.
     const forzado = orden[0];
     const resto = nodo.stats.filter((st) => st !== forzado);
 
@@ -333,7 +306,6 @@ function construir(nodoPedido, ctx, profundidad = 0) {
     nodo.objetos = { madre: PIEDRAETERNA, padre: RECIO_DE[forzado] };
     nodo.forzados = [forzado];
     nodo.compartidos = resto;
-    nodo.viaNaturaleza = 'piedraeterna';
     nodo.explicacion =
       `La Piedraeterna pasa la naturaleza pero ocupa un hueco de objeto, así que este cruce ` +
       `sólo puede forzar un IV (${NOMBRE_STAT[forzado]}). ` +
@@ -510,18 +482,15 @@ export function asignarSexos(arbol, objetivo) {
  * @param {Object} opciones {inventario, regionesDisponibles}
  */
 /**
- * Coste aproximado de un árbol, para poder comparar dos estrategias.
- *
- * Mide las dos cosas que duelen de verdad:
+ * Coste aproximado de un árbol: lo que cuesta de verdad, para poder enseñarlo.
  *
  * - **esfuerzo**: encuentros salvajes esperados. Cada IV suelto a 31 es 1 de 32 y
  *   la naturaleza 1 de 25, así que una hoja de "1×31" cuesta 32 y una de "sólo
- *   naturaleza" cuesta 25. Es lo que de verdad cuesta tiempo.
+ *   naturaleza" cuesta 25.
  * - **dinero**: los objetos de crianza, que se consumen todos.
  *
  * No usa los precios de datos/objetos.json a propósito: coste.js ya hace el
- * presupuesto de verdad, y si el planificador lo importase habría un ciclo. Aquí
- * basta el orden de magnitud, que es lo que decide entre dos estrategias.
+ * presupuesto de verdad, y si el planificador lo importase habría un ciclo.
  */
 export function medirArbol(arbol) {
   let esfuerzo = 0;
@@ -550,90 +519,53 @@ export function medirArbol(arbol) {
 /**
  * Plan completo: árbol, pasos en orden de ejecución, qué hay que conseguir y coste.
  *
- * Con naturaleza hay dos formas de llevarla por la cadena y **ninguna gana
- * siempre**, que es algo que sólo se vio probando:
- *
- * - **compartida** sale más barata en vacío, porque cambia padres de 1×31 (1 de 32)
- *   por padres de sólo naturaleza (1 de 25) y no gasta Piedraeternas arriba;
- * - **piedraeterna** gana en cuanto hay inventario, porque deja media cadena SIN
- *   naturaleza, y ahí sí encajan los Pokémon que ya tienes aunque no la lleven.
- *
- * Por eso el valor por defecto es `'auto'`: se construyen las dos y se queda la
- * de menos esfuerzo. La comparación viaja en el resultado para poder enseñarla.
- *
  * @param {Object} objetivo {especie, ivs, naturaleza, evs, movimientos, habilidad, sexo}
  * @param {Object} datos {pokedex, encuentros, objetos, ...}
- * @param {Object} opciones {inventario, regionesDisponibles, estrategiaNaturaleza}
+ * @param {Object} opciones {inventario, regionesDisponibles}
  */
-export function planear(objetivo, datos, {
-  inventario = [],
-  regionesDisponibles = [],
-  estrategiaNaturaleza = 'auto',
-} = {}) {
+export function planear(objetivo, datos, { inventario = [], regionesDisponibles = [] } = {}) {
   const validacion = validarObjetivo(objetivo, datos);
   if (!validacion.valido) return { ok: false, ...validacion };
 
   const pedidos = statsPedidos(objetivo);
   const movsHuevo = movimientosSoloDeHuevo(objetivo, datos.pokedex);
 
-  /** Construye el plan entero para una estrategia concreta. */
-  const construirCon = (estrategia) => {
-    contadorId = 0;
-    const ctx = {
-      datos,
-      objetivo,
-      estrategiaNaturaleza: estrategia,
-      inventarioOriginal: inventario,
-      // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco
-      // y desaparece de la reserva.
-      inventarioLibre: inventario.map((e) => ({ ...e })),
-    };
-
-    // Cuatro pasadas, en este orden: el árbol de requisitos, los movimientos huevo
-    // que atan al padre final, el inventario encima, y el reparto de sexos, que es
-    // lo único que depende de todo lo anterior.
-    const crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
-
-    if (movsHuevo.length && crudo.tipo === 'cruce') {
-      // El movimiento lo pasa el PADRE, así que el hueco que deja de ser libre es
-      // el que no está en la espina. Como se consume con la cría, un padre que
-      // sepa varios ahorra un cruce por cada uno.
-      const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
-      if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
-    }
-
-    const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
-    return { estrategia, arbol, ctx, medida: medirArbol(arbol) };
+  contadorId = 0;
+  const ctx = {
+    datos,
+    objetivo,
+    inventarioOriginal: inventario,
+    // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco y
+    // desaparece de la reserva.
+    inventarioLibre: inventario.map((e) => ({ ...e })),
   };
 
-  // Sin naturaleza no hay nada que elegir: la estrategia no pinta.
-  const candidatas = !objetivo.naturaleza
-    ? ['compartida']
-    : estrategiaNaturaleza === 'auto'
-      ? ['compartida', 'piedraeterna']
-      : [estrategiaNaturaleza];
+  // Cuatro pasadas, en este orden: el árbol de requisitos, los movimientos huevo
+  // que atan al padre final, el inventario encima, y el reparto de sexos, que es
+  // lo único que depende de todo lo anterior.
+  const crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
 
-  const construidos = candidatas.map(construirCon);
-  construidos.sort((a, b) => a.medida.esfuerzo - b.medida.esfuerzo || a.medida.dinero - b.medida.dinero);
-  const elegido = construidos[0];
+  if (movsHuevo.length && crudo.tipo === 'cruce') {
+    // El movimiento lo pasa el PADRE, así que el hueco que deja de ser libre es
+    // el que no está en la espina. Como se consume con la cría, un padre que
+    // sepa varios ahorra un cruce por cada uno.
+    const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
+    if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
+  }
+
+  const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles);
-  const pasos = aPasos(elegido.arbol, objetivo, datos, relleno);
+  const pasos = aPasos(arbol, objetivo, datos, relleno);
 
   return {
     ok: true,
     objetivo,
-    arbol: elegido.arbol,
+    arbol,
     pasos,
     relleno: relleno.slice(0, 8),
-    sobrantes: elegido.ctx.inventarioLibre,
-    estrategiaNaturaleza: elegido.estrategia,
-    estrategiaPedida: estrategiaNaturaleza,
-    // Sólo hay comparación cuando de verdad se han evaluado las dos.
-    comparativa: construidos.length > 1
-      ? construidos.map((c) => ({ estrategia: c.estrategia, ...c.medida }))
-      : null,
-    medida: elegido.medida,
+    sobrantes: ctx.inventarioLibre,
+    medida: medirArbol(arbol),
     movimientosDeHuevo: movsHuevo,
     ...validacion,
   };
