@@ -6,7 +6,7 @@ en qué orden, con qué objetos, qué te falta capturar y dónde, y cuánto cues
 
 Es una web estática: sin dependencias, sin paso de compilación y sin backend.
 Todo el conocimiento del juego sale de la
-[wiki de PokeMMO](https://github.com/Yimmer-R/PokeMMO), de donde se extrae a
+[wiki de PokeMMO](https://github.com/Yimmer-R/Wiki-PokeMMO), de donde se extrae a
 `datos/*.json` con un script.
 
 ## Abrirla

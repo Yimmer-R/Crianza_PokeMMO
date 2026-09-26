@@ -2,7 +2,7 @@
 
 Esto es la deducción entera, porque es lo que no se puede volver a derivar de
 memoria cada vez. Todo parte de dos frases de
-[`wiki/mecanicas/Crianza.md`](https://github.com/Yimmer-R/PokeMMO/blob/main/wiki/mecanicas/Crianza.md):
+[`wiki/mecanicas/Crianza.md`](https://github.com/Yimmer-R/Wiki-PokeMMO/blob/main/wiki/mecanicas/Crianza.md):
 
 > Tres IVs se heredan tal cual de los padres y los otros tres salen del promedio
 > de ambos, redondeado hacia abajo.

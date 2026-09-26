@@ -474,10 +474,10 @@ bloque('planificador: la naturaleza sólo viaja con Piedraeterna', () => {
     igual(soloNat.length, 1);
   });
 
-  prueba('ya no existe la vía compartida: planear() no acepta estrategias', () => {
+  prueba('ya no existe la vía compartida: planear() devuelve una sola cadena', () => {
     const plan = planear(conNat, datos, { regionesDisponibles: REGIONES });
-    igual(plan.comparativa, undefined);
-    igual(plan.estrategiaNaturaleza, undefined);
+    igual(plan.comparativa, undefined, 'no hay dos cadenas que comparar');
+    igual(plan.estrategiaNaturaleza, undefined, 'ni estrategia que elegir');
   });
 
   prueba('medirArbol sigue midiendo esfuerzo, capturas y objetos', () => {
