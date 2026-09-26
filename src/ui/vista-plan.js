@@ -1,10 +1,10 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
-import { el, tarjeta, chip, aviso, frag, tabla, numero } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero } from './componentes.js';
 import { NOMBRE_STAT, STATS, IV_MAX } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
 import { contar, criaDe, ROL } from '../nucleo/planificador.js';
-import { normalizar, ejemplarNuevo } from '../nucleo/inventario.js';
+import { normalizar, ejemplarNuevo, loQueFalta } from '../nucleo/inventario.js';
 import { presupuestar, formatearYen } from '../nucleo/coste.js';
 import { planearMovimientos } from '../nucleo/movimientos.js';
 import { planearHabilidad } from '../nucleo/habilidades.js';
@@ -71,16 +71,17 @@ export function vistaPlan(datos) {
   ]);
 
   // ---------------------------------------------------------------- pasos
+  const ahora = bloqueAhora(plan, objetivo, datos);
   const pasos = bloquePasos(plan, objetivo, datos);
 
   // ---------------------------------------------------------------- árbol
-  const arbol = tarjeta('El árbol', [
+  const arbol = plegable('El árbol', [
     el('p.nota', {}, [
       'Cada cruce garantiza los 31 que COMPARTEN sus dos padres (el promedio de 31 y 31 es 31), ',
       'más los que fuerce un objeto Recio. De ahí sale la forma del árbol.',
     ]),
     el('ul.arbol', {}, [pintarArbol(plan.arbol, objetivo)]),
-  ]);
+  ], { extra: `${cuentas.total} nodos` });
 
   // ------------------------------------------------------------ movimientos
   const bloqueMovs = objetivo.movimientos.length
@@ -134,7 +135,7 @@ export function vistaPlan(datos) {
     el('div.nota', {}, [pres.sinPrecio.nota]),
   ]);
 
-  return frag([resumen, pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
+  return frag([resumen, ahora, pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
 }
 
 function irAObjetivo(e) {
@@ -142,6 +143,76 @@ function irAObjetivo(e) {
   fijarYGuardar({ vista: 'objetivo' });
 }
 
+
+// --------------------------------------------------------------- ahora mismo
+
+/**
+ * Lo único que se puede hacer hoy, y nada más.
+ *
+ * Un 4×31 con naturaleza son 31 pasos, y enseñarlos todos de golpe no ayuda:
+ * 30 de ellos están bloqueados hasta que existan sus padres. Aquí van las dos
+ * cosas que sí se pueden hacer ya —los cruces cuyos dos padres están en el
+ * inventario, y las capturas que faltan agrupadas por lo que piden— y la lista
+ * entera queda plegada debajo para cuando se quiera ver el camino completo.
+ */
+function bloqueAhora(plan, objetivo, datos) {
+  const listos = [];
+  (function recorre(n) {
+    if (n.tipo === 'cruce' && n.hijos.every((h) => h.tipo === 'inventario')) listos.push(n);
+    n.hijos.forEach(recorre);
+  })(plan.arbol);
+
+  const faltan = loQueFalta(plan);
+
+  if (!listos.length && !faltan.length)
+    return tarjeta('Ahora mismo', [
+      el('p', {}, [chip('el plan está terminado', 'bien'), ' No queda ningún padre por conseguir ni ningún cruce por hacer.']),
+    ]);
+
+  return tarjeta('Ahora mismo', [
+    listos.length
+      ? el('div', {}, [
+          el('h3', { texto: `Cruces que ya puedes hacer · ${listos.length}` }),
+          el('ul.listos', {}, listos.map((n) => el('li', {}, [
+            el('span', {}, [
+              el('strong', { texto: etiquetaBonita(n, objetivo) }),
+              ` — ${n.hijos[0].ejemplar.especie} ♀ × ${n.hijos[1].ejemplar.especie} ♂`,
+              ` · ${[n.objetos.madre, n.objetos.padre].filter(Boolean).join(' + ') || 'sin objetos'}`,
+              n.sexoNecesario && n.rol !== ROL.RAIZ ? ` · cría ${n.sexoNecesario}` : '',
+            ]),
+            el('button.boton.mini', {
+              onclick: () => completarCruce(n, objetivo, datos),
+            }, ['Hecho']),
+          ]))),
+        ])
+      : null,
+
+    faltan.length
+      ? el('div', {}, [
+          el('h3', { texto: `Padres que te faltan · ${faltan.reduce((a, f) => a + f.cuantos, 0)}` }),
+          tabla(
+            ['Cuántos', 'Qué', 'Sexo', 'Especie', ''],
+            faltan.map((f) => [
+              `×${f.cuantos}`,
+              (f.stats.length ? `31 en ${f.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '') +
+                (f.naturaleza ? `${f.stats.length ? ' + ' : ''}naturaleza ${f.naturaleza}` : '') +
+                ((f.movimientos ?? []).length ? ` · con ${f.movimientos.join(', ')}` : ''),
+              f.sexo ?? 'cualquiera',
+              f.especieLibre ? chip(`libre — p. ej. ${f.especieSugerida}`, 'si') : f.especieSugerida,
+              el('button.boton.mini.secundario', {
+                onclick: () => alFormularioDesde(f, datos),
+              }, ['Ya lo tengo']),
+            ]),
+            [0],
+          ),
+          el('p.nota', {}, [
+            '«Libre» quiere decir que vale cualquier especie que comparta grupo huevo: sólo la ',
+            'madre de la cadena tiene la especie atada, porque la cría sale de ella.',
+          ]),
+        ])
+      : null,
+  ]);
+}
 
 // -------------------------------------------------------------- el checklist
 
@@ -197,7 +268,7 @@ function bloquePasos(plan, objetivo, datos) {
     ]);
   });
 
-  return tarjeta('Pasos, para ir tachando', [
+  return plegable('Todos los pasos, en orden', [
     el('p.nota', {}, [
       'De abajo hacia arriba. Un cruce se puede marcar cuando sus dos padres están en el ',
       'inventario; al marcarlo se gastan —en PokeMMO los padres se consumen— y la cría entra ',
@@ -214,8 +285,7 @@ function bloquePasos(plan, objetivo, datos) {
       : null,
     el('ol.pasos', {}, filas),
     hechos.length
-      ? el('details.registro', {}, [
-          el('summary', { texto: `Lo que ya has hecho · ${hechos.length}` }),
+      ? plegable(`Lo que ya has hecho · ${hechos.length}`, [
           el('ol', {}, hechos.map((h) => el('li', { texto: h }))),
           el('button.boton.mini.secundario', {
             onclick: () => fijarYGuardar((st) => ({
@@ -223,9 +293,9 @@ function bloquePasos(plan, objetivo, datos) {
                 (c.id === st.crianzaActiva ? { ...c, hechos: [] } : c)),
             })),
           }, ['Vaciar el registro']),
-        ])
+        ], { pequeno: true, id: 'registro-hechos' })
       : null,
-  ]);
+  ], { extra: `${plan.pasos.pasos.length} pasos` });
 }
 
 /**

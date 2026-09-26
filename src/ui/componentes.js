@@ -32,6 +32,43 @@ export const tarjeta = (titulo, hijos, clase = '') =>
 
 export const chip = (texto, clase = '') => el(`span.chip${clase ? `.${clase}` : ''}`, { texto });
 
+/**
+ * Qué plegables ha abierto el usuario, por título.
+ *
+ * Hace falta porque la app repinta la vista entera en cada cambio: sin esto,
+ * abrir «Todos los pasos» y marcar un paso volvía a cerrarlo, y había que
+ * abrirlo otra vez en cada cruce. Vive aquí y no en el estado global porque no
+ * es un dato de la crianza y no tiene que persistir entre sesiones.
+ */
+const abiertos = new Set();
+
+/**
+ * Una tarjeta plegada: mismo aire, pero cerrada hasta que hace falta.
+ *
+ * Es lo que mantiene las pantallas cortas. Lo que se guarda aquí es lo
+ * secundario —importar, el árbol entero, la copia de seguridad—, nunca el
+ * control principal de una vista.
+ *
+ * @param {string} titulo lo que se lee siempre
+ * @param {Object} opciones `extra` es la aclaración pequeña al lado del título;
+ *   `pequeno` lo pinta como una línea dentro de una tarjeta en vez de como
+ *   tarjeta propia; `id` distingue dos plegables con el mismo título.
+ */
+export function plegable(titulo, hijos, { extra = null, abierto = false, pequeno = false, id = null } = {}) {
+  const clave = id ?? titulo;
+  return el(pequeno ? 'details.pequeno' : 'details.tarjeta.plegable', {
+    open: abiertos.has(clave) || abierto,
+    ontoggle: (ev) => {
+      if (ev.target.open) abiertos.add(clave);
+      else abiertos.delete(clave);
+    },
+  }, [
+    el(pequeno ? 'summary.mas' : 'summary', {},
+      [titulo, extra ? el('span.sumario-extra', { texto: ` · ${extra}` }) : null]),
+    ...[].concat(hijos),
+  ]);
+}
+
 export const aviso = (texto, clase = 'aviso') => el(`div.${clase}`, {}, [texto]);
 
 export function lista(clase, items) {

@@ -56,9 +56,27 @@ dos, y la hoja de sólo naturaleza entra por abajo de la espina.
    `src/nucleo/nombres.js`, que además dice por qué vía resolvió. Lo que no
    reconozca se avisa, nunca se inventa.
 
+## Cómo está montada la app
+
+Tres cosas que no son evidentes leyendo un archivo suelto:
+
+1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
+   `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
+   siguen escribiendo `objetivo` como cuando sólo había una. Si escribes
+   `objetivo` **y** quieres que la crianza activa NO lo reciba (al cambiar de
+   crianza), pasa también `crianzas` en la misma llamada. Sin eso, cambiar de
+   crianza escribe el objetivo de la nueva sobre la vieja. Pasó de verdad.
+2. **Lo que marca un paso como hecho es el inventario, no una casilla.**
+   Completar un cruce borra sus dos padres y anota la cría (`criaDe()`), y el
+   plan se recalcula. No guardes casillas por su lado: irían atadas a un id de
+   nodo que cambia en cada recálculo y acabarían mintiendo.
+3. **Los plegables recuerdan si están abiertos** en un `Set` de
+   `componentes.js`, porque la app repinta la vista entera en cada cambio. Sin
+   eso, marcar un paso cerraba la lista de pasos.
+
 ## Al tocar la interfaz
 
-Dos trampas que ya han costado caro y que no se ven en las pruebas unitarias:
+Tres trampas que ya han costado caro y que no se ven en las pruebas unitarias:
 
 - **Un cambio de estado que no cambia nada no debe repintar.** Al repintar, el
   navegador dispara `blur` y `change` sobre los elementos que se están quitando
@@ -66,6 +84,12 @@ Dos trampas que ya han costado caro y que no se ven en las pruebas unitarias:
   vez y la página entra en bucle síncrono y se cuelga. `fijar()` compara antes de
   emitir, y `campoConSugerencias` comprueba `isConnected` y el valor previo. No
   quites ninguna de las dos guardas.
+- **Lo secundario va plegado.** Una vista con nueve tarjetas iguales no es una
+  vista, es un pasillo. El plan tenía 31 pasos en una lista plana y medía cinco
+  pantallas; ahora «Ahora mismo» dice lo accionable y el resto va en
+  `plegable()`. Al plegar algo, comprueba que las pruebas de navegador lo abran
+  (`abrir()` en `pruebas/navegador.mjs`): un `<details>` cerrado esconde sus
+  hijos y Playwright no los puede tocar.
 - **`<datalist>` no sirve en el móvil.** En Android Chrome no lista nada, y
   `autocomplete="off"` lo remata. El autocompletado es propio
   (`campoConSugerencias`), abre la lista con `pointerdown` —no con `focus`, que lo
@@ -95,7 +119,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 158 pruebas unitarias
+node pruebas/ejecutar.mjs             # 171 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

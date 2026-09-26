@@ -9,7 +9,7 @@
 // Por eso vive aquí y no duplicado en las dos vistas: si el formato cambia, no
 // hay dos sitios que puedan quedarse desincronizados.
 
-import { el, tarjeta, chip, aviso, frag, tabla, interruptor } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, interruptor } from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar } from './estado.js';
 import { importar as importarTexto, aObjetivo, PLANTILLA } from '../nucleo/importar.js';
@@ -22,7 +22,11 @@ export const DESTINOS = { INVENTARIO: 'inventario', OBJETIVO: 'objetivo' };
 
 // ------------------------------------------------------------- la tarjeta
 
-export function seccionImportar(datos, destino) {
+/**
+ * @param {Object} opciones `comoTarjeta: false` devuelve sólo el contenido, para
+ *   meterlo dentro de un plegable sin anidar una tarjeta dentro de otra.
+ */
+export function seccionImportar(datos, destino, { comoTarjeta = true } = {}) {
   const { vistaImportar, ocr } = obtener();
   const sub = vistaImportar ?? 'imagen';
   const activo = ocr?.destino === destino ? ocr : null;
@@ -118,17 +122,18 @@ export function seccionImportar(datos, destino) {
     ]),
   }[sub] ?? (() => null);
 
-  return tarjeta(
-    destino === DESTINOS.OBJETIVO ? 'Importar el objetivo de una ficha' : 'Importar',
-    [
-      el('div.fila', { style: 'margin-bottom:12px' }, [
-        pestana('imagen', '📷 Imagen'),
-        pestana('texto', '📋 Texto'),
-        pestana('archivo', '📄 Archivo'),
-      ]),
-      cuerpo(),
-    ],
-  );
+  const contenido = [
+    el('div.fila', { style: 'margin-bottom:12px' }, [
+      pestana('imagen', '📷 Imagen'),
+      pestana('texto', '📋 Texto'),
+      pestana('archivo', '📄 Archivo'),
+    ]),
+    cuerpo(),
+  ];
+
+  return comoTarjeta
+    ? tarjeta(destino === DESTINOS.OBJETIVO ? 'Importar el objetivo de una ficha' : 'Importar', contenido)
+    : frag(contenido);
 }
 
 // ----------------------------------------------------------- la revisión
@@ -278,8 +283,7 @@ function revisarObjetivo(datos, imp, todosLosIvs) {
  * la respuesta está en la propia pantalla y no sólo en los documentos.
  */
 function notaSinExport() {
-  return el('details.registro', {}, [
-    el('summary', { texto: '¿No se pueden sacar las cajas del juego de golpe?' }),
+  return plegable('¿No se pueden sacar las cajas del juego de golpe?', [
     el('p', {}, [
       'No: PokeMMO no tiene export ni API que devuelva tus Pokémon, y leerlos de la memoria ',
       'del juego o del tráfico de red lo prohíben sus términos de servicio — el cliente vigila ',
@@ -287,7 +291,7 @@ function notaSinExport() {
       'Fotografiar la pantalla sí vale, y por eso puedes subir varias capturas de golpe. ',
       'Está explicado en ', el('code', { texto: 'docs/exportar-el-pc.md' }), '.',
     ]),
-  ]);
+  ], { pequeno: true });
 }
 
 // ------------------------------------------------------------- acciones

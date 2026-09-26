@@ -1,6 +1,6 @@
 // El plan de EVs: cuántos faltan, en qué hordas y cuántas rondas.
 
-import { el, tarjeta, chip, aviso, frag, tabla, numero } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla } from './componentes.js';
 import { NOMBRE_STAT, EV_MAX_TOTAL } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { planearEvs } from '../nucleo/entrenamiento.js';
@@ -58,21 +58,30 @@ export function vistaEntrenamiento(datos) {
       ]);
     }
 
+    const plural = (n, una, varias) => `${n} ${n === 1 ? una : varias}`;
     return tarjeta(`${NOMBRE_STAT[s.stat]} · faltan ${s.faltan} EVs`, [
       el('div.etiquetas', {}, [
-        chip(`${s.hordasNecesarias} hordas`, 'si'),
+        chip(plural(s.hordasNecesarias, 'horda', 'hordas'), 'si'),
         chip(`${s.evsPorHorda} EVs por horda`),
-        chip(`+${s.puntosANivel} puntos a nivel ${plan.nivel}`, 'bien'),
+        chip(`+${s.puntosANivel} ${s.puntosANivel === 1 ? 'punto' : 'puntos'} a nivel ${plan.nivel}`, 'bien'),
       ]),
       el('p.nota', {}, [
+        'La mejor: ', el('strong', { texto: `${s.mejor.especie} +${s.mejor.ev}` }),
+        ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}). `,
         `Una horda son 5 Pokémon, así que cada ronda da ${s.mejor.ev} × 5`,
         plan.objeto.factor > 1 ? ` × ${plan.objeto.factor}` : '',
-        ` = ${s.evsPorHorda} EVs. Las hordas salen con Dulce Aroma.`,
+        ` = ${s.evsPorHorda} EVs. Salen con Dulce Aroma.`,
       ]),
-      tabla(
-        ['EV', 'Especie', 'Región', 'Zona', 'Nivel'],
-        s.hordas.map((h) => [`+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel]),
-      ),
+      // La tabla entera plegada: para entrenar hace falta UN sitio, no seis. Los
+      // otros están por si ese pilla lejos.
+      s.hordas.length > 1
+        ? plegable(`Otros ${s.hordas.length - 1} sitios`, [
+            tabla(
+              ['EV', 'Especie', 'Región', 'Zona', 'Nivel'],
+              s.hordas.slice(1).map((h) => [`+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel]),
+            ),
+          ], { pequeno: true, id: `hordas-${s.stat}` })
+        : null,
       el('p.nota', {}, [
         'Alternativa sin moverse: ', el('strong', { texto: `${s.vitamina.cuantas} × ${s.vitamina.nombre}` }),
         `. ${s.vitamina.nota}.`,
@@ -80,9 +89,9 @@ export function vistaEntrenamiento(datos) {
     ]);
   });
 
-  const huecos = tarjeta('Lo que no sé', [
+  const huecos = plegable('Lo que no sé', [
     el('ul', {}, plan.huecos.map((x) => el('li', { texto: x }))),
-  ]);
+  ], { extra: `${plan.huecos.length} huecos de la wiki` });
 
   return frag([resumen, bloqueOptimizar(plan.optimizacion), ...bloques, huecos]);
 }

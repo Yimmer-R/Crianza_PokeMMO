@@ -12,7 +12,7 @@
 // pantalla de revisión: un OCR que se equivoque en un IV rompería el plan entero
 // en silencio.
 
-import { el, tarjeta, chip, aviso, frag, tabla, campoConSugerencias } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, campoConSugerencias } from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX, SEXOS } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar, fijar } from './estado.js';
 import {
@@ -66,7 +66,10 @@ export function vistaInventario(datos) {
 function bloqueFaltan(plan) {
   if (!plan?.ok) return null;
   const faltan = loQueFalta(plan);
-  return tarjeta('Lo que le falta al plan', [
+  const cuantos = faltan.reduce((a, f) => a + f.cuantos, 0);
+  // Plegado: la lista entera ya está en la pestaña Plan. Aquí sirve de
+  // chuleta mientras se anota una captura, no de titular.
+  return plegable('Lo que le falta al plan', [
     faltan.length
       ? tabla(
           ['Cuántos', 'Qué', 'Sexo', 'Especie', 'Movimientos'],
@@ -81,7 +84,7 @@ function bloqueFaltan(plan) {
           [0],
         )
       : el('p', {}, [chip('nada: el inventario ya cubre el plan', 'bien')]),
-  ]);
+  ], { extra: cuantos ? `${cuantos} por conseguir` : 'nada pendiente' });
 }
 
 // ----------------------------------------------------------- registro manual
@@ -266,7 +269,7 @@ function bloqueLista(inventario, seleccion) {
 }
 
 function bloqueCopia(inventario, avisoPersistencia) {
-  return tarjeta('Copia de seguridad', [
+  return plegable('Copia de seguridad', [
     el('p.nota', {}, [
       'El inventario se guarda en este navegador (localStorage), así que no viaja a ningún sitio ',
       'ni se comparte. Si cambias de equipo, expórtalo.',
@@ -282,7 +285,7 @@ function bloqueCopia(inventario, avisoPersistencia) {
         onchange: (ev) => restaurarCopia(ev.target.files?.[0]),
       }),
     ]),
-  ]);
+  ], { abierto: !!avisoPersistencia });
 }
 
 // ---------------------------------------------------------------- acciones

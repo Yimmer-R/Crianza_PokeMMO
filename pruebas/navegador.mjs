@@ -28,6 +28,20 @@ const confirmarCampo = async (selector) => {
   await pagina.waitForTimeout(120);
 };
 
+/**
+ * Abre un plegable por su título, si no lo está ya.
+ *
+ * Lo secundario de cada vista vive en <details> cerrados; una persona los abre
+ * de un toque y la prueba tiene que hacer lo mismo. Quedan abiertos entre
+ * repintados, así que sólo hace falta la primera vez.
+ */
+const abrir = async (titulo) => {
+  const sum = pagina.locator('summary').filter({ hasText: titulo }).first();
+  await sum.waitFor({ timeout: 5000 });
+  if (!(await sum.evaluate((n) => n.parentElement.open))) await sum.click();
+  await pagina.waitForTimeout(150);
+};
+
 const paso = async (nombre, fn) => {
   try { await fn(); console.log(`  ok  ${nombre}`); }
   catch (e) { console.log(`  FALLA  ${nombre}: ${e.message}`); errores.push(`${nombre}: ${e.message}`); }
@@ -59,12 +73,41 @@ await paso('marcar 4 IVs y una naturaleza', async () => {
 
 await paso('la pestaña Plan pinta pasos, árbol y presupuesto', async () => {
   await pagina.click('button[data-vista="plan"]');
+  // Lo secundario va plegado; se abren una vez y se quedan abiertos.
+  await abrir('Todos los pasos, en orden');
+  await abrir('El árbol');
   await pagina.waitForSelector('.pasos li', { timeout: 5000 });
   const pasos = await pagina.locator('.pasos li').count();
   if (pasos < 10) throw new Error(`sólo ${pasos} pasos`);
   const total = await pagina.textContent('.total');
   if (!/PokéYen/.test(total)) throw new Error(`presupuesto raro: ${total}`);
   console.log(`       ${pasos} pasos · presupuesto ${total.trim()}`);
+});
+
+await paso('«Ahora mismo» resume lo accionable y un plegable sobrevive al repintado', async () => {
+  await pagina.click('button[data-vista="plan"]');
+  const ahora = await pagina.textContent('.tarjeta:has-text("Ahora mismo")');
+  if (!/Padres que te faltan/.test(ahora))
+    throw new Error('debería listar los padres que faltan agrupados');
+  // Agrupados: una fila por requisito, no una por captura.
+  const filas = await pagina.locator('.tarjeta:has-text("Ahora mismo") tbody tr').count();
+  const pasos = await pagina.locator('.pasos li.conseguir').count();
+  if (filas >= pasos) throw new Error(`${filas} filas para ${pasos} capturas: no está agrupando`);
+
+  // El detalle abierto tiene que seguir abierto tras un cambio de estado: si se
+  // cerrara, marcar un paso obligaría a reabrirlo en cada cruce.
+  await abrir('Todos los pasos, en orden');
+  await pagina.click('button[data-vista="objetivo"]');
+  await abrir('Regiones desbloqueadas');
+  await pagina.uncheck('#region-Unova');
+  await pagina.check('#region-Unova');
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(200);
+  const sigueAbierto = await pagina.locator('summary')
+    .filter({ hasText: 'Todos los pasos, en orden' })
+    .first().evaluate((n) => n.parentElement.open);
+  if (!sigueAbierto) throw new Error('el plegable se ha cerrado solo al repintar');
+  console.log(`       ${filas} filas agrupan ${pasos} capturas`);
 });
 
 await paso('el árbol tiene nodos anidados', async () => {
@@ -75,6 +118,7 @@ await paso('el árbol tiene nodos anidados', async () => {
 
 await paso('Capturas respeta el filtro de regiones', async () => {
   await pagina.click('button[data-vista="objetivo"]');
+  await abrir('Regiones desbloqueadas');
   for (const r of ['Johto', 'Hoenn', 'Sinnoh', 'Unova']) await pagina.uncheck(`#region-${r}`);
   await pagina.click('button[data-vista="capturas"]');
   await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
@@ -183,6 +227,7 @@ await paso('móvil: 390px de ancho sin scroll horizontal', async () => {
 
 await paso('todos los cruces con naturaleza llevan Piedraeterna', async () => {
   await pagina.click('button[data-vista="plan"]');
+  await abrir('Todos los pasos, en orden');
   await pagina.waitForSelector('.pasos li');
   const texto = await pagina.textContent('.pasos');
   if (!texto.includes('Piedraeterna'))
@@ -224,6 +269,9 @@ await paso('el checklist: marcar un cruce gasta los padres y anota la cría', as
   await anotar('Charmander', '♂', 'velocidad');
 
   await pagina.click('button[data-vista="plan"]');
+  // El cruce listo sale también en «Ahora mismo», pero aquí se prueba el
+  // checklist entero, que es el que gasta los padres.
+  await abrir('Todos los pasos, en orden');
   await pagina.waitForSelector('.pasos li.cruzar.listo', { timeout: 5000 });
   await pagina.click('text=Hecho: quitar los padres');
   await pagina.waitForSelector('#deshacer-paso', { timeout: 5000 });
@@ -239,6 +287,7 @@ await paso('el checklist: marcar un cruce gasta los padres y anota la cría', as
 
   // Y se puede deshacer: los dos padres vuelven.
   await pagina.click('button[data-vista="plan"]');
+  await abrir('Todos los pasos, en orden');
   await pagina.click('#deshacer-paso');
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('.inventario-lista tbody tr:nth-child(2)', { timeout: 5000 });
@@ -492,8 +541,8 @@ await paso('cambiar de pestaña SÍ lleva al principio', async () => {
 
 await paso('Objetivo tiene su propio importador y aplica la ficha al objetivo', async () => {
   await pagina.click('button[data-vista="objetivo"]');
-  await pagina.waitForSelector('.tarjeta:has-text("Importar el objetivo de una ficha")');
-  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=📋 Texto');
+  await abrir('Importar el objetivo de una ficha');
+  await pagina.click('.plegable:has-text("Importar el objetivo de una ficha") >> text=📋 Texto');
   await pagina.waitForSelector('#texto-importar-objetivo');
   await pagina.fill('#texto-importar-objetivo', [
     'Nv. 1 Chimchar ♀',
@@ -503,7 +552,7 @@ await paso('Objetivo tiene su propio importador y aplica la ficha al objetivo', 
     'Habilidad: Mar Llamas',
     'Movimientos: Placaje, Maquinación, Tormento, Desenrollar',
   ].join('\n'));
-  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=Leer el texto');
+  await pagina.click('.plegable:has-text("Importar el objetivo de una ficha") >> text=Leer el texto');
   await pagina.waitForSelector('text=Revisar antes de aplicar', { timeout: 5000 });
 
   const rev = await pagina.textContent('.tarjeta:has-text("Revisar antes de aplicar")');

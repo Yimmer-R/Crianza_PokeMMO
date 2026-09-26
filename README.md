@@ -56,6 +56,24 @@ se recorta por donde puede. El emparejado busca el hueco que **más capturas
 ahorra**, no el primero que encaja: un 3×31 metido en un hueco de 3×31 borra siete
 capturas del árbol, y metido en una hoja de 1×31 no ahorra ninguna.
 
+Y no se tira nada que valga: una **hembra de la especie objetivo** sirve aunque no
+tenga ni un 31, porque la especie la pone la madre y nada más. El plan alarga la
+cadena por abajo con un cruce en el que ella sólo pone la especie y el padre trae
+el IV con su objeto — se cambia la captura cara del árbol (esa especie, hembra, y
+además con el 31) por una fácil.
+
+**Los pasos son un checklist.** Un cruce se puede marcar cuando sus dos padres
+están en el inventario; al marcarlo **se gastan** —en PokeMMO los padres se
+consumen— y la cría entra en el inventario con los 31 que el cruce garantiza. El
+plan se recalcula y el paso desaparece solo. No hay casillas guardadas aparte: el
+estado del plan **es** el inventario, y así no pueden discrepar. Hay un nivel de
+deshacer, porque marcar un paso por error borra dos Pokémon.
+
+**Varias crianzas a la vez.** La barra de arriba cambia entre ellas y se lleva el
+Objetivo, el Plan y el Entrenamiento. El inventario es **uno solo**, a propósito:
+los Pokémon son los mismos, están en tu PC. Si dos planes cuentan con el mismo
+ejemplar se avisa; el reparto de verdad lo hace completar un paso.
+
 **Cuando la captura no sale como decía el plan.** Pedías un macho con 31 en
 Velocidad y te ha salido hembra con 31 en Ataque. Lo anotas y la app te dice si
 encaja en otro hueco, en cuál conviene más, o si no sirve para esta cadena y hay
@@ -100,6 +118,13 @@ vez de callarlo.
 **Entrenamiento.** Para los EVs que pidas: qué hordas los dan, en qué zona de qué
 región, cuántas rondas con el objeto duplicador, y qué baya usar si te has pasado.
 
+**EVs que no dan ningún punto.** Los EVs suben la característica por escalones y
+lo que queda entre uno y el siguiente está tirado. A nivel 100 un punto son 4 EVs;
+a nivel 50 son 8, pero el corte depende de la **paridad del IV** (impar: 4, 12,
+20…; par: 8, 16, 24…). La app dice cuánto estás tirando y dónde reinvertirlo para
+completar un punto entero. El clásico 252/252/6 con IVs a 31 tira 2 EVs; con IVs a
+30 tira 14, y uno de ellos sí vale un punto.
+
 ## Estructura
 
 ```
@@ -118,7 +143,9 @@ src/nucleo/             la lógica, sin nada del DOM
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
   habilidades.js          normal, oculta, y qué objeto hace falta
 src/ui/                 vistas y estado; nada de reglas del juego
-  componentes.js          helpers de render, y el autocompletado propio
+  estado.js               las crianzas, el inventario y el repintado
+  barra-crianzas.js       cambiar de crianza sin salir de la pestaña
+  componentes.js          helpers de render, el autocompletado y los plegables
   importador.js           la interfaz de importar, compartida por dos pestañas
   ocr.js                  lee una captura con Tesseract.js (necesita canvas)
 src/datos/cargador.js   carga los JSON
@@ -129,7 +156,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                158 pruebas unitarias + una de navegador
+pruebas/                171 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 
@@ -142,7 +169,7 @@ las pruebas corren en Node sin navegador.
 node herramientas/extraer-wiki.mjs [ruta-al-repo-de-la-wiki]
 ```
 
-Busca `../PokeMMO` por defecto. Saca 667 Pokémon con sus grupos huevo, ratios de
+Busca `../wiki-pokemmo` por defecto, y `../PokeMMO` como respaldo. Saca 667 Pokémon con sus grupos huevo, ratios de
 género, learnsets completos y encuentros por región; las 25 naturalezas; los 177
 movimientos huevo cruzados al revés con sus grupos; las hordas de EVs por
 característica; y los precios de los objetos de crianza y entrenamiento.

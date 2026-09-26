@@ -107,11 +107,22 @@ a { color: var(--acento); }
 
 .tarjeta {
   background: var(--fondo-alt); border: 1px solid var(--borde);
-  border-radius: var(--radio); padding: 16px; margin-bottom: 16px;
+  border-radius: var(--radio); padding: 16px 18px; margin-bottom: 14px;
 }
 .tarjeta > h2, .tarjeta > h3 { margin-top: 0; }
-h2 { font-size: 1.15rem; }
-h3 { font-size: 1rem; }
+.tarjeta > h3 { margin-top: 18px; }
+h2 { font-size: 1.05rem; letter-spacing: 0.01em; }
+h3 { font-size: 0.92rem; color: var(--texto-tenue); text-transform: none; }
+
+/* Un bloque plegable con el mismo aire que una tarjeta. Lo secundario se
+   guarda aquí en vez de ocupar pantalla: importar, el árbol, la copia. */
+.plegable { padding-top: 12px; padding-bottom: 12px; }
+.plegable > summary {
+  cursor: pointer; font-weight: 600; font-size: 1.05rem; list-style-position: outside;
+}
+.plegable > summary::marker { color: var(--texto-tenue); }
+.plegable[open] > summary { margin-bottom: 12px; }
+.plegable .sumario-extra { font-weight: 400; color: var(--texto-tenue); font-size: 0.85rem; }
 
 .rejilla { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
@@ -126,9 +137,14 @@ input, select, textarea, button {
 input[type="checkbox"] { width: auto; accent-color: var(--acento); }
 textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 
+/* Se pone también en <label> y en <a>, así que trae su propia caja: los
+   <label> no entran en la regla de arriba y salían sin borde ni relleno. */
 .boton {
-  background: var(--acento); border-color: var(--acento); color: #fff;
-  cursor: pointer; width: auto; font-weight: 600;
+  display: inline-block; width: auto;
+  padding: 7px 12px; border: 1px solid var(--acento); border-radius: 8px;
+  background: var(--acento); color: #fff;
+  font: inherit; font-weight: 600; line-height: 1.3; text-decoration: none;
+  cursor: pointer;
 }
 .boton:hover { filter: brightness(1.1); }
 .boton.secundario { background: var(--fondo-alt2); color: var(--texto); border-color: var(--borde); }
@@ -139,7 +155,9 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 
 .etiquetas { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
-  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  /* nowrap: al partirse en dos líneas el radio de 999px lo convertía en un
+     globo ilegible, y en el móvil pasaba en cada tabla. */
+  display: inline-block; white-space: nowrap; padding: 2px 9px; border-radius: 999px;
   background: var(--fondo-alt2); border: 1px solid var(--borde);
   font-size: 0.78rem; color: var(--texto-tenue);
 }
@@ -148,13 +166,17 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 .chip.mal { color: var(--mal); border-color: var(--mal); }
 .chip.ojo { color: var(--ojo); border-color: var(--ojo); }
 
-.aviso, .error, .nota {
+/* Un aviso y un error sí son cajas: interrumpen. Una nota no — era una caja
+   rellena por cada párrafo explicativo y la pantalla parecía un acordeón. */
+.aviso, .error {
   border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 0.9rem;
   border: 1px solid var(--borde); background: var(--fondo-alt2);
 }
 .error { border-color: var(--mal); color: var(--mal); }
 .aviso { border-color: var(--ojo); }
-.nota { color: var(--texto-tenue); }
+.nota {
+  margin: 6px 0 12px; font-size: 0.86rem; color: var(--texto-tenue);
+}
 .error ul, .aviso ul, .nota ul { margin: 6px 0 0; padding-left: 20px; }
 
 .cargando { color: var(--texto-tenue); }
@@ -207,9 +229,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pasos li.cruzar:not(.listo) { opacity: 0.75; }
 .pasos .marca { display: none; }
 .pasos li .boton.mini { margin-top: 8px; }
-.registro { margin-top: 12px; font-size: 0.86rem; color: var(--texto-tenue); }
-.registro summary { cursor: pointer; }
-.registro ol { margin: 8px 0; padding-left: 20px; }
+.pequeno > summary { cursor: pointer; font-size: 0.85rem; color: var(--texto-tenue); margin: 6px 0; }
+.pequeno { font-size: 0.9rem; }
+.listos { list-style: none; padding: 0; margin: 0 0 4px; }
+.listos li {
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; padding: 8px 10px; margin-bottom: 6px; font-size: 0.9rem;
+  background: var(--fondo-alt2); border: 1px solid var(--acento); border-radius: 8px;
+}
+.pequeno ol, .pequeno ul { margin: 8px 0; padding-left: 20px; }
 
 .arbol { list-style: none; padding-left: 0; margin: 0; }
 .arbol ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--borde); }
