@@ -1,7 +1,10 @@
 // El formulario del Pokémon objetivo: lo que el usuario quiere conseguir.
 
 import { el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor } from './componentes.js';
-import { STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS } from '../nucleo/constantes.js';
+import {
+  STATS, NOMBRE_STAT, REGIONES, HORAS, ESTACIONES,
+  EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS,
+} from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { validarObjetivo } from '../nucleo/planificador.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
@@ -12,7 +15,7 @@ let resolutores = null;
 const res = (datos) => (resolutores ??= crearResolutores(datos));
 
 export function vistaObjetivo(datos) {
-  const { objetivo, regionesDisponibles } = obtener();
+  const { objetivo, regionesDisponibles, cuando } = obtener();
   const p = datos.pokedex[objetivo.especie];
 
   // Acepta un objeto o una función del objetivo ACTUAL. La forma de función es
@@ -213,6 +216,39 @@ export function vistaObjetivo(datos) {
       : el('p.vacio', { texto: 'Elige una especie primero.' }),
   ]);
 
+  // --------------------------------------------------------- dónde y cuándo
+  //
+  // Hora y estación van con las regiones porque son el mismo tipo de cosa: un
+  // filtro global sobre dónde puedes cazar y entrenar hoy, que no pertenece a
+  // ninguna crianza en concreto.
+  const selectorCuando = (clave, etiqueta, opciones, ninguna) => el('div', { style: 'flex:1 1 160px' }, [
+    el('label', { for: `cuando-${clave}`, texto: etiqueta }),
+    el('select', {
+      id: `cuando-${clave}`,
+      onchange: (ev) => fijarYGuardar((e) => ({
+        cuando: { ...e.cuando, [clave]: ev.target.value || null },
+      })),
+    }, [
+      el('option', { value: '', selected: !cuando[clave] }, [ninguna]),
+      ...opciones.map((o) => el('option', { value: o, selected: cuando[clave] === o }, [o])),
+    ]),
+  ]);
+
+  const bloqueCuando = plegable('Cuándo estás jugando', [
+    el('p.nota', {}, [
+      'Muchas tablas de encuentro sólo existen a una hora o en una estación. Si dices cuál ',
+      'tienes, las capturas y las hordas que sirven ahora salen primero; el resto no se ',
+      'esconde, se marca con cuándo sí. En PokeMMO un día del juego son 6 horas reales, así ',
+      'que la franja rota cuatro veces al día; las estaciones van por mes real.',
+    ]),
+    el('div.fila', {}, [
+      selectorCuando('hora', 'Hora del juego', HORAS, 'Me da igual'),
+      selectorCuando('estacion', 'Estación', ESTACIONES, 'Me da igual'),
+    ]),
+  ], {
+    extra: [cuando.hora, cuando.estacion].filter(Boolean).join(' · ') || 'sin filtrar',
+  });
+
   // ------------------------------------------------------------- regiones
   const bloqueRegiones = plegable('Regiones desbloqueadas', [
     el('p.nota', {}, [
@@ -275,6 +311,7 @@ export function vistaObjetivo(datos) {
     p ? tarjeta('Habilidad y movimientos', [bloqueHabilidad, bloqueMovimientos]) : null,
     bloqueEvs,
     bloqueRegiones,
+    bloqueCuando,
     validacion ? (sueltoAlFinal ? validacion : tarjeta(null, [validacion])) : null,
   ]);
 }

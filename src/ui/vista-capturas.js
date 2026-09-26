@@ -7,15 +7,16 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunida
 import { NOMBRE_STAT } from '../nucleo/constantes.js';
 import { obtener } from './estado.js';
 import { planDeCapturas, regionesQueHacenFalta } from '../nucleo/capturas.js';
+import { cuandoLegible } from '../nucleo/cuando.js';
 
 export function vistaCapturas(datos) {
-  const { plan, regionesDisponibles, objetivo } = obtener();
+  const { plan, regionesDisponibles, objetivo, cuando } = obtener();
 
   if (!plan?.ok)
     return tarjeta('Sin plan no hay capturas', [el('p.vacio', { texto: 'Define el objetivo primero.' })]);
 
-  const capturas = planDeCapturas(plan, datos, regionesDisponibles);
-  const regiones = regionesQueHacenFalta(plan, datos, regionesDisponibles);
+  const capturas = planDeCapturas(plan, datos, regionesDisponibles, cuando);
+  const regiones = regionesQueHacenFalta(plan, datos, regionesDisponibles, cuando);
 
   if (!capturas.length)
     return tarjeta('Nada que capturar', [
@@ -27,6 +28,8 @@ export function vistaCapturas(datos) {
       chip(`${capturas.reduce((a, c) => a + c.cuantos, 0)} padres por conseguir`, 'ojo'),
       ...regiones.usadas.map((r) => chip(r, 'si')),
       ...regiones.bloqueadas.map((r) => chip(`${r} (bloqueada)`, 'mal')),
+      cuando.hora ? chip(cuando.hora, 'si') : null,
+      cuando.estacion ? chip(cuando.estacion, 'si') : null,
     ]),
     el('p.nota', {}, [
       'Los IVs no se pueden filtrar al capturar, así que la columna de intentos es una media, ',
@@ -72,7 +75,19 @@ export function vistaCapturas(datos) {
           : chip('espina materna: tiene que ser esta especie', 'ojo'),
         rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
         chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
+        (cuando.hora || cuando.estacion)
+          ? chip(
+              rec.zonasAhora ? `${rec.zonasAhora} ahora mismo` : 'ninguna ahora mismo',
+              rec.zonasAhora ? 'bien' : 'mal',
+            )
+          : null,
       ]),
+      (cuando.hora || cuando.estacion) && !rec.zonasAhora
+        ? aviso(
+            `Con ${[cuando.hora, cuando.estacion].filter(Boolean).join(' y ')} no sale en ninguna ` +
+            'de estas zonas. La tabla dice cuándo sí: espera a esa franja, o quita el filtro en Objetivo.',
+          )
+        : null,
       libre
         ? el('p.nota', {}, [
             'Como la cría saca la especie de la MADRE, estos padres pueden ser de cualquier especie ',
@@ -97,8 +112,10 @@ export function vistaCapturas(datos) {
 
       el('h3', { texto: 'Dónde' }),
       tabla(
-        ['Región', 'Zona', 'Método', 'Nivel', 'Rareza'],
-        rec.zonas.map((z) => [chip(z.region, 'si'), z.zona, z.metodo, z.nivel, z.rareza]),
+        ['Región', 'Zona', 'Método', 'Nivel', 'Rareza', 'Cuándo'],
+        rec.zonas.map((z) => [
+          chip(z.region, 'si'), z.zona, z.metodo, z.nivel, z.rareza, celdaCuando(z),
+        ]),
       ),
 
       grupo[0].viables.length > 1
@@ -139,4 +156,20 @@ export function vistaCapturas(datos) {
   });
 
   return frag([cabecera, ...bloques, ...bloquesGtl]);
+}
+
+
+/**
+ * La columna «Cuándo» de una zona.
+ *
+ * Tres casos distintos y los tres importan: la que vale siempre no necesita
+ * aviso, la que vale ahora mismo se marca en verde, y la que no se marca con
+ * lo que hay que esperar — que no es lo mismo esperar a la noche (minutos) que
+ * a otra estación (semanas).
+ */
+function celdaCuando(z) {
+  const texto = cuandoLegible(z);
+  if (texto === 'siempre') return chip('siempre');
+  if (z.ahora !== false && !z.noAhora) return chip(texto, 'bien');
+  return chip(texto, z.noAhora?.espera === 'estacion' ? 'mal' : 'ojo');
 }

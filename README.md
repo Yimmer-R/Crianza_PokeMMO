@@ -115,6 +115,20 @@ está fijado, porque da igual quién haga de madre.
 nada de las demás. Cuando algo sólo existe en una región que no tienes, lo dice en
 vez de callarlo.
 
+**Hora del juego y estación.** Muchas tablas de encuentro sólo existen a una hora
+o en una estación: una horda «de noche · invierno» no está si entras de día en
+verano. Dices qué tienes y las capturas y las hordas que sirven ahora salen
+primero. Lo que no toca **no se esconde** —a diferencia de las regiones, esperar
+a la noche son minutos y a otra estación semanas— sino que se marca con cuándo
+sí: verde «ahora», amarillo «espera una franja», rojo «espera una estación».
+
+**Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme. Al lado,
+para los objetos de los que hay un precio de mercado observado, se compara: la
+Piedraeterna la venden las cinco guarderías a 4.000 fijos y el GTL lleva un año
+por encima casi todo el tiempo, así que comprarla ahí —lo que uno hace por
+costumbre— suele salir más caro. El precio observado va con su fecha y avisando
+de que caduca.
+
 **Entrenamiento.** Para los EVs que pidas: qué hordas los dan, en qué zona de qué
 región, cuántas rondas con el objeto duplicador, y qué baya usar si te has pasado.
 
@@ -138,6 +152,7 @@ src/nucleo/             la lógica, sin nada del DOM
   nombres.js              resolver nombres del juego, del inglés y de OCR
   importar.js             parser de texto, CSV y JSON
   capturas.js             dónde conseguir lo que falta, filtrado por región
+  cuando.js               hora del juego y estación: si está ahí cuando entras
   coste.js                el presupuesto, separando lo confirmado de lo estimado
   entrenamiento.js        el plan de EVs
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
@@ -156,7 +171,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                171 pruebas unitarias + una de navegador
+pruebas/                188 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 

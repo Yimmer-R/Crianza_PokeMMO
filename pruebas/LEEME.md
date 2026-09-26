@@ -6,7 +6,7 @@
 node pruebas/ejecutar.mjs
 ```
 
-171 pruebas, contra los JSON reales de `datos/` y no contra dobles inventados: si
+188 pruebas, contra los JSON reales de `datos/` y no contra dobles inventados: si
 la extracción de la wiki rompe algo, las pruebas lo ven.
 
 Las dos que más valen:

@@ -24,6 +24,7 @@ import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
   costeElegirSexo, sirveComoLineaMaterna,
 } from './compatibilidad.js';
+import { disponibleAhora, CUANDO_CUALQUIERA } from './cuando.js';
 
 let contadorId = 0;
 const nuevoId = () => `n${++contadorId}`;
@@ -143,7 +144,7 @@ export function vias(p, movimiento) {
  * una región disponible, en sitios comunes, y que dé machos y hembras con soltura
  * (los huecos de relleno necesitan de los dos sexos).
  */
-export function elegirRelleno(especieObjetivo, datos, regionesDisponibles) {
+export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuando = CUANDO_CUALQUIERA) {
   const { pokedex, encuentros } = datos;
   const regiones = new Set(regionesDisponibles);
 
@@ -152,6 +153,11 @@ export function elegirRelleno(especieObjetivo, datos, regionesDisponibles) {
     const enc = (encuentros[cand.especie] ?? []).filter((e) => regiones.has(e.region));
     if (!enc.length) return -Infinity; // no se puede capturar donde juega el usuario
     let puntos = 0;
+    // Lo que se puede cazar con la hora y la estación que hay puestas pesa
+    // mucho: de poco vale la especie más común si sólo sale en invierno.
+    const ahora = enc.filter((e) => disponibleAhora(e, cuando));
+    if (!ahora.length) puntos -= 20;
+    else puntos += Math.min(ahora.length, 6);
     for (const e of enc) {
       const r = (e.rareza ?? '').toLowerCase();
       if (r.includes('muy común') || r.includes('muy comun')) puntos += 10;
@@ -381,30 +387,34 @@ function restriccionesDeLosHijos(rolDelCruce) {
  *
  * Sólo cabe una cosa en el objeto del padre, así que esto vale mientras al hueco
  * le falte un único requisito. Al hueco de abajo de la espina siempre le falta
- * exactamente uno: un 31, o la naturaleza. Y sólo se alarga si en el inventario
- * hay de verdad una hembra así sin usar; si no, sería un cruce regalado.
+ * exactamente uno: un 31, o la naturaleza.
+ *
+ * Se llama DESPUÉS de colocar el inventario y mira sólo lo que ha SOBRADO. Una
+ * hembra de la especie que además trae la naturaleza o un 31 ya habrá caído en
+ * un hueco donde eso cuenta; gastarla aquí sería tirar lo que aporta. Y si no
+ * sobra ninguna hembra de la línea, no se alarga nada: sería un cruce regalado.
  */
 export function extenderEspinaPorEspecie(arbol, ctx) {
   const { datos, objetivo, inventarioLibre } = ctx;
 
-  // El hueco de abajo de la espina: el único 'conseguir' con la especie atada.
+  // El hueco de abajo de la espina, si es que sigue sin cubrir: el único
+  // 'conseguir' con la especie atada.
   let hoja = null;
   (function recorre(n) {
     if (n.tipo === 'conseguir' && (n.rol === ROL.ESPINA || n.rol === ROL.RAIZ)) hoja = n;
     n.hijos.forEach(recorre);
   })(arbol);
-  if (!hoja) return arbol;
+  if (!hoja) return { arbol, alargada: false };
 
   // Un objeto, un requisito.
   const pide = hoja.stats.length + (hoja.naturaleza ? 1 : 0);
-  if (pide !== 1) return arbol;
+  if (pide !== 1) return { arbol, alargada: false };
 
-  // ¿Hay alguna hembra de la línea que el plan esté tirando a la basura?
-  const soloEspecie = inventarioLibre.filter((e) => {
-    if (!sirveComoLineaMaterna(e, objetivo.especie, datos.pokedex).sirve) return false;
-    return !cumple(e, hoja, datos, objetivo).ok;
-  });
-  if (!soloEspecie.length) return arbol;
+  // ¿Ha sobrado alguna hembra de la línea que el plan esté tirando a la basura?
+  const soloEspecie = inventarioLibre.filter((e) =>
+    sirveComoLineaMaterna(e, objetivo.especie, datos.pokedex).sirve
+    && !cumple(e, hoja, datos, objetivo).ok);
+  if (!soloEspecie.length) return { arbol, alargada: false };
 
   const objetoDelPadre = hoja.naturaleza ? PIEDRAETERNA : RECIO_DE[hoja.stats[0]];
   const loQueTrae = hoja.naturaleza
@@ -449,7 +459,7 @@ export function extenderEspinaPorEspecie(arbol, ctx) {
   hoja.hijos = [madre, padre];
   delete hoja.movimientosNecesarios;
 
-  return arbol;
+  return { arbol, alargada: true };
 }
 
 /** Cuántas capturas cuelgan de un nodo: es lo que se ahorra si el inventario lo cubre. */
@@ -620,7 +630,7 @@ export function medirArbol(arbol) {
  * @param {Object} datos {pokedex, encuentros, objetos, ...}
  * @param {Object} opciones {inventario, regionesDisponibles}
  */
-export function planear(objetivo, datos, { inventario = [], regionesDisponibles = [] } = {}) {
+export function planear(objetivo, datos, { inventario = [], regionesDisponibles = [], cuando = CUANDO_CUALQUIERA } = {}) {
   const validacion = validarObjetivo(objetivo, datos);
   if (!validacion.valido) return { ok: false, ...validacion };
 
@@ -650,13 +660,19 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
   }
 
-  // Antes de colocar el inventario: si hay una hembra de la especie objetivo que
-  // el árbol tal cual tiraría a la basura, se alarga la espina para darle uso.
-  extenderEspinaPorEspecie(crudo, ctx);
+  // El inventario primero, y sólo DESPUÉS se mira si hay que alargar la espina.
+  //
+  // El orden importa y costó un error: alargando antes, una hembra de la
+  // especie que además traía la naturaleza —o un 31— se gastaba como «madre que
+  // sólo pone la especie» y se tiraba lo bueno que tenía. Colocando primero, esa
+  // hembra cae en el hueco donde de verdad aprovecha, y sólo se alarga si
+  // después sigue sobrando alguna que no encaja en ningún sitio.
+  asignarInventario(crudo, ctx);
+  if (extenderEspinaPorEspecie(crudo, ctx).alargada) asignarInventario(crudo, ctx);
 
-  const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
+  const arbol = asignarSexos(crudo, objetivo);
 
-  const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles);
+  const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
   const pasos = aPasos(arbol, objetivo, datos, relleno);
 
   return {

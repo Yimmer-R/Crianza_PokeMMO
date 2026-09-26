@@ -132,6 +132,29 @@ export function vistaPlan(datos) {
     pres.hayEstimados
       ? aviso('Hay líneas estimadas. La wiki sólo publica los extremos del pago por sexo (5.000 y 25.000); los tramos de en medio no están en ninguna fuente.')
       : null,
+
+    // El total usa el precio de TIENDA, que es firme y no caduca. Lo del GTL va
+    // aparte y con fecha, porque un precio de mercado miente a los dos meses.
+    pres.dondeComprar?.length
+      ? el('div.nota', {}, [
+          el('strong', { texto: 'Tienda o GTL: ' }),
+          ...pres.dondeComprar.flatMap((d) => [
+            el('span', {}, [
+              `${d.objeto} × ${d.cuantos}. ${d.consejo} `,
+              `En el último año se movió entre ${numero(d.gtl.min)} (${d.gtl.minFecha}) y `,
+              `${numero(d.gtl.max)} (${d.gtl.maxFecha}). `,
+              d.masCaroEnGtl && d.diferencia > 0
+                ? el('strong', { texto: `Comprarla en la guardería te ahorra ${numero(d.diferencia)} PokéYen.` })
+                : null,
+            ]),
+            el('br'),
+          ]),
+          el('span.tenue', {
+            texto: `Los precios de GTL salen de ${pres.dondeComprar[0].gtl.fuente} y caducan: `
+              + 'la wiki no los guarda a propósito. Vuelve a mirarlos antes de comprar.',
+          }),
+        ])
+      : null,
     el('div.nota', {}, [pres.sinPrecio.nota]),
   ]);
 

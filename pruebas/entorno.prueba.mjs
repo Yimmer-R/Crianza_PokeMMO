@@ -336,3 +336,33 @@ bloque('entrenamiento: los escalones de EVs', () => {
     falso(o.mereceLaPena);
   });
 });
+
+bloque('coste: tienda contra GTL', () => {
+  const objetivo = {
+    especie: 'Larvitar', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {},
+    movimientos: [], naturaleza: 'Audaz',
+  };
+  const plan = planear(objetivo, datos, { regionesDisponibles: REGIONES });
+  const pres = presupuestar(plan, datos);
+
+  prueba('la Piedraeterna sale más cara en el GTL que en la guardería', () => {
+    const d = pres.dondeComprar.find((x) => x.objeto === 'Piedraeterna');
+    cierto(d, 'un plan con naturaleza tiene que usar Piedraeterna');
+    igual(d.tienda, 4000, 'la guardería la vende a 4.000 fijos en las cinco regiones');
+    cierto(d.masCaroEnGtl, `el GTL estaba a ${d.gtl.ultimo}, no por debajo de 4.000`);
+    cierto(d.diferencia > 0);
+    cierto(/guardería/.test(d.consejo));
+  });
+
+  prueba('el total NO usa el precio de mercado, que caduca', () => {
+    const conGtl = pres.lineas.find((l) => l.concepto === 'Piedraeterna');
+    igual(conGtl.precioUnidad, 4000, 'el presupuesto suma el precio de tienda');
+  });
+
+  prueba('el precio observado viene con su fecha, para poder desconfiar de él', () => {
+    const d = pres.dondeComprar.find((x) => x.objeto === 'Piedraeterna');
+    cierto(/^\d{4}-\d{2}-\d{2}$/.test(d.gtl.fecha));
+    cierto(d.gtl.min < d.gtl.ultimo && d.gtl.ultimo < d.gtl.max, 'el rango tiene que contener al último');
+    cierto(d.gtl.fuente.includes('usuario'));
+  });
+});

@@ -129,6 +129,46 @@ await paso('Capturas respeta el filtro de regiones', async () => {
   if (!texto.includes('Kanto')) throw new Error('no propone nada en Kanto');
 });
 
+await paso('hora y estación ordenan las capturas, y no esconden nada', async () => {
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
+  const filas = () => pagina.locator('.tarjeta:has-text("Dónde") tbody tr').count();
+  const sinFiltro = await filas();
+
+  await pagina.click('button[data-vista="objetivo"]');
+  await abrir('Cuándo estás jugando');
+  await pagina.selectOption('#cuando-hora', 'noche');
+  await pagina.selectOption('#cuando-estacion', 'invierno');
+  await pagina.waitForTimeout(300);
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForSelector('.tarjeta:has-text("Dónde")', { timeout: 5000 });
+  if (await filas() !== sinFiltro)
+    throw new Error('el filtro de hora no puede quitar filas, sólo reordenarlas y marcarlas');
+
+  // El filtro activo se ve, y la columna «Cuándo» existe.
+  const resumen = await pagina.textContent('.tarjeta:has-text("Resumen")');
+  for (const x of ['noche', 'invierno']) {
+    if (!resumen.includes(x)) throw new Error(`el resumen no dice "${x}"`);
+  }
+  const cabeceras = await pagina.locator('.tarjeta:has-text("Dónde") thead').allTextContents();
+  if (!cabeceras.some((c) => c.includes('Cuándo')))
+    throw new Error('falta la columna Cuándo en la tabla de zonas');
+
+  // Entrenamiento lo respeta también: la mejor horda tiene que servir de noche.
+  await pagina.click('button[data-vista="entrenamiento"]');
+  await pagina.waitForTimeout(400);
+  const ent = await pagina.textContent('#vista');
+  if (/La mejor:/.test(ent) && !/(siempre|noche)/.test(ent))
+    throw new Error('la mejor horda propuesta no sirve de noche');
+
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.selectOption('#cuando-hora', '');
+  await pagina.selectOption('#cuando-estacion', '');
+  await pagina.waitForTimeout(200);
+  console.log(`       ${sinFiltro} filas de zonas, las mismas con y sin filtro`);
+});
+
 await paso('Inventario: anotar una captura que NO encaja lo dice', async () => {
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('#b-especie');

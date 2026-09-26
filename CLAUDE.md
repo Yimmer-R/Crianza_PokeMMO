@@ -73,6 +73,13 @@ Tres cosas que no son evidentes leyendo un archivo suelto:
 3. **Los plegables recuerdan si están abiertos** en un `Set` de
    `componentes.js`, porque la app repinta la vista entera en cada cambio. Sin
    eso, marcar un paso cerraba la lista de pasos.
+4. **El inventario se coloca antes de alargar la espina.** Al revés, una hembra
+   de la especie que además traía la naturaleza o un 31 se gastaba como «madre
+   que sólo pone la especie» y se tiraba lo bueno. No cambies ese orden en
+   `planear()`.
+5. **La hora y la estación se ordenan, no se esconden.** Con las regiones
+   esconder está bien; con la hora no, porque un día del juego son 6 horas
+   reales. Lo que no toca ahora se queda en la tabla marcado con cuándo sí.
 
 ## Al tocar la interfaz
 
@@ -99,7 +106,15 @@ Tres trampas que ya han costado caro y que no se ven en las pruebas unitarias:
 
 ## Al parsear la wiki
 
-Dos cosas que rompen en silencio y ya han roto una vez:
+Tres cosas que rompen en silencio y ya han roto una vez:
+
+- **los encuentros salen de `wiki/zonas/`, no de la ficha del Pokémon.** La
+  ficha trae su tabla de «Dónde encontrarlo» y es lo primero que uno mira, pero
+  ahí la zona viene con el nombre pelado y se pierde el sufijo de hora y
+  estación — que es justo lo que decide si el Pokémon está cuando tú entras. Las
+  fichas de zona lo traen en el frontmatter (`horas:`, `estaciones:`), y eso es
+  mejor que deducirlo del nombre del archivo, que viene medio traducido en cinco
+  formas distintas. Ver [`docs/datos-y-fuentes.md`](docs/datos-y-fuentes.md).
 
 - **el `\|` escapado de un alias no separa celdas** en una tabla. Partir por
   todos los `|` desplaza la fila entera una columna. Usa el `filas()` del
@@ -119,7 +134,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 171 pruebas unitarias
+node pruebas/ejecutar.mjs             # 188 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

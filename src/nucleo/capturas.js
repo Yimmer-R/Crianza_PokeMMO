@@ -12,6 +12,7 @@
 import { IV_MAX, SEXOS } from './constantes.js';
 import { padresCompatibles, gruposEnComun, sinGenero, esEsteril } from './compatibilidad.js';
 import { elegirRelleno } from './planificador.js';
+import { disponibleAhora, porQueNoAhora, ordenarPorCuando, CUANDO_CUALQUIERA } from './cuando.js';
 
 /** Probabilidad de que un IV suelto salga 31 al capturar: 1 de 32 valores (0-31). */
 export const P_IV_PERFECTO = 1 / (IV_MAX + 1);
@@ -51,9 +52,18 @@ function pesoRareza(rareza = '') {
   return 2;
 }
 
-/** Ordena las zonas de mejor a peor para farmear capturas. */
-export const mejoresZonas = (lista, cuantas = 6) =>
-  [...lista].sort((a, b) => pesoRareza(b.rareza) - pesoRareza(a.rareza)).slice(0, cuantas);
+/**
+ * Ordena las zonas de mejor a peor para farmear capturas.
+ *
+ * Primero lo que existe con la hora y la estación que tengas puestas: una zona
+ * más común pero «sólo de noche · invierno» no te sirve ahora, y ponerla la
+ * primera manda a dar vueltas. Lo que no toca no se esconde, se marca.
+ */
+export function mejoresZonas(lista, cuantas = 6, cuando = CUANDO_CUALQUIERA) {
+  return ordenarPorCuando(lista, cuando, (a, b) => pesoRareza(b.rareza) - pesoRareza(a.rareza))
+    .slice(0, cuantas)
+    .map((z) => ({ ...z, ahora: disponibleAhora(z, cuando), noAhora: porQueNoAhora(z, cuando) }));
+}
 
 /**
  * Convierte un hueco del plan en un consejo de captura concreto.
@@ -63,14 +73,14 @@ export const mejoresZonas = (lista, cuantas = 6) =>
  * el usuario ("sugerirme capturar otra especie del mismo grupo huevo si es más
  * fácil de obtener").
  */
-export function comoConseguir(requisito, datos, regionesDisponibles, objetivo) {
+export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, cuando = CUANDO_CUALQUIERA) {
   const { pokedex } = datos;
   const ivs31 = requisito.stats.length;
   const conNaturaleza = !!requisito.naturaleza;
 
   const opciones = [];
   const candidatas = requisito.especieLibre
-    ? elegirRelleno(objetivo.especie, datos, regionesDisponibles).slice(0, 6).map((c) => c.especie)
+    ? elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando).slice(0, 6).map((c) => c.especie)
     : [requisito.especieSugerida];
 
   for (const especie of candidatas) {
@@ -89,8 +99,9 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo) {
       ratioSexo: ratio,
       // Un ratio de 0 significa que ese sexo no existe en la especie: no sirve.
       viable: ratio > 0 || sinGenero(p),
-      zonas: mejoresZonas(donde.disponibles),
-      zonasFueraDeAlcance: donde.hayEnOtraRegion ? mejoresZonas(donde.fueraDeAlcance, 3) : [],
+      zonas: mejoresZonas(donde.disponibles, 6, cuando),
+      zonasAhora: donde.disponibles.filter((z) => disponibleAhora(z, cuando)).length,
+      zonasFueraDeAlcance: donde.hayEnOtraRegion ? mejoresZonas(donde.fueraDeAlcance, 3, cuando) : [],
       soloEnOtraRegion: donde.disponibles.length === 0 && donde.hayEnOtraRegion,
       noSalvaje: donde.ninguna,
       intentos: intentosEsperados({ ivs31, sexo: requisito.sexo, ratioSexo: ratio, naturaleza: conNaturaleza }),
@@ -98,7 +109,12 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo) {
   }
 
   const viables = opciones.filter((o) => o.viable && o.zonas.length);
-  viables.sort((a, b) => a.intentos - b.intentos || b.zonas.length - a.zonas.length);
+  // Una especie que ahora mismo no aparece en ningún sitio va detrás de otra
+  // que sí, aunque sea algo más rara: lo primero es poder ir hoy.
+  viables.sort((a, b) =>
+    (b.zonasAhora > 0) - (a.zonasAhora > 0)
+    || a.intentos - b.intentos
+    || b.zonas.length - a.zonas.length);
 
   return {
     requisito,
@@ -117,22 +133,22 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo) {
 }
 
 /** Todos los consejos de captura de un plan, agrupados por hueco repetido. */
-export function planDeCapturas(plan, datos, regionesDisponibles) {
+export function planDeCapturas(plan, datos, regionesDisponibles, cuando = CUANDO_CUALQUIERA) {
   if (!plan?.ok) return [];
   const mapa = new Map();
   for (const req of plan.pasos.conseguir) {
     const clave = JSON.stringify([req.stats, req.naturaleza, req.sexo, req.especieLibre]);
     if (mapa.has(clave)) { mapa.get(clave).cuantos++; continue; }
-    mapa.set(clave, { cuantos: 1, ...comoConseguir(req, datos, regionesDisponibles, plan.objetivo) });
+    mapa.set(clave, { cuantos: 1, ...comoConseguir(req, datos, regionesDisponibles, plan.objetivo, cuando) });
   }
   return [...mapa.values()].sort((a, b) => b.cuantos - a.cuantos);
 }
 
 /** Regiones donde hace falta jugar para completar el plan, y las que no. */
-export function regionesQueHacenFalta(plan, datos, regionesDisponibles) {
+export function regionesQueHacenFalta(plan, datos, regionesDisponibles, cuando) {
   const usadas = new Set();
   const bloqueadas = new Set();
-  for (const c of planDeCapturas(plan, datos, regionesDisponibles)) {
+  for (const c of planDeCapturas(plan, datos, regionesDisponibles, cuando)) {
     for (const z of c.recomendada?.zonas ?? []) usadas.add(z.region);
     if (c.soloGtl) for (const o of c.opciones) for (const z of o.zonasFueraDeAlcance) bloqueadas.add(z.region);
   }

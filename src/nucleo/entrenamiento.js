@@ -8,6 +8,7 @@ import {
   STATS, NOMBRE_STAT, EV_MAX_POR_STAT, EV_MAX_TOTAL,
   EV_POR_VITAMINA, EV_POR_BAYA, EVS_POR_PUNTO,
 } from './constantes.js';
+import { disponibleAhora, porQueNoAhora, ordenarPorCuando, CUANDO_CUALQUIERA } from './cuando.js';
 
 /** Vitamina y baya de cada característica. */
 export const VITAMINA_DE = {
@@ -186,7 +187,7 @@ export function validarEvs(evs) {
  * @param {Object} evsObjetivo  {ps: 252, ...}
  * @param {Object} evsActuales  los que ya tiene (0 si es recién criado)
  * @param {Object} datos        los JSON
- * @param {Object} opciones     {regionesDisponibles, objeto, nivel, ivs}
+ * @param {Object} opciones     {regionesDisponibles, objeto, nivel, ivs, cuando}
  */
 export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
   const {
@@ -194,6 +195,7 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
     objeto = 'Vínculo de Entrenamiento',
     nivel = 50,
     ivs = {},
+    cuando = CUANDO_CUALQUIERA,
   } = opciones;
 
   const regiones = new Set(regionesDisponibles);
@@ -221,10 +223,13 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
       continue;
     }
 
-    // Hordas disponibles, de más EVs por Pokémon a menos.
-    const hordas = (datos.dondeEntrenar?.[stat] ?? [])
-      .filter((h) => regiones.has(h.region))
-      .sort((a, b) => b.ev - a.ev);
+    // Hordas disponibles: primero las que existen con la hora y la estación
+    // puestas, y dentro de eso las que más EVs dan. Una horda «de noche ·
+    // invierno» no existe si entras de día en verano, y mandar ahí a alguien es
+    // mandarlo a dar vueltas por un mapa vacío.
+    const todas = (datos.dondeEntrenar?.[stat] ?? []).filter((h) => regiones.has(h.region));
+    const hordas = ordenarPorCuando(todas, cuando, (a, b) => b.ev - a.ev)
+      .map((h) => ({ ...h, ahora: disponibleAhora(h, cuando), noAhora: porQueNoAhora(h, cuando) }));
 
     const mejor = hordas[0] ?? null;
     const porHorda = mejor ? mejor.ev * POKEMON_POR_HORDA * mult.factor : 0;
@@ -235,6 +240,11 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
       puntosANivel: Math.floor(faltan / (EVS_POR_PUNTO[nivel] ?? EVS_POR_PUNTO[50])),
       mejor,
       hordas: hordas.slice(0, 6),
+      // De todas las que hay en tus regiones, cuántas y cuáles sirven AHORA.
+      // El filtro de hora y estación NO quita ninguna: sólo cambia el orden y
+      // marca las que no tocan, porque una franja llega sola en minutos.
+      hordasTotales: hordas.length,
+      hordasAhora: hordas.filter((h) => h.ahora).length,
       evsPorHorda: porHorda,
       hordasNecesarias: porHorda ? Math.ceil(faltan / porHorda) : null,
       // Las vitaminas son la alternativa que no depende de la región.
@@ -264,6 +274,10 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
         : []),
       ...(porStat.some((s) => s.sinHordasAlAlcance && s.faltan > 0)
         ? ['hay características sin hordas en tus regiones: mira las vitaminas o desbloquea la región']
+        : []),
+      ...(porStat.some((s) => s.faltan > 0 && !s.sinHordasAlAlcance && s.hordasAhora === 0)
+        ? ['hay características cuyas hordas no salen con la hora o la estación que tienes puestas: '
+           + 'espera a la franja buena o usa vitaminas']
         : []),
     ],
     huecos: [
