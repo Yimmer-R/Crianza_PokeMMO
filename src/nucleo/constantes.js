@@ -73,6 +73,22 @@ export const GRUPO_SIN_GENERO = 'Sin género';
 export const REGIONES = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova'];
 
 /**
+ * Cuándo aparece un Pokémon salvaje: hora del juego y estación.
+ *
+ * No es un adorno. Muchas tablas de encuentro sólo existen en una franja o en
+ * una estación: una horda «de noche · invierno» no está si entras de día en
+ * verano, y mandar a alguien a esa zona es mandarlo a dar vueltas.
+ *
+ * En PokeMMO un día del juego son **6 horas reales**, así que la hora rota
+ * cuatro veces al día real; las estaciones van por mes real. O sea: esperar a
+ * otra franja son minutos, esperar a otra estación son semanas, y por eso la
+ * app las trata distinto al ordenar.
+ * (wiki/mecanicas/Dónde entrenar EVs.md, 22-09-2026)
+ */
+export const HORAS = ['mañana', 'día', 'noche'];
+export const ESTACIONES = ['primavera', 'verano', 'otoño', 'invierno'];
+
+/**
  * Coste de pagar por elegir el sexo de la cría.
  *
  * wiki/mecanicas/Crianza.md sólo fija los dos extremos: «desde $5.000 en
@@ -99,6 +115,32 @@ export const PRECIO_RESPALDO = {
   'Banda Recia': 10000,
   'Franja Recia': 10000,
   Piedraeterna: 4000,
+};
+
+/**
+ * Precios de mercado observados en el GTL, con su fecha.
+ *
+ * Esto **no** sale de la wiki y no puede salir: la wiki no guarda precios de
+ * mercado a propósito, porque caducan en semanas. Viene de las capturas del
+ * rastreador de precios que mandó el usuario el 26-09-2026, y por eso lleva la
+ * fecha pegada y se muestra siempre como estimación caducable, nunca sumado al
+ * total como si fuera un dato firme.
+ *
+ * Sirve para una cosa concreta y útil: comparar con el precio de tienda. La
+ * Piedraeterna la venden los cinco encargados de guardería a 4.000 fijos, y el
+ * GTL lleva un año oscilando **por encima** casi todo el tiempo.
+ */
+export const PRECIO_GTL_OBSERVADO = {
+  Piedraeterna: {
+    ultimo: 4957,
+    fecha: '2026-09-22',
+    min: 3480,
+    minFecha: '2026-08-14',
+    max: 5728,
+    maxFecha: '2025-11-17',
+    desde: '2025-05-21',
+    fuente: 'rastreador de precios del GTL (capturas del usuario, 26-09-2026)',
+  },
 };
 
 /**

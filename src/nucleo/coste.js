@@ -6,7 +6,7 @@
 // que los padres que haya que comprar salen aparte, como "lo pones tú", y nunca
 // mezclados con el total confirmado.
 
-import { PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, SEXOS } from './constantes.js';
+import { PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, PRECIO_GTL_OBSERVADO, SEXOS } from './constantes.js';
 import { costeElegirSexo } from './compatibilidad.js';
 import { ROL } from './planificador.js';
 
@@ -21,6 +21,9 @@ export function parsearPrecio(texto) {
 }
 
 const ES_YEN = (moneda) => /yen/i.test(moneda);
+
+/** 346000 -> "346.000". Se usa aquí y en las vistas. */
+export const formatearYen = (n) => new Intl.NumberFormat('es-ES').format(Math.round(n));
 
 /** Precio en PokéYen de un objeto, leído de datos/objetos.json. */
 export function precioEnYen(nombre, objetos) {
@@ -136,11 +139,15 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
       });
   }
 
-  // 3. Lo que no se puede presupuestar aquí.
+  // 3. Dónde conviene comprar cada objeto.
+  const dondeComprar = comparaConElGtl(objetosUsados, objetos);
+
+  // 4. Lo que no se puede presupuestar aquí.
   const padresQueComprar = plan.pasos.conseguir.length;
 
   return {
     lineas,
+    dondeComprar,
     totalYen: yen,
     otrasMonedas: [...otrasMonedas].map(([moneda, cantidad]) => ({ moneda, cantidad })),
     objetosUsados: [...objetosUsados].map(([nombre, cuantos]) => ({ nombre, cuantos })),
@@ -156,4 +163,42 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
 }
 
 /** Formatea 1234567 como "1.234.567". */
-export const formatearYen = (n) => new Intl.NumberFormat('es-ES').format(Math.round(n));
+
+/**
+ * Tienda contra GTL, para los objetos de los que tenemos un precio observado.
+ *
+ * El caso que motiva esto: la Piedraeterna la venden los cinco encargados de
+ * guardería a 4.000 fijos, y el GTL lleva un año oscilando entre 3.480 y 5.728
+ * — casi siempre por encima. O sea que comprarla en el GTL, que es lo que uno
+ * hace por costumbre, suele salir más caro.
+ *
+ * El total del presupuesto sigue usando el precio de TIENDA: es un dato firme
+ * que no caduca. Esto es una nota al lado, con su fecha, porque un precio de
+ * mercado apuntado miente a los dos meses.
+ */
+export function comparaConElGtl(objetosUsados, objetos) {
+  const salida = [];
+  for (const [nombre, cuantos] of objetosUsados) {
+    const gtl = PRECIO_GTL_OBSERVADO[nombre];
+    if (!gtl) continue;
+    const tienda = precioEnYen(nombre, objetos);
+    if (!tienda || !ES_YEN(tienda.moneda)) continue;
+    const masCaroEnGtl = gtl.ultimo > tienda.cantidad;
+    salida.push({
+      objeto: nombre,
+      cuantos,
+      tienda: tienda.cantidad,
+      donde: tienda.donde,
+      gtl,
+      masCaroEnGtl,
+      // Lo que te ahorras comprando en la tienda, al último precio visto.
+      diferencia: (gtl.ultimo - tienda.cantidad) * cuantos,
+      consejo: masCaroEnGtl
+        ? `Cómprala en la guardería: ${formatearYen(tienda.cantidad)} fijos frente a ` +
+          `${formatearYen(gtl.ultimo)} en el GTL el ${gtl.fecha}.`
+        : `El GTL estaba a ${formatearYen(gtl.ultimo)} el ${gtl.fecha}, por debajo de los ` +
+          `${formatearYen(tienda.cantidad)} de la guardería: esta vez sale mejor comprarla ahí.`,
+    });
+  }
+  return salida;
+}

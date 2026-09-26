@@ -41,13 +41,13 @@ let recalculando = false;
  */
 function recalcular() {
   if (recalculando) return;
-  const { crianzas, crianzaActiva, inventario, regionesDisponibles } = obtener();
+  const { crianzas, crianzaActiva, inventario, regionesDisponibles, cuando } = obtener();
 
   const planes = {};
   for (const c of crianzas) {
     if (!c.objetivo.especie) continue;
     try {
-      planes[c.id] = planear(c.objetivo, datos, { inventario, regionesDisponibles });
+      planes[c.id] = planear(c.objetivo, datos, { inventario, regionesDisponibles, cuando });
     } catch (e) {
       planes[c.id] = { ok: false, problemas: [`error al planear: ${e.message}`], avisos: [] };
     }

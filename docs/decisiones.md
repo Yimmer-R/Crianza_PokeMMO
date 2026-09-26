@@ -139,6 +139,47 @@ débil**. Un cruce que salió con la naturaleza buena sin Piedraeterna es 1 de 2
 no una prueba. Cuando la wiki calle sobre algo, el hueco se declara; no se rellena
 con una partida.
 
+## Hora y estación se ordenan, no se esconden
+
+Con las regiones, esconder es lo correcto: una sugerencia en Unova no vale nada
+si no tienes Unova, y desbloquearla es una partida entera. Con la hora y la
+estación no: **un día del juego son 6 horas reales**, así que esperar a la noche
+son minutos; las estaciones van por mes real, así que esperar al invierno son
+semanas. Esconder una zona porque ahora es de día sería tirar información útil.
+
+Así que el filtro **ordena**: primero lo que sirve ahora, luego lo que espera un
+cambio de franja, y al final lo que espera un cambio de estación. Lo que no toca
+se queda en la tabla con una etiqueta que dice cuándo sí, en tres colores: verde
+«sirve ahora», amarillo «espera minutos», rojo «espera semanas».
+
+## El inventario se coloca ANTES de alargar la espina
+
+El orden de esas dos pasadas cambia el resultado, y al revés se pierde valor.
+Alargando primero, una hembra de la especie objetivo que además traía la
+naturaleza —o un 31— se gastaba como «madre que sólo pone la especie» y se
+tiraba lo bueno que tenía: el hueco nuevo ahorra lo mismo que el de naturaleza
+(una captura), así que el desempate la mandaba a cualquiera de los dos.
+
+Colocando el inventario primero, esa hembra cae donde de verdad aprovecha, y la
+espina sólo se alarga si después **sigue sobrando** alguna hembra de la línea que
+no encaja en ningún sitio. Lo vigilan tres pruebas en
+`pruebas/planificador.prueba.mjs`.
+
+## Los precios de mercado se enseñan, no se suman
+
+La wiki no guarda precios del GTL a propósito: caducan en semanas. Pero el
+usuario mandó capturas de un rastreador de precios de la Piedraeterna, y ahí
+había algo que sí merece estar: la guardería la vende a **4.000 fijos** en las
+cinco regiones, y el GTL lleva un año oscilando entre 3.480 y 5.728 — **casi
+siempre por encima**. O sea que comprarla en el GTL, que es lo que uno hace por
+costumbre, suele salir más caro.
+
+La solución respeta las dos cosas. El total del presupuesto sigue usando el
+precio de tienda, que es firme. El precio observado va aparte, en
+`PRECIO_GTL_OBSERVADO`, **con su fecha pegada**, su rango y de dónde sale, y la
+vista dice explícitamente que caduca y que hay que volver a mirarlo. Un número
+de mercado sin fecha miente a los dos meses; con fecha, es un dato.
+
 ## Tesseract.js es la única excepción a «sin dependencias»
 
 El OCR necesita un motor, y escribirlo no es razonable. Se carga desde CDN, **sólo

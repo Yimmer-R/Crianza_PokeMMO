@@ -12,6 +12,7 @@
 // porque ahí el Pokémon se gasta y sale del inventario.
 
 import { STATS, REGIONES } from '../nucleo/constantes.js';
+import { CUANDO_CUALQUIERA } from '../nucleo/cuando.js';
 import { cargar as cargarInventario, guardar as guardarInventario } from '../nucleo/inventario.js';
 
 const CLAVE = 'crianza-pokemmo:estado:v2';
@@ -62,6 +63,9 @@ const inicial = {
   // crianza activa. Ver la nota de fijar().
   objetivo: primera.objetivo,
   regionesDisponibles: [...REGIONES],
+  // Hora del juego y estación. Como las regiones, filtran capturas y
+  // entrenamiento a la vez y no son de ninguna crianza en concreto.
+  cuando: { ...CUANDO_CUALQUIERA },
   inventario: [],
   // Los planes se recalculan en cada cambio, no se guardan. `plan` es el de la
   // crianza activa; `planes` los de todas, que es lo que permite avisar de un
@@ -237,6 +241,7 @@ function persistir() {
       crianzas: estado.crianzas,
       crianzaActiva: estado.crianzaActiva,
       regionesDisponibles: estado.regionesDisponibles,
+      cuando: estado.cuando,
       vista: estado.vista,
     }));
   } catch (e) {
@@ -285,6 +290,7 @@ export function restaurar() {
     crianzaActiva: activa,
     objetivo: crianzas.find((c) => c.id === activa).objetivo,
     regionesDisponibles: guardado?.regionesDisponibles ?? [...REGIONES],
+    cuando: { ...CUANDO_CUALQUIERA, ...(guardado?.cuando ?? {}) },
     vista: guardado?.vista ?? 'objetivo',
   };
 }

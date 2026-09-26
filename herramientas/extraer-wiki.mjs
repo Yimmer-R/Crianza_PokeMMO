@@ -177,6 +177,111 @@ function encuentros(texto) {
     .filter((e) => e.region && e.zona);
 }
 
+// ------------------------------------------------------------------- zonas
+//
+// Los encuentros NO se sacan de la ficha del Pokémon aunque tenga su tabla:
+// ahí la zona viene con el nombre pelado («Monte Plateado») y se pierde el
+// sufijo de hora y estación, que es justo lo que decide si el Pokémon está
+// ahí cuando tú entras. La ficha de ZONA sí lo trae, y encima estructurado en
+// el frontmatter (`horas:`, `estaciones:`), sin tener que adivinarlo del
+// nombre del archivo — que viene medio traducido («nightspring»,
+// «NochePrimavera», «mañana  invierno») y sería una fuente de errores.
+
+const HORAS = ['mañana', 'día', 'noche'];
+const ESTACIONES = ['primavera', 'verano', 'otoño', 'invierno'];
+
+/** [todas] en la wiki significa «siempre»; aquí es la lista entera. */
+function cuandoDe(fm) {
+  const lista = (valor, todas) => {
+    const v = [].concat(valor ?? []).map(String);
+    if (!v.length || v.includes('todas')) return [...todas];
+    const buenos = v.filter((x) => todas.includes(x));
+    if (buenos.length !== v.length) avisa(`valor raro en una zona: ${v.join(', ')}`);
+    return buenos.length ? buenos : [...todas];
+  };
+  return { horas: lista(fm.horas, HORAS), estaciones: lista(fm.estaciones, ESTACIONES) };
+}
+
+/**
+ * «Ruta 39 (noche/verano)» -> «Ruta 39». El paréntesis ya está en `horas` y
+ * `estaciones`, así que repetirlo en el nombre sólo estorba. Un sufijo que NO
+ * sea de hora/estación —«Altering Cave (2)», tablas distintas del mismo
+ * mapa— no lleva paréntesis en el `title`, así que esto no lo toca.
+ */
+const zonaSinSufijo = (titulo) => titulo.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+/**
+ * Junta filas que son la misma salvo por cuándo.
+ *
+ * Snorunt en Acuity Lakefront sale de noche y hay una ficha de zona por
+ * estación, así que llegan cuatro filas idénticas con una estación cada una.
+ * Son «de noche, todo el año», y en una tabla cuatro filas iguales sólo
+ * estorban.
+ *
+ * La unión sólo es válida cuando una de las dos dimensiones coincide: si las
+ * HORAS son las mismas se suman las estaciones, y al revés. Unir
+ * {noche, primavera} con {día, verano} daría {noche, día} × {primavera,
+ * verano}, que incluye un «día en primavera» que no existe.
+ */
+function juntarPorCuando(filasZona) {
+  const salida = [];
+  for (const f of filasZona) {
+    const igual = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+    const ya = salida.find((o) =>
+      o.region === f.region && o.zona === f.zona && o.metodo === f.metodo
+      && o.nivel === f.nivel && o.rareza === f.rareza
+      && (igual(o.horas, f.horas) || igual(o.estaciones, f.estaciones)));
+    if (!ya) { salida.push({ ...f, horas: [...f.horas], estaciones: [...f.estaciones] }); continue; }
+    const campo = igual(ya.horas, f.horas) ? 'estaciones' : 'horas';
+    const orden = campo === 'horas' ? HORAS : ESTACIONES;
+    ya[campo] = orden.filter((x) => ya[campo].includes(x) || f[campo].includes(x));
+  }
+  return salida;
+}
+
+/** Lee wiki/zonas/ y devuelve, por especie, dónde y CUÁNDO aparece. */
+function leerZonas() {
+  const dir = join(WIKI, 'wiki', 'zonas');
+  if (!existsSync(dir)) {
+    avisa('no hay wiki/zonas/: los encuentros se quedan sin hora ni estación');
+    return { porEspecie: {}, zonas: 0 };
+  }
+
+  const porEspecie = {};
+  let zonas = 0;
+
+  for (const archivo of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+    const texto = readFileSync(join(dir, archivo), 'utf8');
+    const fm = frontmatter(texto);
+    if (fm.tipo !== 'zona') continue;
+    zonas++;
+
+    const zona = zonaSinSufijo(String(fm.title ?? basename(archivo, '.md')));
+    const region = fm.region ?? '';
+    const { horas, estaciones } = cuandoDe(fm);
+
+    // Una sección por método de encuentro: "### Hierba", "### Cueva", "### Agua"…
+    const bloque = seccion(texto, '## Encuentros');
+    if (!bloque) continue;
+    for (const [, metodo, tabla] of bloque.matchAll(/\n### ([^\n]+)\n([\s\S]*?)(?=\n### |$)/g)) {
+      for (const c of filas(tabla)) {
+        if (c.length < 3) continue;
+        const especie = enlace(c[0]);
+        if (!especie) continue;
+        (porEspecie[especie] ??= []).push({
+          region, zona, metodo: metodo.trim(),
+          nivel: c[1], rareza: c[2],
+          horas, estaciones,
+        });
+      }
+    }
+  }
+
+  for (const [especie, lista] of Object.entries(porEspecie)) porEspecie[especie] = juntarPorCuando(lista);
+
+  return { porEspecie, zonas };
+}
+
 function habilidadesDe(texto) {
   return seccion(texto, '## Habilidades')
     .split('\n')
@@ -189,6 +294,11 @@ const dirPokemon = join(WIKI, 'wiki', 'pokemon');
 const pokemon = {};
 const mapaEncuentros = {};
 
+// Las zonas primero: son las que saben CUÁNDO aparece cada Pokémon.
+const { porEspecie: encuentrosDeZonas, zonas: cuantasZonas } = leerZonas();
+let deZonas = 0;
+let deFicha = 0;
+
 for (const archivo of readdirSync(dirPokemon).filter((f) => f.endsWith('.md'))) {
   const nombre = basename(archivo, '.md');
   if (nombre === 'README') continue;
@@ -200,7 +310,18 @@ for (const archivo of readdirSync(dirPokemon).filter((f) => f.endsWith('.md'))) 
   for (const s of STATS) stats[s] = Number(fm.stats?.[s] ?? 0);
 
   const ev = evolucion(texto);
-  const enc = encuentros(texto);
+
+  // Las fichas de zona mandan: traen hora y estación. La tabla de la ficha del
+  // Pokémon es el respaldo para lo que no salga en ninguna zona, y entonces se
+  // marca `cuandoDesconocido` en vez de dar por hecho que vale a cualquier hora.
+  const deLaZona = encuentrosDeZonas[nombre];
+  let enc;
+  if (deLaZona?.length) { enc = deLaZona; deZonas++; } else {
+    enc = encuentros(texto).map((e) => ({
+      ...e, horas: [...HORAS], estaciones: [...ESTACIONES], cuandoDesconocido: true,
+    }));
+    if (enc.length) deFicha++;
+  }
   if (enc.length) mapaEncuentros[nombre] = enc;
 
   pokemon[nombre] = {
@@ -439,6 +560,23 @@ const ETIQUETA_A_STAT = {
   'At. Esp.': 'at-esp', 'Def. Esp.': 'def-esp', 'Velocidad': 'velocidad',
 };
 
+/**
+ * "día/mañana · primavera" -> {horas: ['día','mañana'], estaciones: ['primavera']}
+ *
+ * La tabla de EVs no trae el frontmatter de la zona, sólo esta frase, así que
+ * aquí sí hay que leerla. "cualquiera" y "todo el año" son el caso abierto.
+ */
+function cuandoDeTexto(celda) {
+  const txt = (celda ?? '').toLowerCase();
+  if (!txt) return { horas: [...HORAS], estaciones: [...ESTACIONES], cuandoDesconocido: true };
+  const horas = HORAS.filter((h) => txt.includes(h));
+  const estaciones = ESTACIONES.filter((e) => txt.includes(e));
+  return {
+    horas: horas.length ? horas : [...HORAS],
+    estaciones: estaciones.length ? estaciones : [...ESTACIONES],
+  };
+}
+
 const rutaEntrenar = join(WIKI, 'wiki', 'mecanicas', 'Dónde entrenar EVs.md');
 const dondeEntrenar = {};
 if (existsSync(rutaEntrenar)) {
@@ -454,8 +592,11 @@ if (existsSync(rutaEntrenar)) {
         ev: Number((c[0].match(/\d+/) ?? [0])[0]),
         especie: enlace(c[1]),
         region: c[2],
-        zona: enlace(c[3]) ?? c[3],
+        zona: zonaSinSufijo(enlace(c[3]) ?? c[3]),
         nivel: c[4],
+        // La sexta columna es «Cuándo»: "día/mañana · primavera". Sin ella la
+        // app manda a entrenar a una zona donde esa horda no sale.
+        ...cuandoDeTexto(c[5]),
       }))
       .filter((h) => h.especie);
   }

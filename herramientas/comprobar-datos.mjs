@@ -70,6 +70,32 @@ for (const [nombre, n] of Object.entries(naturalezas))
 for (const s of STATS)
   if (!(dondeEntrenar[s] ?? []).length) mal(`donde-entrenar: sin hordas de ${s}`);
 
+// Cuándo aparece cada cosa. Sin hora y estación la app manda a una zona donde
+// el Pokémon no está, y eso no se nota hasta que estás allí dando vueltas.
+const HORAS = ['mañana', 'día', 'noche'];
+const ESTACIONES = ['primavera', 'verano', 'otoño', 'invierno'];
+const revisaCuando = (fila, donde) => {
+  for (const [campo, validos] of [['horas', HORAS], ['estaciones', ESTACIONES]]) {
+    const v = fila[campo];
+    if (!Array.isArray(v) || !v.length) { mal(`${donde}: sin ${campo}`); continue; }
+    const raros = v.filter((x) => !validos.includes(x));
+    if (raros.length) mal(`${donde}: ${campo} raras (${raros.join(', ')})`);
+  }
+};
+let filasEnc = 0;
+let restringidas = 0;
+for (const [especie, lista] of Object.entries(encuentros))
+  for (const e of lista) {
+    filasEnc++;
+    revisaCuando(e, `encuentros de ${especie}`);
+    if (e.horas.length < 3 || e.estaciones.length < 4) restringidas++;
+  }
+for (const s of STATS) for (const h of dondeEntrenar[s] ?? []) revisaCuando(h, `horda de ${s}`);
+// Si NINGUNA fila estuviera restringida, la extracción habría perdido el
+// sufijo de hora/estación de las zonas y no lo sabríamos.
+if (restringidas < 100)
+  mal(`sólo ${restringidas} de ${filasEnc} encuentros tienen hora o estación: ¿se ha perdido el sufijo de las zonas?`);
+
 // Los objetos de crianza que el planificador da por existentes.
 const objetos = leer('objetos.json');
 for (const o of ['Pesa Recia', 'Brazal Recio', 'Cinto Recio', 'Lente Recia', 'Banda Recia', 'Franja Recia', 'Piedraeterna'])

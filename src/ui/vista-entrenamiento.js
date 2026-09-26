@@ -4,15 +4,17 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla } from './componentes.j
 import { NOMBRE_STAT, EV_MAX_TOTAL } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { planearEvs } from '../nucleo/entrenamiento.js';
+import { cuandoLegible } from '../nucleo/cuando.js';
 
 export function vistaEntrenamiento(datos) {
-  const { objetivo, regionesDisponibles } = obtener();
+  const { objetivo, regionesDisponibles, cuando } = obtener();
 
   const plan = planearEvs(objetivo.evs, {}, datos, {
     regionesDisponibles,
     objeto: objetivo.objetoEntrenamiento,
     nivel: objetivo.nivel,
     ivs: objetivo.ivs,
+    cuando,
   });
 
   if (!plan.porStat.length)
@@ -25,6 +27,8 @@ export function vistaEntrenamiento(datos) {
       chip(`nivel ${plan.nivel}`),
       chip(plan.objeto.nombre ? `${plan.objeto.nombre} (×${plan.objeto.factor})` : 'sin objeto', plan.objeto.factor > 1 ? 'si' : ''),
       chip(`${plan.libres} EVs libres`),
+      cuando.hora ? chip(cuando.hora, 'si') : null,
+      cuando.estacion ? chip(cuando.estacion, 'si') : null,
     ]),
     el('p.nota', { texto: plan.objeto.nota }),
     plan.problemas.length
@@ -67,18 +71,27 @@ export function vistaEntrenamiento(datos) {
       ]),
       el('p.nota', {}, [
         'La mejor: ', el('strong', { texto: `${s.mejor.especie} +${s.mejor.ev}` }),
-        ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}). `,
+        ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}), ${cuandoLegible(s.mejor)}. `,
         `Una horda son 5 Pokémon, así que cada ronda da ${s.mejor.ev} × 5`,
         plan.objeto.factor > 1 ? ` × ${plan.objeto.factor}` : '',
         ` = ${s.evsPorHorda} EVs. Salen con Dulce Aroma.`,
       ]),
+      s.hordasAhora === 0
+        ? aviso(
+            `Ninguna horda de ${NOMBRE_STAT[s.stat]} sale con ${
+              [cuando.hora, cuando.estacion].filter(Boolean).join(' y ')
+            }. Espera a la franja que dice la tabla, o tira de vitaminas.`,
+          )
+        : null,
       // La tabla entera plegada: para entrenar hace falta UN sitio, no seis. Los
       // otros están por si ese pilla lejos.
       s.hordas.length > 1
         ? plegable(`Otros ${s.hordas.length - 1} sitios`, [
             tabla(
-              ['EV', 'Especie', 'Región', 'Zona', 'Nivel'],
-              s.hordas.slice(1).map((h) => [`+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel]),
+              ['EV', 'Especie', 'Región', 'Zona', 'Nivel', 'Cuándo'],
+              s.hordas.slice(1).map((h) => [
+                `+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel, celdaCuando(h),
+              ]),
             ),
           ], { pequeno: true, id: `hordas-${s.stat}` })
         : null,
@@ -181,4 +194,13 @@ function bloqueOptimizar(o) {
         }, ['Aplicar este reparto al objetivo'])
       : null,
   ]);
+}
+
+
+/** Igual que en Capturas: siempre / ahora sí / cuánto hay que esperar. */
+function celdaCuando(h) {
+  const texto = cuandoLegible(h);
+  if (texto === 'siempre') return chip('siempre');
+  if (h.ahora !== false && !h.noAhora) return chip(texto, 'bien');
+  return chip(texto, h.noAhora?.espera === 'estacion' ? 'mal' : 'ojo');
 }

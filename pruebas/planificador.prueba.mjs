@@ -540,6 +540,49 @@ bloque('planificador: el inventario reestructura el árbol', () => {
     cierto(arbolSolido(con.arbol));
   });
 
+  prueba('una hembra de la especie que SÍ aporta algo no se quema como madre pelada', () => {
+    // El error que esto vigila: alargar la espina antes de colocar el
+    // inventario gastaba a esta hembra como «madre que sólo pone la especie» y
+    // tiraba la naturaleza que traía.
+    const conNaturaleza = {
+      id: 'n', especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: 'Agitada',
+      ivs: ivs(), evs: {}, movimientos: [],
+    };
+    const sin = plan([]);
+    const con = plan([conNaturaleza]);
+    igual(con.sobrantes.length, 0);
+    falso(nodos(con.arbol).some((n) => n.alargadaPorEspecie),
+      'con la naturaleza puesta no hace falta alargar nada');
+    cierto(
+      con.pasos.conseguir.length < sin.pasos.conseguir.length,
+      'y tiene que ahorrar una captura de verdad, no sólo ocupar un hueco',
+    );
+    cierto(arbolSolido(con.arbol));
+  });
+
+  prueba('lo mismo con una hembra que trae un 31: se usa por el IV, no por la especie', () => {
+    const sin = plan([]);
+    const conIv = {
+      id: 'i', especie: 'Larvitar', sexo: SEXOS.HEMBRA,
+      ivs: ivs({ ps: 31 }), evs: {}, movimientos: [],
+    };
+    const con = plan([conIv]);
+    igual(con.sobrantes.length, 0);
+    falso(nodos(con.arbol).some((n) => n.alargadaPorEspecie));
+    cierto(con.pasos.conseguir.length < sin.pasos.conseguir.length);
+  });
+
+  prueba('la hembra pelada quita la captura difícil: especie + sexo + IV a la vez', () => {
+    const atadas = (p) => p.pasos.conseguir.filter((r) => !r.especieLibre);
+    const sin = plan([]);
+    cierto(atadas(sin).length === 1, 'sin inventario hay una captura atada a la especie');
+    const con = plan([{
+      id: 'h', especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: 'Miedosa',
+      ivs: ivs(), evs: {}, movimientos: [],
+    }]);
+    igual(atadas(con).length, 0, 'con ella, ya no hace falta cazar ningún Larvitar');
+  });
+
   prueba('sin una hembra así no se alarga nada: sería un cruce regalado', () => {
     const p = plan([]);
     falso(nodos(p.arbol).some((n) => n.alargadaPorEspecie));
