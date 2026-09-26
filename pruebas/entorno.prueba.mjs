@@ -4,7 +4,10 @@ import { bloque, prueba, igual, cerca, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
 import { planear } from '../src/nucleo/planificador.js';
 import { presupuestar, parsearPrecio, precioEnYen } from '../src/nucleo/coste.js';
-import { planearEvs, validarEvs, VITAMINA_DE, BAYA_DE } from '../src/nucleo/entrenamiento.js';
+import {
+  planearEvs, validarEvs, VITAMINA_DE, BAYA_DE,
+  puntosPorEvs, escalonInferior, escalonSiguiente, optimizarEvs,
+} from '../src/nucleo/entrenamiento.js';
 import { planearMovimientos, padresQuePasan, mejorVia } from '../src/nucleo/movimientos.js';
 import { planearHabilidad, habilidadesDe } from '../src/nucleo/habilidades.js';
 import { comoConseguir, planDeCapturas, dondeAparece, intentosEsperados } from '../src/nucleo/capturas.js';
@@ -269,5 +272,67 @@ bloque('capturas: el filtro de regiones', () => {
       cierto(o.gruposEnComun.includes('Monstruo'), `${o.especie} no comparte Monstruo`);
       cierto(o.zonas.every((z) => z.region === 'Kanto'));
     }
+  });
+});
+
+
+bloque('entrenamiento: los escalones de EVs', () => {
+  prueba('a nivel 100 un punto son 4 EVs y da igual el IV', () => {
+    igual([0, 3, 4, 7, 8, 252].map((e) => puntosPorEvs(e, 100, 31)), [0, 0, 1, 1, 2, 63]);
+    igual([0, 3, 4, 7, 8, 252].map((e) => puntosPorEvs(e, 100, 30)), [0, 0, 1, 1, 2, 63]);
+  });
+
+  prueba('a nivel 50 con IV impar los escalones caen en 4, 12, 20…', () => {
+    igual([0, 3, 4, 11, 12, 19, 20].map((e) => puntosPorEvs(e, 50, 31)), [0, 0, 1, 1, 2, 2, 3]);
+    igual(puntosPorEvs(252, 50, 31), 32);
+    igual(escalonInferior(11, 50, 31), 4);
+    igual(escalonSiguiente(4, 50, 31), 12);
+  });
+
+  prueba('a nivel 50 con IV par caen en 8, 16, 24… y 252 tira 4', () => {
+    igual([0, 7, 8, 15, 16].map((e) => puntosPorEvs(e, 50, 30)), [0, 0, 1, 1, 2]);
+    igual(puntosPorEvs(248, 50, 30), 31);
+    igual(puntosPorEvs(252, 50, 30), 31, '252 no da más punto que 248 con IV par');
+    igual(escalonInferior(252, 50, 30), 248);
+  });
+
+  prueba('252/252/6 con IVs a 31 sólo tira 2 EVs, y no hay dónde reinvertirlos', () => {
+    const o = optimizarEvs(
+      { ataque: 252, velocidad: 252, ps: 6 },
+      { ataque: 31, velocidad: 31, ps: 31 }, 50,
+    );
+    igual(o.recuperados, 2);
+    igual(o.ajustados.ps, 4);
+    igual(o.reinversiones, []);
+    igual(o.sobrantes, 2);
+    igual(o.puntosDespues, o.puntosAntes, 'no se gana nada, pero tampoco se pierde');
+  });
+
+  prueba('con IVs pares el mismo reparto tira 14 EVs y uno de ellos vale un punto', () => {
+    const o = optimizarEvs(
+      { ataque: 252, velocidad: 252, ps: 6 },
+      { ataque: 30, velocidad: 30, ps: 30 }, 50,
+    );
+    igual(o.recuperados, 14, '4 + 4 de los 252, y 6 de los PS');
+    igual(o.ajustados.ataque, 248);
+    igual(o.ajustados.velocidad, 248);
+    igual(o.reinversiones.length, 1);
+    igual(o.ajustados.ps, 8);
+    cierto(o.puntosDespues > o.puntosAntes, 'reinvertir tiene que ganar un punto');
+  });
+
+  prueba('nunca se pasa de los topes', () => {
+    const o = optimizarEvs(
+      { ataque: 252, velocidad: 250, defensa: 8 },
+      { ataque: 31, velocidad: 31, defensa: 31 }, 50,
+    );
+    for (const [, v] of Object.entries(o.ajustados)) cierto(v <= 252);
+    cierto(Object.values(o.ajustados).reduce((a, b) => a + b, 0) <= 510);
+  });
+
+  prueba('un reparto ya en escalones no recupera nada', () => {
+    const o = optimizarEvs({ ataque: 252, velocidad: 4 }, { ataque: 31, velocidad: 31 }, 50);
+    igual(o.recuperados, 0);
+    falso(o.mereceLaPena);
   });
 });

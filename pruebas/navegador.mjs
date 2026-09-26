@@ -28,6 +28,20 @@ const confirmarCampo = async (selector) => {
   await pagina.waitForTimeout(120);
 };
 
+/**
+ * Abre un plegable por su título, si no lo está ya.
+ *
+ * Lo secundario de cada vista vive en <details> cerrados; una persona los abre
+ * de un toque y la prueba tiene que hacer lo mismo. Quedan abiertos entre
+ * repintados, así que sólo hace falta la primera vez.
+ */
+const abrir = async (titulo) => {
+  const sum = pagina.locator('summary').filter({ hasText: titulo }).first();
+  await sum.waitFor({ timeout: 5000 });
+  if (!(await sum.evaluate((n) => n.parentElement.open))) await sum.click();
+  await pagina.waitForTimeout(150);
+};
+
 const paso = async (nombre, fn) => {
   try { await fn(); console.log(`  ok  ${nombre}`); }
   catch (e) { console.log(`  FALLA  ${nombre}: ${e.message}`); errores.push(`${nombre}: ${e.message}`); }
@@ -59,12 +73,41 @@ await paso('marcar 4 IVs y una naturaleza', async () => {
 
 await paso('la pestaña Plan pinta pasos, árbol y presupuesto', async () => {
   await pagina.click('button[data-vista="plan"]');
+  // Lo secundario va plegado; se abren una vez y se quedan abiertos.
+  await abrir('Todos los pasos, en orden');
+  await abrir('El árbol');
   await pagina.waitForSelector('.pasos li', { timeout: 5000 });
   const pasos = await pagina.locator('.pasos li').count();
   if (pasos < 10) throw new Error(`sólo ${pasos} pasos`);
   const total = await pagina.textContent('.total');
   if (!/PokéYen/.test(total)) throw new Error(`presupuesto raro: ${total}`);
   console.log(`       ${pasos} pasos · presupuesto ${total.trim()}`);
+});
+
+await paso('«Ahora mismo» resume lo accionable y un plegable sobrevive al repintado', async () => {
+  await pagina.click('button[data-vista="plan"]');
+  const ahora = await pagina.textContent('.tarjeta:has-text("Ahora mismo")');
+  if (!/Padres que te faltan/.test(ahora))
+    throw new Error('debería listar los padres que faltan agrupados');
+  // Agrupados: una fila por requisito, no una por captura.
+  const filas = await pagina.locator('.tarjeta:has-text("Ahora mismo") tbody tr').count();
+  const pasos = await pagina.locator('.pasos li.conseguir').count();
+  if (filas >= pasos) throw new Error(`${filas} filas para ${pasos} capturas: no está agrupando`);
+
+  // El detalle abierto tiene que seguir abierto tras un cambio de estado: si se
+  // cerrara, marcar un paso obligaría a reabrirlo en cada cruce.
+  await abrir('Todos los pasos, en orden');
+  await pagina.click('button[data-vista="objetivo"]');
+  await abrir('Regiones desbloqueadas');
+  await pagina.uncheck('#region-Unova');
+  await pagina.check('#region-Unova');
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(200);
+  const sigueAbierto = await pagina.locator('summary')
+    .filter({ hasText: 'Todos los pasos, en orden' })
+    .first().evaluate((n) => n.parentElement.open);
+  if (!sigueAbierto) throw new Error('el plegable se ha cerrado solo al repintar');
+  console.log(`       ${filas} filas agrupan ${pasos} capturas`);
 });
 
 await paso('el árbol tiene nodos anidados', async () => {
@@ -75,6 +118,7 @@ await paso('el árbol tiene nodos anidados', async () => {
 
 await paso('Capturas respeta el filtro de regiones', async () => {
   await pagina.click('button[data-vista="objetivo"]');
+  await abrir('Regiones desbloqueadas');
   for (const r of ['Johto', 'Hoenn', 'Sinnoh', 'Unova']) await pagina.uncheck(`#region-${r}`);
   await pagina.click('button[data-vista="capturas"]');
   await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
@@ -88,9 +132,12 @@ await paso('Capturas respeta el filtro de regiones', async () => {
 await paso('Inventario: anotar una captura que NO encaja lo dice', async () => {
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('#b-especie');
+  // Macho a propósito: una HEMBRA de Larvitar siempre sirve aunque no tenga
+  // ningún 31, porque la especie la pone la madre. Un macho con el 31 que no
+  // toca no vale para nada.
   await pagina.fill('#b-especie', 'Larvitar');
   await confirmarCampo('#b-especie');
-  await pagina.selectOption('#b-sexo', '♀');
+  await pagina.selectOption('#b-sexo', '♂');
   await pagina.fill('#b-iv-at-esp', '31');
   await pagina.dispatchEvent('#b-iv-at-esp', 'change');
   await pagina.click('text=Sólo comprobar si me sirve');
@@ -135,6 +182,33 @@ await paso('Entrenamiento calcula hordas', async () => {
   console.log(`       ${(t.match(/\d+ hordas/g) ?? []).slice(0, 3).join(' · ')}`);
 });
 
+await paso('Entrenamiento avisa de los EVs que caen entre escalones', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#ev-ataque');
+  await pagina.fill('#ev-ataque', '252');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.fill('#ev-ps', '6');
+  await pagina.dispatchEvent('#ev-ps', 'change');
+
+  await pagina.click('button[data-vista="entrenamiento"]');
+  await pagina.waitForSelector('.tarjeta:has-text("Optimizar el reparto")', { timeout: 5000 });
+  const t = await pagina.textContent('.tarjeta:has-text("Optimizar el reparto")');
+  if (!t.includes('2 EVs')) throw new Error(`esperaba recuperar 2 EVs: "${t.slice(0, 120)}"`);
+
+  await pagina.click('#aplicar-optimizacion');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#ev-ps');
+  const ps = await pagina.inputValue('#ev-ps');
+  if (ps !== '4') throw new Error(`los PS deberían haber bajado a 4 y están en ${ps}`);
+  console.log('       PS 6 -> 4: los 2 de más no daban ni un punto');
+
+  // Se deja como estaba para no descolocar las pruebas de más abajo.
+  await pagina.fill('#ev-ataque', '0');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.fill('#ev-ps', '0');
+  await pagina.dispatchEvent('#ev-ps', 'change');
+});
+
 await paso('el estado sobrevive a un recargado', async () => {
   await pagina.reload({ waitUntil: 'networkidle' });
   await pagina.waitForSelector('.tarjeta', { timeout: 10000 });
@@ -151,36 +225,152 @@ await paso('móvil: 390px de ancho sin scroll horizontal', async () => {
   if (desborda) throw new Error('hay scroll horizontal');
 });
 
-await paso('la estrategia de naturaleza es automática y enseña la comparación', async () => {
-  await pagina.click('button[data-vista="objetivo"]');
-  await pagina.waitForSelector('#estrategia-nat');
-  const valor = await pagina.inputValue('#estrategia-nat');
-  if (valor !== 'auto') throw new Error(`por defecto debería ser auto, es ${valor}`);
-
+await paso('todos los cruces con naturaleza llevan Piedraeterna', async () => {
   await pagina.click('button[data-vista="plan"]');
-  await pagina.waitForSelector('.tarjeta:has-text("Cómo se lleva la naturaleza")');
-  const comp = await pagina.textContent('.tarjeta:has-text("Cómo se lleva la naturaleza")');
-  for (const esperado of ['Piedraeterna', 'comparten', 'elegida']) {
-    if (!comp.includes(esperado)) throw new Error(`la comparativa no menciona "${esperado}"`);
-  }
-  console.log(`       ${comp.replace(/\s+/g, ' ').slice(120, 330)}`);
+  await abrir('Todos los pasos, en orden');
+  await pagina.waitForSelector('.pasos li');
+  const texto = await pagina.textContent('.pasos');
+  if (!texto.includes('Piedraeterna'))
+    throw new Error('el plan con naturaleza debería pedir Piedraeterna');
+  if (await pagina.locator('#estrategia-nat').count())
+    throw new Error('ya no hay estrategias de naturaleza que elegir');
+  console.log(`       ${(await pagina.textContent('.total')).trim()}`);
 });
 
-await paso('forzar una estrategia cambia el presupuesto y quita la comparativa', async () => {
-  await pagina.click('button[data-vista="plan"]');
-  const auto = await pagina.textContent('.total');
+await paso('el checklist: marcar un cruce gasta los padres y anota la cría', async () => {
+  // Inventario limpio y una crianza propia y pequeña, para que esta prueba no
+  // dependa de lo que hayan dejado las de arriba.
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('#vaciar-inventario');
+  await pagina.click('#vaciar-inventario');
+  await pagina.click('#vaciar-si');
+  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
 
+  await pagina.click('text=+ Nueva');
   await pagina.click('button[data-vista="objetivo"]');
-  await pagina.selectOption('#estrategia-nat', 'piedraeterna');
-  await pagina.click('button[data-vista="plan"]');
-  await pagina.waitForSelector('.pasos li');
-  if (await pagina.locator('.tarjeta:has-text("Cómo se lleva la naturaleza")').count())
-    throw new Error('con una estrategia forzada no debería haber comparativa');
-  const forzada = await pagina.textContent('.total');
-  console.log(`       auto ${auto.trim()} · piedraeterna forzada ${forzada.trim()}`);
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Larvitar');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.check('#iv-velocidad');
 
+  const anotar = async (especie, sexo, stat) => {
+    await pagina.click('button[data-vista="inventario"]');
+    await pagina.waitForSelector('#b-especie');
+    await pagina.fill('#b-especie', especie);
+    await confirmarCampo('#b-especie');
+    await pagina.selectOption('#b-sexo', sexo);
+    await pagina.fill(`#b-iv-${stat}`, '31');
+    await pagina.dispatchEvent(`#b-iv-${stat}`, 'change');
+    await pagina.click('text=Añadir al inventario');
+    await pagina.waitForTimeout(150);
+  };
+  await anotar('Larvitar', '♀', 'ataque');
+  await anotar('Charmander', '♂', 'velocidad');
+
+  await pagina.click('button[data-vista="plan"]');
+  // El cruce listo sale también en «Ahora mismo», pero aquí se prueba el
+  // checklist entero, que es el que gasta los padres.
+  await abrir('Todos los pasos, en orden');
+  await pagina.waitForSelector('.pasos li.cruzar.listo', { timeout: 5000 });
+  await pagina.click('text=Hecho: quitar los padres');
+  await pagina.waitForSelector('#deshacer-paso', { timeout: 5000 });
+
+  await pagina.click('button[data-vista="inventario"]');
+  const inv = await pagina.textContent('.inventario-lista');
+  if (inv.includes('Charmander'))
+    throw new Error('el padre debería haberse gastado en el cruce');
+  if (!/Tu inventario · 1/.test(await pagina.textContent('.inventario-lista h2')))
+    throw new Error(`deberían quedar sólo la cría; dice "${inv.slice(0, 80)}"`);
+  if (!inv.includes('2×31'))
+    throw new Error('la cría tendría que llevar los dos 31 garantizados');
+
+  // Y se puede deshacer: los dos padres vuelven.
+  await pagina.click('button[data-vista="plan"]');
+  await abrir('Todos los pasos, en orden');
+  await pagina.click('#deshacer-paso');
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('.inventario-lista tbody tr:nth-child(2)', { timeout: 5000 });
+  console.log('       cruce hecho y deshecho, con los padres de vuelta');
+
+  await pagina.click('text=Borrar');  // se lleva esta crianza de prueba
+  await pagina.waitForTimeout(200);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+});
+
+await paso('Inventario: marcar varios y borrarlos por tandas', async () => {
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('#sel-todos');
+  // Hay varias tablas en la vista: sólo cuenta la del inventario.
+  const cuantos = () => pagina.locator('.inventario-lista tbody tr').count();
+  const antes = await cuantos();
+  if (antes < 1) throw new Error('hace falta algo en el inventario para esta prueba');
+
+  await pagina.check('#sel-todos');
+  await pagina.waitForSelector('#borrar-seleccion');
+  const etiqueta = await pagina.textContent('#borrar-seleccion');
+  if (!etiqueta.includes(String(antes)))
+    throw new Error(`el botón dice "${etiqueta}" y hay ${antes} marcados`);
+
+  await pagina.click('text=Quitar la marca');
+  await pagina.waitForTimeout(120);
+  if (await pagina.locator('#borrar-seleccion').count())
+    throw new Error('quitar la marca debería esconder el botón de borrar');
+
+  // Vaciar pide confirmación: un clic no basta.
+  await pagina.click('#vaciar-inventario');
+  await pagina.waitForSelector('#vaciar-si');
+  await pagina.click('text=Cancelar');
+  await pagina.waitForTimeout(120);
+  if (await cuantos() !== antes) throw new Error('cancelar no debería borrar nada');
+
+  await pagina.click('#vaciar-inventario');
+  await pagina.click('#vaciar-si');
+  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
+  console.log(`       ${antes} -> 0 tras confirmar`);
+});
+
+await paso('dos crianzas a la vez, con inventario compartido y sin pisarse', async () => {
+  const cuantas = () => pagina.locator('.crianza').count();
   await pagina.click('button[data-vista="objetivo"]');
-  await pagina.selectOption('#estrategia-nat', 'auto');
+  await pagina.waitForSelector('#especie');
+  const antes = await cuantas();
+
+  await pagina.click('text=+ Nueva');
+  await pagina.waitForFunction((n) => document.querySelectorAll('.crianza').length === n + 1, antes);
+  if (await pagina.inputValue('#especie') !== '')
+    throw new Error('la crianza nueva debería empezar en blanco');
+
+  await pagina.fill('#especie', 'Bulbasaur');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.waitForSelector('.crianza.activa:has-text("Bulbasaur")', { timeout: 5000 });
+
+  // Volver a la primera: su objetivo tiene que seguir intacto.
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+  if (await pagina.inputValue('#especie') !== 'Larvitar')
+    throw new Error('cambiar de crianza ha perdido el objetivo de la primera');
+  if (!(await pagina.isChecked('#iv-ps')))
+    throw new Error('la primera crianza ha perdido sus IVs');
+
+  // Y el inventario es el mismo para las dos.
+  await pagina.click('button[data-vista="inventario"]');
+  const inv = await pagina.textContent('.inventario-lista');
+  await pagina.click('.crianza:has-text("Bulbasaur")');
+  await pagina.waitForTimeout(150);
+  const inv2 = await pagina.textContent('.inventario-lista');
+  if (inv.replace(/\s+/g, '') !== inv2.replace(/\s+/g, ''))
+    throw new Error('el inventario debería ser el mismo en las dos crianzas');
+
+  // Se borra la de prueba y vuelve a quedar la de Larvitar.
+  await pagina.click('text=Borrar');
+  await pagina.waitForFunction((n) => document.querySelectorAll('.crianza').length === n, antes);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  console.log(`       ${antes} -> ${antes + 1} -> ${await cuantas()} crianzas`);
 });
 
 await paso('el registro manual acepta movimientos y traduce el nombre del juego', async () => {
@@ -223,9 +413,38 @@ await paso('importar por texto rellena la revisión y guarda tras confirmar', as
   const despues = await contarInventario();
   if (despues !== antes + 1) throw new Error(`inventario ${antes} -> ${despues}`);
 
-  const fila = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const fila = await pagina.textContent('.inventario-lista');
   if (!fila.includes('Rodar')) throw new Error('el movimiento no se ha guardado');
   console.log(`       inventario ${antes} -> ${despues}, con los movimientos`);
+});
+
+await paso('importar varios de golpe, y quitar uno antes de guardar', async () => {
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.click('text=📋 Texto');
+  await pagina.waitForSelector('#texto-importar-inventario');
+  await pagina.fill('#texto-importar-inventario', [
+    'Rattata ♂ Nv. 5',
+    'IVs: 31/12/9/4/7/20',
+    '',
+    'Charmander ♀ Nv. 5',
+    'IVs: 8/31/11/6/9/14',
+    '',
+    'Bulbasaur ♂ Nv. 5',
+    'IVs: 5/7/31/12/8/19',
+  ].join('\n'));
+  await pagina.click('text=Leer el texto');
+  await pagina.waitForSelector('text=Revisar antes de guardar · 3', { timeout: 5000 });
+
+  // Una tanda de tres no puede obligar a descartar las tres por una mal leída.
+  await pagina.click('.tarjeta:has-text("Revisar antes de guardar") tbody tr:nth-child(2) button');
+  await pagina.waitForSelector('text=Revisar antes de guardar · 2', { timeout: 5000 });
+
+  const antes = await contarInventario();
+  await pagina.click('text=Guardar 2 en el inventario');
+  await pagina.waitForTimeout(250);
+  const despues = await contarInventario();
+  if (despues !== antes + 2) throw new Error(`inventario ${antes} -> ${despues}, esperaba +2`);
+  console.log(`       3 leídos, 1 quitado, inventario ${antes} -> ${despues}`);
 });
 
 await paso('un texto que no se entiende se avisa y no se guarda nada', async () => {
@@ -322,8 +541,8 @@ await paso('cambiar de pestaña SÍ lleva al principio', async () => {
 
 await paso('Objetivo tiene su propio importador y aplica la ficha al objetivo', async () => {
   await pagina.click('button[data-vista="objetivo"]');
-  await pagina.waitForSelector('.tarjeta:has-text("Importar el objetivo de una ficha")');
-  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=📋 Texto');
+  await abrir('Importar el objetivo de una ficha');
+  await pagina.click('.plegable:has-text("Importar el objetivo de una ficha") >> text=📋 Texto');
   await pagina.waitForSelector('#texto-importar-objetivo');
   await pagina.fill('#texto-importar-objetivo', [
     'Nv. 1 Chimchar ♀',
@@ -333,7 +552,7 @@ await paso('Objetivo tiene su propio importador y aplica la ficha al objetivo', 
     'Habilidad: Mar Llamas',
     'Movimientos: Placaje, Maquinación, Tormento, Desenrollar',
   ].join('\n'));
-  await pagina.click('.tarjeta:has-text("Importar el objetivo de una ficha") >> text=Leer el texto');
+  await pagina.click('.plegable:has-text("Importar el objetivo de una ficha") >> text=Leer el texto');
   await pagina.waitForSelector('text=Revisar antes de aplicar', { timeout: 5000 });
 
   const rev = await pagina.textContent('.tarjeta:has-text("Revisar antes de aplicar")');
@@ -420,7 +639,7 @@ if (process.env.OCR === '1') {
 }
 
 async function contarInventario() {
-  const t = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const t = await pagina.textContent('.inventario-lista');
   return Number((t.match(/Tu inventario · (\d+)/) ?? [0, 0])[1]);
 }
 

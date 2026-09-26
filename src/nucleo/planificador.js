@@ -17,7 +17,9 @@
 // puede recortar media cadena, y por eso el plan se recalcula entero al tocarlo.
 
 import { STATS, NOMBRE_STAT, IV_MAX, PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, SEXOS } from './constantes.js';
-import { RECIO_DE, PIEDRAETERNA, perfectos } from './herencia.js';
+import {
+  RECIO_DE, PIEDRAETERNA, perfectos, ivsGarantizados, naturalezaGarantizada, ivsVacios,
+} from './herencia.js';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
   costeElegirSexo, sirveComoLineaMaterna,
@@ -293,47 +295,26 @@ function construir(nodoPedido, ctx, profundidad = 0) {
   if (nodo.naturaleza) {
     const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol);
 
-    // Vía A — los dos padres traen ya la naturaleza, así que la cría la saca sola
-    // y NINGÚN hueco de objeto se gasta en ella: el cruce sigue forzando dos IVs,
-    // igual que uno sin naturaleza. Es la estrategia por defecto porque sale más
-    // barata en capturas y en objetos que la de Piedraeterna.
+    // La naturaleza sólo la pasa la Piedraeterna, y ocupa el hueco de objeto de
+    // quien la lleva: el cruce se queda con un solo Recio, así que sólo fuerza un
+    // IV y el otro padre tiene que traer YA todos los pedidos.
     //
-    // No sirve cuando sólo queda un IV por cubrir: dos padres de 0×31 con la
-    // naturaleza no tienen ningún 31 que forzar, así que ese caso cae a la vía B.
-    if (ctx.estrategiaNaturaleza === 'compartida' && n >= 2) {
-      const [f1, f2] = orden;
-      const compartidos = nodo.stats.filter((st) => st !== f1 && st !== f2);
-      nodo.tipo = 'cruce';
-      nodo.objetos = { madre: RECIO_DE[f1], padre: RECIO_DE[f2] };
-      nodo.forzados = [f1, f2];
-      nodo.compartidos = compartidos;
-      nodo.viaNaturaleza = 'compartida';
-      nodo.explicacion =
-        `Los dos padres ya traen la naturaleza, así que la cría la saca sola y no hace falta ` +
-        `Piedraeterna: los dos huecos de objeto quedan libres para forzar ${NOMBRE_STAT[f1]} y ` +
-        `${NOMBRE_STAT[f2]}. ` +
-        (compartidos.length
-          ? `${compartidos.map((st) => NOMBRE_STAT[st]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''} porque los dos lo tienen a 31.`
-          : 'No hay IVs compartidos: los dos forzados son todo el objetivo.');
-
-      nodo.hijos = [
-        construir({ stats: [...compartidos, f1], naturaleza: true, objeto: RECIO_DE[f1], ...hijoA }, ctx, profundidad + 1),
-        construir({ stats: [...compartidos, f2], naturaleza: true, objeto: RECIO_DE[f2], ...hijoB }, ctx, profundidad + 1),
-      ];
-      return nodo;
-    }
-
-    // Vía B — Piedraeterna. La lleva un padre y pasa su naturaleza, pero ocupa su
-    // hueco de objeto, así que el cruce sólo puede forzar un IV y el otro padre
-    // tiene que traer YA todos los pedidos.
+    // Dos padres con la misma naturaleza NO la transmiten, por mucho que con los
+    // IVs sí funcione. Ver naturalezaGarantizada() en herencia.js.
     const forzado = orden[0];
     const resto = nodo.stats.filter((st) => st !== forzado);
 
     nodo.tipo = 'cruce';
-    nodo.objetos = { madre: PIEDRAETERNA, padre: RECIO_DE[forzado] };
+    // La Piedraeterna la lleva el PADRE, no la madre, y esto no es un detalle.
+    // Da igual quién la lleve —pasa la naturaleza de quien la tenga puesta—,
+    // pero el hueco de la madre es el de la espina: especie objetivo y hembra.
+    // Colgando de ahí la cadena de naturaleza, todos sus huecos quedaban atados
+    // a la especie y ningún Pokémon del inventario con la naturaleza buena
+    // entraba en ellos. Con la Piedraeterna en el padre, la cadena entera de
+    // naturaleza es LIBRE: cualquier especie del grupo huevo, cualquier sexo.
+    nodo.objetos = { madre: RECIO_DE[forzado], padre: PIEDRAETERNA };
     nodo.forzados = [forzado];
     nodo.compartidos = resto;
-    nodo.viaNaturaleza = 'piedraeterna';
     nodo.explicacion =
       `La Piedraeterna pasa la naturaleza pero ocupa un hueco de objeto, así que este cruce ` +
       `sólo puede forzar un IV (${NOMBRE_STAT[forzado]}). ` +
@@ -342,8 +323,8 @@ function construir(nodoPedido, ctx, profundidad = 0) {
         : 'No queda ningún IV que tengan que compartir.');
 
     nodo.hijos = [
-      construir({ stats: resto, naturaleza: true, objeto: PIEDRAETERNA, ...hijoA }, ctx, profundidad + 1),
-      construir({ stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado], ...hijoB }, ctx, profundidad + 1),
+      construir({ stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado], ...hijoA }, ctx, profundidad + 1),
+      construir({ stats: resto, naturaleza: true, objeto: PIEDRAETERNA, ...hijoB }, ctx, profundidad + 1),
     ];
     return nodo;
   }
@@ -383,6 +364,92 @@ function restriccionesDeLosHijos(rolDelCruce) {
   return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
     ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.HEMBRA }, { rol: ROL.LIBRE, sexoNecesario: SEXOS.MACHO }]
     : [{ rol: ROL.LIBRE, sexoNecesario: null }, { rol: ROL.LIBRE, sexoNecesario: null }];
+}
+
+/**
+ * Alarga la espina por abajo para poder usar una hembra que SÓLO aporta la especie.
+ *
+ * El caso, que es el del usuario: tienes una hembra de la especie objetivo con
+ * los IVs que sea —una captura difícil que costó encontrar— y el plan la ignora,
+ * porque el hueco de abajo de la espina pide esa especie **y** un 31 concreto.
+ *
+ * Pero la especie la pone la madre y nada más: si esa hembra se cruza con un
+ * macho libre que traiga el 31 (o la naturaleza) en su objeto, la cría sale de
+ * la especie objetivo **y** con lo que pedía el hueco. Se cambia una captura
+ * difícil (especie concreta + sexo + 31) por una fácil (cualquier especie del
+ * grupo huevo + 31) más un cruce.
+ *
+ * Sólo cabe una cosa en el objeto del padre, así que esto vale mientras al hueco
+ * le falte un único requisito. Al hueco de abajo de la espina siempre le falta
+ * exactamente uno: un 31, o la naturaleza. Y sólo se alarga si en el inventario
+ * hay de verdad una hembra así sin usar; si no, sería un cruce regalado.
+ */
+export function extenderEspinaPorEspecie(arbol, ctx) {
+  const { datos, objetivo, inventarioLibre } = ctx;
+
+  // El hueco de abajo de la espina: el único 'conseguir' con la especie atada.
+  let hoja = null;
+  (function recorre(n) {
+    if (n.tipo === 'conseguir' && (n.rol === ROL.ESPINA || n.rol === ROL.RAIZ)) hoja = n;
+    n.hijos.forEach(recorre);
+  })(arbol);
+  if (!hoja) return arbol;
+
+  // Un objeto, un requisito.
+  const pide = hoja.stats.length + (hoja.naturaleza ? 1 : 0);
+  if (pide !== 1) return arbol;
+
+  // ¿Hay alguna hembra de la línea que el plan esté tirando a la basura?
+  const soloEspecie = inventarioLibre.filter((e) => {
+    if (!sirveComoLineaMaterna(e, objetivo.especie, datos.pokedex).sirve) return false;
+    return !cumple(e, hoja, datos, objetivo).ok;
+  });
+  if (!soloEspecie.length) return arbol;
+
+  const objetoDelPadre = hoja.naturaleza ? PIEDRAETERNA : RECIO_DE[hoja.stats[0]];
+  const loQueTrae = hoja.naturaleza
+    ? `la naturaleza ${objetivo.naturaleza}`
+    : `31 en ${NOMBRE_STAT[hoja.stats[0]]}`;
+
+  const madre = {
+    id: nuevoId(),
+    tipo: 'conseguir',
+    stats: [],
+    naturaleza: false,
+    rol: ROL.ESPINA,
+    profundidad: hoja.profundidad + 1,
+    objeto: null,
+    sexoNecesario: SEXOS.HEMBRA,
+    soloEspecie: true,
+    hijos: [],
+  };
+  const padre = {
+    id: nuevoId(),
+    tipo: 'conseguir',
+    stats: [...hoja.stats],
+    naturaleza: hoja.naturaleza,
+    rol: ROL.LIBRE,
+    profundidad: hoja.profundidad + 1,
+    objeto: objetoDelPadre,
+    sexoNecesario: SEXOS.MACHO,
+    movimientosNecesarios: hoja.movimientosNecesarios ?? [],
+    hijos: [],
+  };
+
+  hoja.tipo = 'cruce';
+  hoja.objetos = { madre: null, padre: objetoDelPadre };
+  hoja.forzados = hoja.naturaleza ? [] : [hoja.stats[0]];
+  hoja.compartidos = [];
+  hoja.alargadaPorEspecie = true;
+  hoja.explicacion =
+    `La especie la pone la madre y nada más, así que aquí basta una hembra de ` +
+    `${objetivo.especie} aunque no tenga nada: el padre trae ${loQueTrae} con su ` +
+    `${objetoDelPadre}. Sale más barato que cazar una hembra de ${objetivo.especie} ` +
+    `que además cumpla.`;
+  hoja.hijos = [madre, padre];
+  delete hoja.movimientosNecesarios;
+
+  return arbol;
 }
 
 /** Cuántas capturas cuelgan de un nodo: es lo que se ahorra si el inventario lo cubre. */
@@ -510,18 +577,15 @@ export function asignarSexos(arbol, objetivo) {
  * @param {Object} opciones {inventario, regionesDisponibles}
  */
 /**
- * Coste aproximado de un árbol, para poder comparar dos estrategias.
- *
- * Mide las dos cosas que duelen de verdad:
+ * Coste aproximado de un árbol: lo que cuesta de verdad, para poder enseñarlo.
  *
  * - **esfuerzo**: encuentros salvajes esperados. Cada IV suelto a 31 es 1 de 32 y
  *   la naturaleza 1 de 25, así que una hoja de "1×31" cuesta 32 y una de "sólo
- *   naturaleza" cuesta 25. Es lo que de verdad cuesta tiempo.
+ *   naturaleza" cuesta 25.
  * - **dinero**: los objetos de crianza, que se consumen todos.
  *
  * No usa los precios de datos/objetos.json a propósito: coste.js ya hace el
- * presupuesto de verdad, y si el planificador lo importase habría un ciclo. Aquí
- * basta el orden de magnitud, que es lo que decide entre dos estrategias.
+ * presupuesto de verdad, y si el planificador lo importase habría un ciclo.
  */
 export function medirArbol(arbol) {
   let esfuerzo = 0;
@@ -536,7 +600,9 @@ export function medirArbol(arbol) {
       esfuerzo += (IV_MAX + 1) ** n.stats.length * (n.naturaleza ? 25 : 1);
     }
     if (n.tipo === 'cruce') {
-      for (const o of [n.objetos.madre, n.objetos.padre]) {
+      // El cruce alargado de la espina deja el hueco de la madre a null: ella
+      // sólo aporta la especie y un Recio suyo no forzaría nada.
+      for (const o of [n.objetos.madre, n.objetos.padre].filter(Boolean)) {
         objetos.set(o, (objetos.get(o) ?? 0) + 1);
         dinero += PRECIO_RESPALDO[o] ?? 10000;
       }
@@ -550,90 +616,57 @@ export function medirArbol(arbol) {
 /**
  * Plan completo: árbol, pasos en orden de ejecución, qué hay que conseguir y coste.
  *
- * Con naturaleza hay dos formas de llevarla por la cadena y **ninguna gana
- * siempre**, que es algo que sólo se vio probando:
- *
- * - **compartida** sale más barata en vacío, porque cambia padres de 1×31 (1 de 32)
- *   por padres de sólo naturaleza (1 de 25) y no gasta Piedraeternas arriba;
- * - **piedraeterna** gana en cuanto hay inventario, porque deja media cadena SIN
- *   naturaleza, y ahí sí encajan los Pokémon que ya tienes aunque no la lleven.
- *
- * Por eso el valor por defecto es `'auto'`: se construyen las dos y se queda la
- * de menos esfuerzo. La comparación viaja en el resultado para poder enseñarla.
- *
  * @param {Object} objetivo {especie, ivs, naturaleza, evs, movimientos, habilidad, sexo}
  * @param {Object} datos {pokedex, encuentros, objetos, ...}
- * @param {Object} opciones {inventario, regionesDisponibles, estrategiaNaturaleza}
+ * @param {Object} opciones {inventario, regionesDisponibles}
  */
-export function planear(objetivo, datos, {
-  inventario = [],
-  regionesDisponibles = [],
-  estrategiaNaturaleza = 'auto',
-} = {}) {
+export function planear(objetivo, datos, { inventario = [], regionesDisponibles = [] } = {}) {
   const validacion = validarObjetivo(objetivo, datos);
   if (!validacion.valido) return { ok: false, ...validacion };
 
   const pedidos = statsPedidos(objetivo);
   const movsHuevo = movimientosSoloDeHuevo(objetivo, datos.pokedex);
 
-  /** Construye el plan entero para una estrategia concreta. */
-  const construirCon = (estrategia) => {
-    contadorId = 0;
-    const ctx = {
-      datos,
-      objetivo,
-      estrategiaNaturaleza: estrategia,
-      inventarioOriginal: inventario,
-      // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco
-      // y desaparece de la reserva.
-      inventarioLibre: inventario.map((e) => ({ ...e })),
-    };
-
-    // Cuatro pasadas, en este orden: el árbol de requisitos, los movimientos huevo
-    // que atan al padre final, el inventario encima, y el reparto de sexos, que es
-    // lo único que depende de todo lo anterior.
-    const crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
-
-    if (movsHuevo.length && crudo.tipo === 'cruce') {
-      // El movimiento lo pasa el PADRE, así que el hueco que deja de ser libre es
-      // el que no está en la espina. Como se consume con la cría, un padre que
-      // sepa varios ahorra un cruce por cada uno.
-      const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
-      if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
-    }
-
-    const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
-    return { estrategia, arbol, ctx, medida: medirArbol(arbol) };
+  contadorId = 0;
+  const ctx = {
+    datos,
+    objetivo,
+    inventarioOriginal: inventario,
+    // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco y
+    // desaparece de la reserva.
+    inventarioLibre: inventario.map((e) => ({ ...e })),
   };
 
-  // Sin naturaleza no hay nada que elegir: la estrategia no pinta.
-  const candidatas = !objetivo.naturaleza
-    ? ['compartida']
-    : estrategiaNaturaleza === 'auto'
-      ? ['compartida', 'piedraeterna']
-      : [estrategiaNaturaleza];
+  // Cuatro pasadas, en este orden: el árbol de requisitos, los movimientos huevo
+  // que atan al padre final, el inventario encima, y el reparto de sexos, que es
+  // lo único que depende de todo lo anterior.
+  const crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
 
-  const construidos = candidatas.map(construirCon);
-  construidos.sort((a, b) => a.medida.esfuerzo - b.medida.esfuerzo || a.medida.dinero - b.medida.dinero);
-  const elegido = construidos[0];
+  if (movsHuevo.length && crudo.tipo === 'cruce') {
+    // El movimiento lo pasa el PADRE, así que el hueco que deja de ser libre es
+    // el que no está en la espina. Como se consume con la cría, un padre que
+    // sepa varios ahorra un cruce por cada uno.
+    const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
+    if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
+  }
+
+  // Antes de colocar el inventario: si hay una hembra de la especie objetivo que
+  // el árbol tal cual tiraría a la basura, se alarga la espina para darle uso.
+  extenderEspinaPorEspecie(crudo, ctx);
+
+  const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles);
-  const pasos = aPasos(elegido.arbol, objetivo, datos, relleno);
+  const pasos = aPasos(arbol, objetivo, datos, relleno);
 
   return {
     ok: true,
     objetivo,
-    arbol: elegido.arbol,
+    arbol,
     pasos,
     relleno: relleno.slice(0, 8),
-    sobrantes: elegido.ctx.inventarioLibre,
-    estrategiaNaturaleza: elegido.estrategia,
-    estrategiaPedida: estrategiaNaturaleza,
-    // Sólo hay comparación cuando de verdad se han evaluado las dos.
-    comparativa: construidos.length > 1
-      ? construidos.map((c) => ({ estrategia: c.estrategia, ...c.medida }))
-      : null,
-    medida: elegido.medida,
+    sobrantes: ctx.inventarioLibre,
+    medida: medirArbol(arbol),
     movimientosDeHuevo: movsHuevo,
     ...validacion,
   };
@@ -705,7 +738,7 @@ export function aPasos(arbol, objetivo, datos, relleno = []) {
       explicacion: nodo.explicacion,
       sexoCria: sexoNecesario,
       texto: `Cruza los dos padres de ${etiqueta(nodo, objetivo)}` +
-        ` · ${nodo.objetos.madre} + ${nodo.objetos.padre}` +
+        ` · ${[nodo.objetos.madre, nodo.objetos.padre].filter(Boolean).join(' + ') || 'sin objetos'}` +
         (sexoNecesario && !esRaiz ? ` · paga por que la cría salga ${sexoNecesario}` : ''),
     });
   })(arbol);
@@ -725,6 +758,59 @@ export function etiqueta(nodo, objetivo = null) {
   if (n) partes.push(`${n}×31 (${nodo.stats.map((s) => NOMBRE_STAT[s] ?? s).join(', ')})`);
   if (nodo.naturaleza) partes.push(`naturaleza ${objetivo?.naturaleza ?? ''}`.trim());
   return partes.join(' + ') || 'cualquiera';
+}
+
+/**
+ * El Pokémon que sale de un cruce, con lo que la regla de herencia GARANTIZA y
+ * nada más.
+ *
+ * Es lo que se anota en el inventario al marcar un cruce como hecho. Se calcula
+ * con `ivsGarantizados()`, o sea con la regla de verdad y no con lo que el nodo
+ * prometía: si los dos padres que has acabado usando comparten un 31 de más, la
+ * cría lo lleva y el inventario tiene que saberlo.
+ *
+ * Lo que NO se pone es lo que sale al azar: un IV no garantizado queda a 0
+ * («sin anotar»), y la naturaleza a null si nadie lleva Piedraeterna. Anotar un
+ * 31 que no está garantizado sería inventarse un dato, y un IV mal anotado
+ * produce un árbol plausible y equivocado.
+ *
+ * Devuelve null si el cruce todavía no se puede hacer: hacen falta los dos
+ * padres de verdad, en el inventario.
+ */
+export function criaDe(nodo, objetivo, datos) {
+  if (nodo.tipo !== 'cruce' || nodo.hijos.length !== 2) return null;
+  const [madre, padre] = nodo.hijos;
+  if (madre.tipo !== 'inventario' || padre.tipo !== 'inventario') return null;
+
+  const eMadre = madre.ejemplar;
+  const ePadre = padre.ejemplar;
+
+  // La especie la pone la madre; si la madre es Ditto, el otro.
+  const especie = esDitto(eMadre.especie) ? ePadre.especie : eMadre.especie;
+  const base = datos.pokedex[especie]?.base ?? especie;
+
+  const g = ivsGarantizados(eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre);
+  const ivs = ivsVacios();
+  for (const st of g.garantizados) ivs[st] = IV_MAX;
+
+  const nat = naturalezaGarantizada(eMadre, ePadre, nodo.objetos.madre, nodo.objetos.padre);
+
+  // Movimientos huevo: los pasa el padre, y sólo los que la cría pueda aprender.
+  const pBase = datos.pokedex[base];
+  const movimientos = pBase
+    ? (ePadre.movimientos ?? []).filter((m) => vias(pBase, m).length > 0)
+    : [];
+
+  return {
+    especie: base,
+    sexo: nodo.sexoNecesario ?? (nodo.rol === ROL.RAIZ ? (objetivo.sexo ?? SEXOS.MACHO) : SEXOS.MACHO),
+    naturaleza: nat.naturaleza,
+    ivs,
+    evs: ivsVacios(),
+    movimientos,
+    nota: `cría de ${eMadre.especie} ♀ × ${ePadre.especie} ♂`,
+    padres: [eMadre.id, ePadre.id],
+  };
 }
 
 /** Cuenta nodos por tipo: sirve para el resumen y para el coste. */

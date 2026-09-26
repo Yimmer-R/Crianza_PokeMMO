@@ -2,7 +2,7 @@
 
 Esto es la deducción entera, porque es lo que no se puede volver a derivar de
 memoria cada vez. Todo parte de dos frases de
-[`wiki/mecanicas/Crianza.md`](https://github.com/Yimmer-R/PokeMMO/blob/main/wiki/mecanicas/Crianza.md):
+[`wiki/mecanicas/Crianza.md`](https://github.com/Yimmer-R/Wiki-PokeMMO/blob/main/wiki/mecanicas/Crianza.md):
 
 > Tres IVs se heredan tal cual de los padres y los otros tres salen del promedio
 > de ambos, redondeado hacia abajo.
@@ -65,57 +65,47 @@ se capturan o se compran. Sale un árbol binario completo:
 Son **2^(n-1) padres y 2^(n-1) - 1 cruces**. Y como en PokeMMO los padres se
 consumen, esos números son Pokémon gastados, no Pokémon prestados.
 
-## La naturaleza: dos vías, y ninguna gana siempre
+## La naturaleza: sólo la Piedraeterna
 
-La naturaleza se hereda garantizada de dos formas:
+> **Dos padres de la misma naturaleza NO la transmiten.** Aunque el padre y la
+> madre compartan naturaleza, la cría no la hereda: sigue saliendo al azar entre
+> las 25. La Piedraeterna hace falta siempre, y la pasa al 100%.
+> — `wiki/mecanicas/Crianza.md` de [Yimmer-R/Wiki-PokeMMO](https://github.com/Yimmer-R/Wiki-PokeMMO)
 
-1. **Piedraeterna**: la pasa quien la lleve. Está en `wiki/mecanicas/Crianza.md`.
-2. **Los dos padres la comparten**: la cría sale con ella, exactamente igual que
-   pasa con un IV que los dos tienen a 31.
-   *(experiencia propia del usuario, 20-09-2026. La wiki **no** documenta qué pasa
-   con la naturaleza cuando no hay Piedraeterna, así que este dato es más débil
-   que uno de `raw/` y convendría meterlo en la wiki como fuente nueva.)*
+Esto **corrige** lo que esta app dio por bueno hasta el 23-09-2026. El modelo
+anterior tenía dos vías —Piedraeterna y naturaleza compartida— y elegía entre
+ellas; la segunda venía de una observación del usuario al jugar (20-09-2026) que
+la wiki desmiente. Los IVs se promedian; la naturaleza no, se sortea.
 
-La diferencia que importa no es de dónde sale la naturaleza, sino **cuánto ocupa**:
+La consecuencia de diseño es una sola, pero manda sobre todo el árbol: **la
+Piedraeterna gasta el hueco de objeto** de ese padre, así que un cruce que
+prometa naturaleza sólo puede forzar **un** IV con Recio, en vez de dos.
 
-- la Piedraeterna **gasta el hueco de objeto** de ese padre, así que el cruce sólo
-  puede forzar UN IV con Recio en vez de dos;
-- la naturaleza compartida **no gasta nada**: el cruce rinde igual que uno sin
-  naturaleza.
+### Lo que cuesta
 
-### Lo que cuesta cada vía
+Con `A(k) = 2^(k-1)` hojas para un k×31 sin naturaleza, y `B(k)` para uno con
+ella: el cruce fuerza un IV, así que hacen falta un `(k-1)×31` **con** naturaleza
+y un `k×31` **sin** ella → `B(k) = B(k-1) + A(k)`.
 
-Con `A(k) = 2^(k-1)` hojas para un k×31 sin naturaleza, y `B(k)` para uno con ella:
+Con `B(0) = 1` (un padre con la naturaleza y ningún 31), sale **`B(k) = 2^k`**:
+el doble de padres que un k×31 pelado. De ellos, **una sola hoja** es de sólo
+naturaleza —la de abajo del todo, 1 de 25— y las otras `2^k - 1` son de 1×31, 1
+de 32 cada una. Para k=4: `1×25 + 15×32 = 505` encuentros esperados.
 
-- **Piedraeterna**: el cruce fuerza un IV, así que hacen falta un `(k-1)×31` con
-  naturaleza y un `k×31` sin ella → `B(k) = B(k-1) + A(k)`.
-- **Compartida**: los dos padres son `(k-1)×31` **con** naturaleza, y cada uno
-  lleva su Recio → `B(k) = 2·B(k-1)`.
+Que la naturaleza entre por abajo tiene una ventaja que se aprovecha en
+`asignarInventario()`: **media cadena queda sin naturaleza**, y ahí encaja
+cualquier ejemplar que ya tengas aunque su naturaleza no sea la buena.
 
-Con `B(0) = 1` (un padre con la naturaleza y ningún 31), **las dos dan
-`B(k) = 2^k`**: el mismo número de padres. Lo que cambia es de qué tipo:
+### La Piedraeterna la lleva el PADRE, y eso no es un detalle
 
-| vía | hojas de sólo naturaleza | hojas de 1×31 | encuentros esperados (k=4) |
-|---|---|---|---|
-| compartida | 8 | 8 | 8×25 + 8×32 = **456** |
-| Piedraeterna | 1 | 15 | 1×25 + 15×32 = **505** |
-
-En vacío gana la compartida: un padre de sólo naturaleza es 1 de 25 y uno de 1×31
-es 1 de 32. También gasta menos dinero, porque cambia Recios de 10.000 por
-Piedraeternas de 4.000 (322.000 frente a 346.000 en un 4×31).
-
-**Pero con inventario se da la vuelta**, y esto sólo se vio probando la app: la
-compartida exige la naturaleza en **todos** los huecos, así que un 3×31 que ya
-tengas y que no la lleve no encaja en ninguno y no ahorra nada. La Piedraeterna
-deja media cadena sin naturaleza, y ahí sí entra.
-
-Por eso el planificador **construye las dos y se queda con la de menos esfuerzo**
-(`estrategiaNaturaleza: 'auto'`, que es el valor por defecto), y devuelve la
-comparación para poder enseñarla. Forzar una de las dos sigue siendo posible.
-
-La vía compartida no sirve cuando sólo queda un IV por cubrir: dos padres de 0×31
-con la naturaleza no tienen ningún 31 que forzar. Ese caso cae siempre a la
-Piedraeterna, y es donde entra en la cadena por abajo.
+Puede llevarla cualquiera de los dos: pasa la naturaleza de quien la tenga
+puesta. Pero el hueco de la madre es el de la **espina** —especie objetivo,
+hembra—, así que colgar de ahí la cadena de naturaleza ataba **todos** sus
+huecos a la especie, y ningún Pokémon del inventario con la naturaleza buena
+entraba en ninguno. Con la Piedraeterna en el padre, la cadena de naturaleza
+entera es `ROL.LIBRE`: cualquier especie del grupo huevo, cualquier sexo. La
+espina pasa a bajar por la cadena de sólo IVs, y su hoja de abajo es un 1×31 de
+la especie objetivo en vez de una de sólo naturaleza.
 
 ## La especie: sólo la espina materna la tiene atada
 
@@ -141,6 +131,32 @@ colocado el inventario.
 Un **Ditto** rompe la regla en el buen sentido: cría con cualquiera y la especie
 sale del otro padre, así que permite usar un **macho** de la especie objetivo como
 línea materna. También es la única forma de criar una especie sin género.
+
+### Una hembra que sólo aporta la especie alarga la espina
+
+Si la especie objetivo es difícil de encontrar, la hoja de abajo de la espina es
+la captura cara del árbol entero: esa especie, **hembra**, y además con el 31
+que pide el hueco. Pero la madre aporta **sólo** la especie. Una hembra de la
+especie con los IVs que sea —una que ya tengas— sirve igual si se le pone
+delante un cruce más:
+
+```
+        [hueco de la espina: 1×31 (PS), ♀, especie objetivo]
+                              ↓ se convierte en
+                            cruce
+                   ┌──────────┴──────────┐
+        tu hembra (sólo especie)   1×31 (PS) ♂, cualquier especie
+              sin objeto                 + Pesa Recia
+```
+
+Se cambia una captura difícil por una fácil más un cruce. Sólo cabe **un**
+requisito, porque sólo hay un objeto útil en ese cruce (el de la madre no
+forzaría nada: ella no tiene ningún 31). Al hueco de abajo de la espina siempre
+le falta exactamente uno —un 31, o la naturaleza—, así que siempre cabe.
+
+`extenderEspinaPorEspecie()` lo hace **antes** de colocar el inventario, y sólo
+si en el inventario hay de verdad una hembra así que si no se quedaría sin usar:
+en vacío sería un cruce regalado.
 
 ## Emparejar el inventario
 

@@ -1,7 +1,7 @@
 # Datos y fuentes
 
 Nada en `datos/` se escribe a mano. Todo sale de
-[Yimmer-R/PokeMMO](https://github.com/Yimmer-R/PokeMMO) vía
+[Yimmer-R/Wiki-PokeMMO](https://github.com/Yimmer-R/Wiki-PokeMMO) vía
 `herramientas/extraer-wiki.mjs`. Si un dato está mal, se corrige **en la wiki** y
 se vuelve a extraer.
 

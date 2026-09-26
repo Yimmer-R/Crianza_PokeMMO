@@ -61,12 +61,10 @@ bloque('herencia: IVs garantizados', () => {
     igual([...r.garantizados], ['velocidad']); // el 31 en Ataque de la madre se pierde
   });
 
-  prueba('el tope garantizable baja a compartidos + 1 sólo con Piedraeterna', () => {
-    igual(topeGarantizable(3, null), 5);
-    igual(topeGarantizable(3, 'piedraeterna'), 4);
-    // Si la naturaleza viene de que los dos padres la comparten, no gasta objeto
-    // y el cruce rinde igual que uno sin naturaleza.
-    igual(topeGarantizable(3, 'compartida'), 5);
+  prueba('pedir naturaleza siempre cuesta un hueco de objeto', () => {
+    igual(topeGarantizable(3, false), 5);
+    // La Piedraeterna es la única vía, y ocupa el sitio de un Recio.
+    igual(topeGarantizable(3, true), 4);
   });
 });
 
@@ -148,10 +146,24 @@ bloque('herencia: naturaleza', () => {
     );
   });
 
-  prueba('si los dos padres comparten naturaleza, la cría la saca sin Piedraeterna', () => {
+  prueba('dos padres con la MISMA naturaleza no la transmiten: sale al azar', () => {
+    // Es la trampa de esta mecánica: con los IVs sí funciona y con la naturaleza
+    // no. La app llegó a implementarlo al revés.
+    // (wiki/mecanicas/Crianza.md, 23-09-2026)
     igual(
       naturalezaGarantizada(conNat('Audaz'), conNat('Audaz'), RECIO_DE.ataque, RECIO_DE.velocidad),
-      { naturaleza: 'Audaz', via: 'compartida' },
+      { naturaleza: null, via: null },
+    );
+  });
+
+  prueba('ni siquiera con los dos padres iguales y un Recio cada uno', () => {
+    igual(naturalezaGarantizada(conNat('Agitada'), conNat('Agitada'), null, null).naturaleza, null);
+  });
+
+  prueba('la Piedraeterna la pasa aunque el otro padre tenga otra naturaleza', () => {
+    igual(
+      naturalezaGarantizada(conNat('Agitada'), conNat('Audaz'), PIEDRAETERNA, RECIO_DE.ps).naturaleza,
+      'Agitada',
     );
   });
 
@@ -167,15 +179,13 @@ bloque('herencia: naturaleza', () => {
     igual(naturalezaGarantizada({}, {}, PIEDRAETERNA, null), { naturaleza: null, via: null });
   });
 
-  prueba('la vía compartida deja los dos huecos de objeto libres; la Piedraeterna sólo uno', () => {
+  prueba('la Piedraeterna cuesta un IV forzado: 3×31 con dos Recios, 2×31 con ella', () => {
     const a = ivs({ ps: 31, ataque: 31 });
     const b = ivs({ ps: 31, velocidad: 31 });
-    // Compartida: los dos Recios funcionan, salen 3×31.
     igual(
       [...ivsGarantizados(a, b, RECIO_DE.ataque, RECIO_DE.velocidad).garantizados].sort(),
       ['ataque', 'ps', 'velocidad'],
     );
-    // Piedraeterna: uno de los dos IVs forzados se pierde, salen 2×31.
     igual(
       [...ivsGarantizados(a, b, PIEDRAETERNA, RECIO_DE.velocidad).garantizados].sort(),
       ['ps', 'velocidad'],

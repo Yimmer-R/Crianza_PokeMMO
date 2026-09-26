@@ -14,6 +14,7 @@ import { vistaPlan } from './vista-plan.js';
 import { vistaInventario } from './vista-inventario.js';
 import { vistaCapturas } from './vista-capturas.js';
 import { vistaEntrenamiento } from './vista-entrenamiento.js';
+import { barraCrianzas, alPintar } from './barra-crianzas.js';
 
 const VISTAS = {
   objetivo: vistaObjetivo,
@@ -25,29 +26,55 @@ const VISTAS = {
 
 const contenedor = document.getElementById('vista');
 const pestanas = document.getElementById('pestanas');
+const barra = document.getElementById('crianzas');
 
 let datos = null;
 let recalculando = false;
 
-/** Recalcula el plan cuando cambia algo que le afecta. */
+/**
+ * Recalcula el plan de TODAS las crianzas cuando cambia algo que les afecta.
+ *
+ * Todas ven el inventario entero: esconderle a una lo que otra "ha pedido"
+ * sería mentir, porque hasta que no completas el paso el Pokémon sigue en tu PC
+ * y lo puedes usar donde quieras. Lo que sí se calcula es qué ejemplares están
+ * usando dos planes a la vez, para poder decirlo.
+ */
 function recalcular() {
   if (recalculando) return;
-  const { objetivo, inventario, regionesDisponibles } = obtener();
-  if (!objetivo.especie) { if (obtener().plan) { recalculando = true; fijar({ plan: null }); recalculando = false; } return; }
+  const { crianzas, crianzaActiva, inventario, regionesDisponibles } = obtener();
 
-  let plan;
-  try {
-    plan = planear(objetivo, datos, {
-      inventario,
-      regionesDisponibles,
-      estrategiaNaturaleza: objetivo.estrategiaNaturaleza ?? 'auto',
-    });
-  } catch (e) {
-    plan = { ok: false, problemas: [`error al planear: ${e.message}`], avisos: [] };
+  const planes = {};
+  for (const c of crianzas) {
+    if (!c.objetivo.especie) continue;
+    try {
+      planes[c.id] = planear(c.objetivo, datos, { inventario, regionesDisponibles });
+    } catch (e) {
+      planes[c.id] = { ok: false, problemas: [`error al planear: ${e.message}`], avisos: [] };
+    }
   }
+
   recalculando = true;
-  fijar({ plan });
+  fijar({ planes, plan: planes[crianzaActiva] ?? null, disputados: buscarDisputados(crianzas, planes) });
   recalculando = false;
+}
+
+/** Ejemplares del inventario que aparecen en el plan de más de una crianza. */
+function buscarDisputados(crianzas, planes) {
+  const porEjemplar = new Map();
+  for (const c of crianzas) {
+    const plan = planes[c.id];
+    if (!plan?.ok) continue;
+    (function recorre(n) {
+      if (n.tipo === 'inventario') {
+        const ya = porEjemplar.get(n.ejemplar.id) ?? { ejemplar: n.ejemplar, crianzas: [] };
+        ya.crianzas.push(c.id);
+        porEjemplar.set(n.ejemplar.id, ya);
+        return;
+      }
+      n.hijos.forEach(recorre);
+    })(plan.arbol);
+  }
+  return [...porEjemplar.values()].filter((x) => x.crianzas.length > 1);
 }
 
 /**
@@ -76,6 +103,8 @@ function pintar() {
 
   for (const b of pestanas.querySelectorAll('button'))
     b.classList.toggle('activa', b.dataset.vista === vista);
+
+  if (barra) barra.replaceChildren(barraCrianzas());
 
   // Qué estaba enfocado y dónde estaba el scroll, para devolverlo después. Sin
   // esto, escribir en un campo te echaba del campo y mandaba la página al
@@ -150,6 +179,7 @@ async function arrancar() {
       `${datos.meta.recuentos.conEncuentros} con encuentros, ` +
       `${datos.meta.recuentos.movimientosHuevo} movimientos huevo.`;
 
+  alPintar(programarPintado);
   restaurar();
   // Se suscribe ANTES del primer recalculo para que el primer pintado ya lleve plan.
   suscribir(() => { recalcular(); programarPintado(); });

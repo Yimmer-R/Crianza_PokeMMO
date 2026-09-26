@@ -83,7 +83,10 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
   const porObjeto = new Map();
   (function recorre(n) {
     if (n.tipo === 'cruce') {
-      for (const o of [n.objetos.madre, n.objetos.padre]) porObjeto.set(o, (porObjeto.get(o) ?? 0) + 1);
+      // .filter(Boolean): el cruce que alarga la espina no lleva objeto en la
+      // madre, que sólo aporta la especie.
+      for (const o of [n.objetos.madre, n.objetos.padre].filter(Boolean))
+        porObjeto.set(o, (porObjeto.get(o) ?? 0) + 1);
     }
     n.hijos.forEach(recorre);
   })(plan.arbol);

@@ -9,18 +9,42 @@
 // Por defecto busca ../PokeMMO (el repo hermano). Se puede fijar con WIKI_POKEMMO.
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..');
-const WIKI = process.argv[2] || process.env.WIKI_POKEMMO || join(RAIZ, '..', 'PokeMMO');
+// La wiki vive en el repo hermano. Desde el 24-09-2026 el bueno es
+// `wiki-pokemmo`; `PokeMMO` es el anterior y se deja como respaldo para que una
+// copia antigua del entorno siga funcionando.
+const CANDIDATAS = [
+  process.argv[2],
+  process.env.WIKI_POKEMMO,
+  join(RAIZ, '..', 'wiki-pokemmo'),
+  join(RAIZ, '..', 'PokeMMO'),
+].filter(Boolean);
+const WIKI = CANDIDATAS.find((c) => existsSync(join(c, 'wiki', 'pokemon'))) ?? CANDIDATAS[0];
 
 if (!existsSync(join(WIKI, 'wiki', 'pokemon'))) {
   console.error(`No encuentro la wiki en ${WIKI}.`);
-  console.error('Clona Yimmer-R/PokeMMO al lado de este repo, o pasa la ruta:');
-  console.error('  node herramientas/extraer-wiki.mjs /ruta/a/PokeMMO');
+  console.error('Clona Yimmer-R/Wiki-PokeMMO al lado de este repo, o pasa la ruta:');
+  console.error('  node herramientas/extraer-wiki.mjs /ruta/a/Wiki-PokeMMO');
   process.exit(1);
+}
+
+// De dónde salió esto, para que `datos/meta.json` lo diga y no haya que
+// adivinarlo. El remoto de git es el dato bueno; el nombre de la carpeta es el
+// respaldo cuando la wiki no es un clon.
+function origenDeLaWiki() {
+  try {
+    const url = execFileSync('git', ['-C', WIKI, 'config', '--get', 'remote.origin.url'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    const m = url.match(/([^/:]+)\/([^/]+?)(?:\.git)?$/);
+    if (m) return `${m[1]}/${m[2]}`;
+  } catch { /* la wiki no es un clon de git: nos quedamos con la carpeta */ }
+  return basename(WIKI);
 }
 
 const huecos = [];
@@ -445,7 +469,7 @@ const regiones = [...new Set(Object.values(mapaEncuentros).flat().map((e) => e.r
 
 const meta = {
   generado: new Date().toISOString().slice(0, 10),
-  wikiOrigen: 'Yimmer-R/PokeMMO',
+  wikiOrigen: origenDeLaWiki(),
   recuentos: {
     pokemon: Object.keys(pokemon).length,
     conEncuentros: Object.keys(mapaEncuentros).length,

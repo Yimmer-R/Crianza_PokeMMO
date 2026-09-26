@@ -1,6 +1,6 @@
 // El formulario del Pokémon objetivo: lo que el usuario quiere conseguir.
 
-import { el, tarjeta, chip, aviso, frag, campoConSugerencias, interruptor } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor } from './componentes.js';
 import { STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { validarObjetivo } from '../nucleo/planificador.js';
@@ -24,7 +24,7 @@ export function vistaObjetivo(datos) {
     }));
 
   // ------------------------------------------------------------- la especie
-  const bloqueEspecie = tarjeta('¿Qué quieres criar?', [
+  const bloqueEspecie = frag([
     el('div.fila', {}, [
       campoConSugerencias(
         'especie', 'Especie', objetivo.especie, datos.especies,
@@ -54,7 +54,8 @@ export function vistaObjetivo(datos) {
 
   // ----------------------------------------------------------------- IVs
   const cuantos31 = STATS.filter((s) => objetivo.ivs[s] >= IV_MAX).length;
-  const bloqueIvs = tarjeta(`IVs a 31 · ${cuantos31} marcados`, [
+  const bloqueIvs = frag([
+    el('h3', { texto: `IVs a 31 · ${cuantos31} marcados` }),
     el('p.nota', {}, [
       'Marca los IVs que quieres perfectos. Cada uno que añades DUPLICA la cadena: ',
       'un n×31 sale de 2', el('sup', { texto: 'n-1' }), ' padres.',
@@ -71,7 +72,8 @@ export function vistaObjetivo(datos) {
 
   // --------------------------------------------------------- naturaleza
   const nat = objetivo.naturaleza ? datos.naturalezas[objetivo.naturaleza] : null;
-  const bloqueNaturaleza = tarjeta('Naturaleza', [
+  const bloqueNaturaleza = frag([
+    el('h3', { texto: 'Naturaleza' }),
     el('div.fila', {}, [
       campoConSugerencias(
         'naturaleza', 'Naturaleza (opcional)', objetivo.naturaleza ?? '', datos.nombresNaturaleza,
@@ -85,55 +87,23 @@ export function vistaObjetivo(datos) {
       nat.neutra ? chip('neutra') : null,
       chip(`en inglés: ${nat.ingles}`),
     ]) : null,
-    objetivo.naturaleza ? frag([
-      el('h3', { texto: 'Cómo llevar la naturaleza por la cadena' }),
-      el('div.fila', {}, [
-        el('div.crece', {}, [
-          el('label', { for: 'estrategia-nat', texto: 'Estrategia' }),
-          el('select', {
-            id: 'estrategia-nat',
-            onchange: (e) => cambiaObjetivo({ estrategiaNaturaleza: e.target.value }),
-          }, [
-            el('option', {
-              value: 'auto',
-              selected: (objetivo.estrategiaNaturaleza ?? 'auto') === 'auto',
-            }, ['Automática: la más barata de las dos (recomendada)']),
-            el('option', {
-              value: 'compartida',
-              selected: objetivo.estrategiaNaturaleza === 'compartida',
-            }, ['Los dos padres la comparten']),
-            el('option', {
-              value: 'piedraeterna',
-              selected: objetivo.estrategiaNaturaleza === 'piedraeterna',
-            }, ['Piedraeterna en cada cruce']),
-          ]),
-        ]),
+    objetivo.naturaleza ? el('div.nota', {}, [
+      el('p', { style: 'margin:0 0 6px' }, [
+        'La naturaleza sólo la pasa la ', el('strong', { texto: 'Piedraeterna' }),
+        ', y la pasa siempre. Ocupa el hueco de objeto de quien la lleve, así que ese cruce ',
+        'se queda con un solo Recio y sólo puede forzar un IV.',
       ]),
-      el('div.nota', {}, [
-        el('p', { style: 'margin:0 0 6px' }, [
-          el('strong', { texto: 'Compartida: ' }),
-          'si los dos padres tienen la misma naturaleza, la cría la saca sola y no se gasta ningún ',
-          'hueco de objeto, así que el cruce sigue forzando dos IVs.',
-        ]),
-        el('p', { style: 'margin:0 0 6px' }, [
-          el('strong', { texto: 'Piedraeterna: ' }),
-          'la lleva un padre y la pasa, pero ocupa su hueco de objeto, así que ese cruce sólo ',
-          'fuerza un IV.',
-        ]),
-        el('p', { style: 'margin:0' }, [
-          'Ninguna gana siempre. La compartida sale más barata en vacío; la Piedraeterna gana ',
-          'en cuanto tienes inventario, porque deja media cadena sin naturaleza y ahí sí encajan ',
-          'los Pokémon que ya tienes. Con ',
-          el('strong', { texto: 'Automática' }),
-          ' se calculan las dos y se enseña la comparación en la pestaña Plan.',
-        ]),
+      el('p', { style: 'margin:0' }, [
+        'Que los dos padres tengan la misma naturaleza ',
+        el('strong', { texto: 'no sirve de nada' }),
+        ': la cría la saca al azar igual. Con los IVs sí funciona, con la naturaleza no.',
       ]),
     ]) : null,
   ]);
 
   // ----------------------------------------------------------------- EVs
   const totalEv = STATS.reduce((a, s) => a + (objetivo.evs[s] ?? 0), 0);
-  const bloqueEvs = tarjeta(`EVs · ${totalEv} de ${EV_MAX_TOTAL}`, [
+  const bloqueEvs = tarjeta(`Entrenamiento · ${totalEv} de ${EV_MAX_TOTAL} EVs`, [
     el('p.nota', {}, [
       `Máximo ${EV_MAX_POR_STAT} por característica y ${EV_MAX_TOTAL} en total. `,
       'El reparto típico es 252 + 252 + 6.',
@@ -171,7 +141,8 @@ export function vistaObjetivo(datos) {
 
   // ------------------------------------------------- habilidad y movimientos
   const habs = p ? habilidadesDe(objetivo.especie, datos.pokedex) : { normales: [], ocultas: [] };
-  const bloqueHabilidad = tarjeta('Habilidad', [
+  const bloqueHabilidad = frag([
+    el('h3', { texto: 'Habilidad' }),
     p
       ? el('div.fila', {}, [
           el('div.crece', {}, [
@@ -199,7 +170,8 @@ export function vistaObjetivo(datos) {
       ])].sort()
     : [];
 
-  const bloqueMovimientos = tarjeta(`Movimientos · ${objetivo.movimientos.length} de 4`, [
+  const bloqueMovimientos = frag([
+    el('h3', { texto: `Movimientos · ${objetivo.movimientos.length} de 4` }),
     p
       ? frag([
           el('p.nota', {}, [`${movsPosibles.length} movimientos posibles para ${objetivo.especie}.`]),
@@ -242,7 +214,7 @@ export function vistaObjetivo(datos) {
   ]);
 
   // ------------------------------------------------------------- regiones
-  const bloqueRegiones = tarjeta('Regiones que tienes desbloqueadas', [
+  const bloqueRegiones = plegable('Regiones desbloqueadas', [
     el('p.nota', {}, [
       'Esto filtra TODAS las sugerencias de captura y de entrenamiento. Hay Pokémon que sólo ',
       'aparecen en una región: si no la tienes, no te lo propongo.',
@@ -258,10 +230,15 @@ export function vistaObjetivo(datos) {
     regionesDisponibles.length === 0
       ? aviso('Sin ninguna región no puedo sugerir dónde capturar nada.', 'error')
       : null,
-  ]);
+  ], {
+    extra: regionesDisponibles.length === REGIONES.length
+      ? 'las cinco' : (regionesDisponibles.join(', ') || 'ninguna'),
+    abierto: regionesDisponibles.length === 0,
+  });
 
   // ------------------------------------------------------------ validación
   let validacion = null;
+  let sueltoAlFinal = false;
   if (objetivo.especie && p) {
     const v = validarObjetivo(objetivo, datos);
     validacion = frag([
@@ -273,19 +250,31 @@ export function vistaObjetivo(datos) {
         ? el('div.aviso', {}, [el('strong', { texto: 'A tener en cuenta:' }),
             el('ul', {}, v.avisos.map((x) => el('li', { texto: x })))])
         : null,
-      v.valido ? el('p', {}, [
+      v.valido ? el('p', { style: 'margin:0' }, [
         el('a.boton', { href: '#', onclick: (e) => { e.preventDefault(); fijarYGuardar({ vista: 'plan' }); } }, ['Ver el plan →']),
       ]) : null,
     ]);
+    // Sin problemas ni avisos es sólo un botón: no merece una tarjeta vacía.
+    if (v.valido && !v.problemas.length && !v.avisos.length) sueltoAlFinal = true;
   }
 
+  // Tres tarjetas y dos plegables, no nueve tarjetas: el formulario entero
+  // cabía en una pantalla y media de móvil y era un pasillo de cajas iguales.
+  // Lo secundario —importar y las regiones— se pliega; lo que se toca en cada
+  // crianza se queda a la vista.
   return frag([
-    // La importación va primero: si ya tienes la ficha del competitivo que
-    // quieres criar, es más rápido pegarla que rellenar siete bloques.
-    seccionImportar(datos, DESTINOS.OBJETIVO),
+    // Si ya tienes la ficha del competitivo que quieres criar, pegarla es más
+    // rápido que rellenar el formulario; pero es el camino de menos gente, así
+    // que va plegado y ocupa una línea.
+    plegable('Importar el objetivo de una ficha', [
+      seccionImportar(datos, DESTINOS.OBJETIVO, { comoTarjeta: false }),
+    ], { extra: 'imagen, texto o archivo', abierto: !!obtener().importacion }),
     seccionRevisar(datos, DESTINOS.OBJETIVO),
-    bloqueEspecie, bloqueIvs, bloqueNaturaleza, bloqueHabilidad,
-    bloqueMovimientos, bloqueEvs, bloqueRegiones,
-    validacion ? tarjeta(null, [validacion]) : null,
+
+    tarjeta('¿Qué quieres criar?', [bloqueEspecie, bloqueIvs, bloqueNaturaleza]),
+    p ? tarjeta('Habilidad y movimientos', [bloqueHabilidad, bloqueMovimientos]) : null,
+    bloqueEvs,
+    bloqueRegiones,
+    validacion ? (sueltoAlFinal ? validacion : tarjeta(null, [validacion])) : null,
   ]);
 }

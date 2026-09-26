@@ -9,7 +9,7 @@
 // Por eso vive aquí y no duplicado en las dos vistas: si el formato cambia, no
 // hay dos sitios que puedan quedarse desincronizados.
 
-import { el, tarjeta, chip, aviso, frag, tabla, interruptor } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, interruptor } from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar } from './estado.js';
 import { importar as importarTexto, aObjetivo, PLANTILLA } from '../nucleo/importar.js';
@@ -22,7 +22,11 @@ export const DESTINOS = { INVENTARIO: 'inventario', OBJETIVO: 'objetivo' };
 
 // ------------------------------------------------------------- la tarjeta
 
-export function seccionImportar(datos, destino) {
+/**
+ * @param {Object} opciones `comoTarjeta: false` devuelve sólo el contenido, para
+ *   meterlo dentro de un plegable sin anidar una tarjeta dentro de otra.
+ */
+export function seccionImportar(datos, destino, { comoTarjeta = true } = {}) {
   const { vistaImportar, ocr } = obtener();
   const sub = vistaImportar ?? 'imagen';
   const activo = ocr?.destino === destino ? ocr : null;
@@ -36,23 +40,32 @@ export function seccionImportar(datos, destino) {
     ? 'y lo pongo como el Pokémon que quieres criar'
     : 'y lo añado a tu inventario';
 
+  // Al inventario caben varios; el objetivo es uno solo por definición.
+  const varios = destino === DESTINOS.INVENTARIO;
+
   const cuerpo = {
     imagen: () => frag([
       el('p.nota', {}, [
         `Sube una captura de la ficha del juego (menú del equipo → Datos), la leo ${queHace}. `,
         'Siempre te la enseño antes: el OCR se equivoca, y un IV mal leído descuadra el plan ',
         'sin que se note.',
+        varios ? ' Puedes elegir varias de golpe: salen todas en la misma tabla de revisión.' : '',
       ]),
       el('div.fila', {}, [
-        el('label.boton', { for: `ocr-archivo-${destino}`, style: 'cursor:pointer;text-align:center' }, ['Elegir imagen…']),
+        el('label.boton', { for: `ocr-archivo-${destino}`, style: 'cursor:pointer;text-align:center' },
+          [varios ? 'Elegir imágenes…' : 'Elegir imagen…']),
         el('input', {
           id: `ocr-archivo-${destino}`, type: 'file', accept: 'image/*', style: 'display:none',
-          onchange: (ev) => leerImagen(ev.target.files?.[0], datos, destino),
+          multiple: varios,
+          onchange: (ev) => leerImagenes([...(ev.target.files ?? [])], datos, destino),
         }),
       ]),
       activo?.activo
         ? el('div.nota', {}, [
-            el('strong', { texto: `${activo.fase}… ${activo.porcentaje}%` }),
+            el('strong', {
+              texto: `${activo.deCuantas > 1 ? `Imagen ${activo.cual} de ${activo.deCuantas} · ` : ''}` +
+                `${activo.fase}… ${activo.porcentaje}%`,
+            }),
             el('div', { style: 'margin-top:6px;height:6px;background:var(--fondo-alt2);border-radius:3px;overflow:hidden' }, [
               el('div', { style: `height:100%;width:${activo.porcentaje}%;background:var(--acento);transition:width .2s` }),
             ]),
@@ -63,12 +76,13 @@ export function seccionImportar(datos, destino) {
         `La primera vez descarga el modelo de español (~${PESO_MODELO_MB} MB) y se queda guardado. `,
         'Si estás con datos del móvil, mejor la vía de texto.',
       ]),
+      varios ? notaSinExport() : null,
     ]),
 
     texto: () => frag([
       el('p.nota', {}, [
         'Pega la ficha tal cual. El orden de las líneas da igual y los dos puntos son opcionales.',
-        destino === DESTINOS.INVENTARIO ? ' Puedes pegar varios separados por una línea en blanco.' : '',
+        varios ? ' Puedes pegar todos los que quieras, separados por una línea en blanco.' : '',
       ]),
       el('textarea', {
         id: `texto-importar-${destino}`,
@@ -92,30 +106,34 @@ export function seccionImportar(datos, destino) {
         'Vale un ', el('code', { texto: '.txt' }), ' con el formato de arriba, un ',
         el('code', { texto: '.csv' }), ' con cabecera, o un ',
         el('code', { texto: '.json' }), ' exportado por esta misma app.',
+        varios ? ' Puedes elegir varios a la vez, y mezclar formatos.' : '',
       ]),
       el('div.fila', {}, [
-        el('label.boton', { for: `archivo-importar-${destino}`, style: 'cursor:pointer;text-align:center' }, ['Elegir archivo…']),
+        el('label.boton', { for: `archivo-importar-${destino}`, style: 'cursor:pointer;text-align:center' },
+          [varios ? 'Elegir archivos…' : 'Elegir archivo…']),
         el('input', {
           id: `archivo-importar-${destino}`, type: 'file', accept: '.txt,.csv,.json,text/plain',
-          style: 'display:none',
-          onchange: (ev) => leerArchivo(ev.target.files?.[0], datos, destino),
+          style: 'display:none', multiple: varios,
+          onchange: (ev) => leerArchivos([...(ev.target.files ?? [])], datos, destino),
         }),
       ]),
       el('p.nota', {}, ['El formato completo está en ', el('code', { texto: 'docs/formato-de-importacion.md' }), '.']),
+      varios ? notaSinExport() : null,
     ]),
   }[sub] ?? (() => null);
 
-  return tarjeta(
-    destino === DESTINOS.OBJETIVO ? 'Importar el objetivo de una ficha' : 'Importar',
-    [
-      el('div.fila', { style: 'margin-bottom:12px' }, [
-        pestana('imagen', '📷 Imagen'),
-        pestana('texto', '📋 Texto'),
-        pestana('archivo', '📄 Archivo'),
-      ]),
-      cuerpo(),
-    ],
-  );
+  const contenido = [
+    el('div.fila', { style: 'margin-bottom:12px' }, [
+      pestana('imagen', '📷 Imagen'),
+      pestana('texto', '📋 Texto'),
+      pestana('archivo', '📄 Archivo'),
+    ]),
+    cuerpo(),
+  ];
+
+  return comoTarjeta
+    ? tarjeta(destino === DESTINOS.OBJETIVO ? 'Importar el objetivo de una ficha' : 'Importar', contenido)
+    : frag(contenido);
 }
 
 // ----------------------------------------------------------- la revisión
@@ -157,17 +175,30 @@ function bloqueAvisos(avisos, titulo = 'Cosas que no he entendido:') {
 
 function revisarInventario(datos, imp) {
   const utiles = imp.ejemplares.filter((e) => e.especie);
+
+  // Con una tanda de diez, un solo Pokémon mal leído no puede obligar a
+  // descartar los otros nueve: cada fila se quita por su cuenta.
+  const quitar = (i) => fijar((st) => {
+    const quedan = st.importacion.ejemplares.filter((e) => e !== utiles[i]);
+    return {
+      importacion: quedan.some((e) => e.especie)
+        ? { ...st.importacion, ejemplares: quedan }
+        : null,
+    };
+  });
+
   return tarjeta(`Revisar antes de guardar · ${utiles.length} Pokémon`, [
     el('p.nota', {}, ['Comprueba los IVs uno por uno: es lo que más cuesta de leer y lo que más daño hace si está mal.']),
     bloqueResoluciones(imp),
     bloqueAvisos(imp.avisos),
     utiles.length
       ? tabla(
-          ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]), 'Movimientos'],
-          utiles.map((e) => [
+          ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]), 'Movimientos', ''],
+          utiles.map((e, i) => [
             e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
             ...filaDeIvs(e),
             (e.movimientos ?? []).join(', ') || '—',
+            el('button.boton.mini.secundario', { onclick: () => quitar(i) }, ['Quitar']),
           ]),
           [4, 5, 6, 7, 8, 9],
         )
@@ -245,51 +276,143 @@ function revisarObjetivo(datos, imp, todosLosIvs) {
   ]);
 }
 
-// ------------------------------------------------------------- acciones
-
-function procesar(texto, datos, destino) {
-  const imp = importarTexto(texto, datos);
-  fijar({ importacion: { ...imp, destino }, ocr: null });
+/**
+ * Por qué hay que fotografiar o teclear en vez de exportar las cajas.
+ *
+ * La pregunta sale sola en cuanto uno tiene veinte Pokéman que anotar, así que
+ * la respuesta está en la propia pantalla y no sólo en los documentos.
+ */
+function notaSinExport() {
+  return plegable('¿No se pueden sacar las cajas del juego de golpe?', [
+    el('p', {}, [
+      'No: PokeMMO no tiene export ni API que devuelva tus Pokémon, y leerlos de la memoria ',
+      'del juego o del tráfico de red lo prohíben sus términos de servicio — el cliente vigila ',
+      'la RAM mientras juegas, así que es un riesgo de baneo y esta app no va por ahí. ',
+      'Fotografiar la pantalla sí vale, y por eso puedes subir varias capturas de golpe. ',
+      'Está explicado en ', el('code', { texto: 'docs/exportar-el-pc.md' }), '.',
+    ]),
+  ], { pequeno: true });
 }
 
-async function leerImagen(archivo, datos, destino) {
-  if (!archivo) return;
-  fijar({ ocr: { activo: true, destino, fase: 'Empezando', porcentaje: 0 } });
-  try {
-    const r = await reconocer(archivo, {
-      onProgreso: (p) => fijar({ ocr: { activo: true, destino, ...p } }),
-    });
-    const imp = importarTexto(r.texto, datos);
-    // El texto crudo se deja en la pestaña de texto: corregirlo a mano es más
-    // rápido que reescribir la ficha entera.
-    textoPegado[destino] = r.texto;
-    if (!imp.ejemplares.some((e) => e.especie)) {
-      fijar({
-        ocr: {
-          activo: false, destino,
-          error: `He leído la imagen (confianza ${Math.round(r.confianza)} %) pero no he reconocido ninguna ficha. ` +
-            'Te he dejado el texto en la pestaña «Texto» para que lo corrijas a mano.',
-        },
-        vistaImportar: 'texto',
-        importacion: { ...imp, destino },
+// ------------------------------------------------------------- acciones
+
+/**
+ * Mete lo leído en la tabla de revisión.
+ *
+ * Al inventario se ACUMULA: leer cinco capturas de una en una tiene que acabar
+ * en la misma tabla que leerlas de golpe, porque si cada una pisara a la
+ * anterior habría que confirmar cinco veces y el error sería confirmar sin
+ * mirar. Al objetivo se sustituye: sólo se cría un Pokémon a la vez.
+ */
+function acumular(imp, destino) {
+  fijar((st) => {
+    const previo = st.importacion?.destino === destino && destino === DESTINOS.INVENTARIO
+      ? st.importacion : null;
+    if (!previo) return { importacion: { ...imp, destino }, ocr: null };
+    return {
+      importacion: {
+        ...imp,
+        destino,
+        ejemplares: [...previo.ejemplares, ...imp.ejemplares],
+        avisos: [...previo.avisos, ...imp.avisos],
+        resoluciones: [...previo.resoluciones, ...imp.resoluciones],
+      },
+      ocr: null,
+    };
+  });
+}
+
+function procesar(texto, datos, destino) {
+  acumular(importarTexto(texto, datos), destino);
+}
+
+/**
+ * Lee una o varias capturas con el OCR, una detrás de otra.
+ *
+ * En serie a propósito: Tesseract carga un modelo de ~15 MB por trabajador y
+ * lanzar cinco a la vez en un móvil es la forma más rápida de quedarse sin
+ * memoria. Además así la barra de progreso dice algo cierto.
+ */
+async function leerImagenes(archivos, datos, destino) {
+  if (!archivos.length) return;
+  const deCuantas = archivos.length;
+  const leidos = [];
+  const fallos = [];
+
+  for (const [i, archivo] of archivos.entries()) {
+    const cual = i + 1;
+    fijar({ ocr: { activo: true, destino, fase: 'Empezando', porcentaje: 0, cual, deCuantas } });
+    try {
+      const r = await reconocer(archivo, {
+        onProgreso: (p) => fijar({ ocr: { activo: true, destino, cual, deCuantas, ...p } }),
       });
-      return;
+      leidos.push({ nombre: archivo.name, texto: r.texto, confianza: r.confianza });
+    } catch (e) {
+      fallos.push(`${archivo.name}: ${e.message}`);
     }
-    fijar({ ocr: null, importacion: { ...imp, destino } });
-  } catch (e) {
+  }
+
+  if (!leidos.length) {
     fijar({
       ocr: {
         activo: false, destino,
-        error: `${e.message}. Usa la pestaña «Texto» y pega la ficha a mano: funciona sin descargar nada.`,
+        error: `${fallos.join(' · ')}. Usa la pestaña «Texto» y pega la ficha a mano: ` +
+          'funciona sin descargar nada.',
       },
     });
+    return;
   }
+
+  // El texto crudo se deja en la pestaña de texto: corregirlo a mano es más
+  // rápido que reescribir las fichas enteras.
+  const crudo = leidos.map((l) => l.texto).join('\n\n');
+  textoPegado[destino] = crudo;
+
+  const imp = importarTexto(crudo, datos);
+  if (fallos.length) imp.avisos = [...imp.avisos, ...fallos];
+
+  if (!imp.ejemplares.some((e) => e.especie)) {
+    const media = Math.round(leidos.reduce((a, l) => a + l.confianza, 0) / leidos.length);
+    fijar({
+      ocr: {
+        activo: false, destino,
+        error: `He leído ${leidos.length === 1 ? 'la imagen' : `las ${leidos.length} imágenes`} ` +
+          `(confianza ${media} %) pero no he reconocido ninguna ficha. ` +
+          'Te he dejado el texto en la pestaña «Texto» para que lo corrijas a mano.',
+      },
+      vistaImportar: 'texto',
+    });
+    acumular(imp, destino);
+    return;
+  }
+  acumular(imp, destino);
 }
 
-function leerArchivo(archivo, datos, destino) {
-  if (!archivo) return;
-  const lector = new FileReader();
-  lector.onload = () => procesar(String(lector.result), datos, destino);
-  lector.onerror = () => fijar({ ocr: { activo: false, destino, error: 'no he podido leer el archivo' } });
-  lector.readAsText(archivo);
+/** Igual con archivos: se leen todos y se revisan juntos. */
+function leerArchivos(archivos, datos, destino) {
+  if (!archivos.length) return;
+  let pendientes = archivos.length;
+  const textos = [];
+  const fallos = [];
+
+  const cuandoTermine = () => {
+    if (--pendientes) return;
+    // Cada archivo se parsea por separado: un .csv y un .json juntos no se
+    // pueden concatenar como texto, cada uno tiene su formato.
+    const partes = textos.map((t) => importarTexto(t, datos));
+    const imp = {
+      ejemplares: partes.flatMap((x) => x.ejemplares),
+      avisos: [...partes.flatMap((x) => x.avisos), ...fallos],
+      resoluciones: partes.flatMap((x) => x.resoluciones),
+      formato: partes.length === 1 ? partes[0].formato : 'varios',
+    };
+    acumular(imp, destino);
+  };
+
+  for (const archivo of archivos) {
+    const lector = new FileReader();
+    lector.onload = () => { textos.push(String(lector.result)); cuandoTermine(); };
+    lector.onerror = () => { fallos.push(`no he podido leer ${archivo.name}`); cuandoTermine(); };
+    lector.readAsText(archivo);
+  }
 }
