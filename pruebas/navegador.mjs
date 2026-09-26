@@ -88,9 +88,12 @@ await paso('Capturas respeta el filtro de regiones', async () => {
 await paso('Inventario: anotar una captura que NO encaja lo dice', async () => {
   await pagina.click('button[data-vista="inventario"]');
   await pagina.waitForSelector('#b-especie');
+  // Macho a propósito: una HEMBRA de Larvitar siempre sirve aunque no tenga
+  // ningún 31, porque la especie la pone la madre. Un macho con el 31 que no
+  // toca no vale para nada.
   await pagina.fill('#b-especie', 'Larvitar');
   await confirmarCampo('#b-especie');
-  await pagina.selectOption('#b-sexo', '♀');
+  await pagina.selectOption('#b-sexo', '♂');
   await pagina.fill('#b-iv-at-esp', '31');
   await pagina.dispatchEvent('#b-iv-at-esp', 'change');
   await pagina.click('text=Sólo comprobar si me sirve');
@@ -160,6 +163,48 @@ await paso('todos los cruces con naturaleza llevan Piedraeterna', async () => {
   if (await pagina.locator('#estrategia-nat').count())
     throw new Error('ya no hay estrategias de naturaleza que elegir');
   console.log(`       ${(await pagina.textContent('.total')).trim()}`);
+});
+
+await paso('dos crianzas a la vez, con inventario compartido y sin pisarse', async () => {
+  const cuantas = () => pagina.locator('.crianza').count();
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  const antes = await cuantas();
+
+  await pagina.click('text=+ Nueva');
+  await pagina.waitForFunction((n) => document.querySelectorAll('.crianza').length === n + 1, antes);
+  if (await pagina.inputValue('#especie') !== '')
+    throw new Error('la crianza nueva debería empezar en blanco');
+
+  await pagina.fill('#especie', 'Bulbasaur');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.waitForSelector('.crianza.activa:has-text("Bulbasaur")', { timeout: 5000 });
+
+  // Volver a la primera: su objetivo tiene que seguir intacto.
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+  if (await pagina.inputValue('#especie') !== 'Larvitar')
+    throw new Error('cambiar de crianza ha perdido el objetivo de la primera');
+  if (!(await pagina.isChecked('#iv-ps')))
+    throw new Error('la primera crianza ha perdido sus IVs');
+
+  // Y el inventario es el mismo para las dos.
+  await pagina.click('button[data-vista="inventario"]');
+  const inv = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  await pagina.click('.crianza:has-text("Bulbasaur")');
+  await pagina.waitForTimeout(150);
+  const inv2 = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  if (inv.replace(/\s+/g, '') !== inv2.replace(/\s+/g, ''))
+    throw new Error('el inventario debería ser el mismo en las dos crianzas');
+
+  // Se borra la de prueba y vuelve a quedar la de Larvitar.
+  await pagina.click('text=Borrar');
+  await pagina.waitForFunction((n) => document.querySelectorAll('.crianza').length === n, antes);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  console.log(`       ${antes} -> ${antes + 1} -> ${await cuantas()} crianzas`);
 });
 
 await paso('el registro manual acepta movimientos y traduce el nombre del juego', async () => {
