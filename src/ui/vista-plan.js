@@ -1,9 +1,10 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
 import { el, tarjeta, chip, aviso, frag, tabla, numero } from './componentes.js';
-import { NOMBRE_STAT, SEXOS } from '../nucleo/constantes.js';
-import { obtener, fijarYGuardar } from './estado.js';
-import { etiqueta, contar, ROL } from '../nucleo/planificador.js';
+import { NOMBRE_STAT, STATS, IV_MAX } from '../nucleo/constantes.js';
+import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
+import { contar, criaDe, ROL } from '../nucleo/planificador.js';
+import { normalizar, ejemplarNuevo } from '../nucleo/inventario.js';
 import { presupuestar, formatearYen } from '../nucleo/coste.js';
 import { planearMovimientos } from '../nucleo/movimientos.js';
 import { planearHabilidad } from '../nucleo/habilidades.js';
@@ -70,17 +71,7 @@ export function vistaPlan(datos) {
   ]);
 
   // ---------------------------------------------------------------- pasos
-  const pasos = tarjeta('Pasos, en orden', [
-    el('p.nota', {}, [
-      'De abajo hacia arriba: primero los padres, luego los cruces. Los padres se consumen en ',
-      'cada cruce, así que el orden importa.',
-    ]),
-    el('ol.pasos', {}, plan.pasos.pasos.map((p) => el(`li.${p.tipo}`, {}, [
-      el('span', { texto: p.texto }),
-      p.explicacion ? el('span.porque', { texto: p.explicacion }) : null,
-      p.aviso ? el('span.porque', { texto: `⚠ ${p.aviso}` }) : null,
-    ]))),
-  ]);
+  const pasos = bloquePasos(plan, objetivo, datos);
 
   // ---------------------------------------------------------------- árbol
   const arbol = tarjeta('El árbol', [
@@ -149,4 +140,134 @@ export function vistaPlan(datos) {
 function irAObjetivo(e) {
   e.preventDefault();
   fijarYGuardar({ vista: 'objetivo' });
+}
+
+
+// -------------------------------------------------------------- el checklist
+
+/**
+ * Los pasos, como lista para ir tachando.
+ *
+ * Lo que marca un paso como hecho **no** es una casilla guardada aparte: es el
+ * inventario. Completar un cruce borra sus dos padres —en PokeMMO se consumen—
+ * y anota la cría, y con eso el plan se recalcula y el paso desaparece solo.
+ * Guardar casillas por su lado obligaría a atarlas a un identificador de nodo
+ * que cambia en cuanto el árbol se recalcula, y acabarían mintiendo.
+ *
+ * Por eso un cruce sólo se puede marcar cuando sus DOS padres están ya en el
+ * inventario. Eso es también lo que da el orden: la lista se desbloquea de
+ * abajo hacia arriba, igual que se juega.
+ */
+function bloquePasos(plan, objetivo, datos) {
+  const porId = new Map();
+  (function recorre(n) { porId.set(n.id, n); n.hijos.forEach(recorre); })(plan.arbol);
+
+  const { deshacer } = obtener();
+  const hechos = crianzaActiva().hechos ?? [];
+
+  const filas = plan.pasos.pasos.map((p) => {
+    const nodo = porId.get(p.nodo);
+
+    if (p.tipo === 'usar')
+      return el('li.usar.hecho', {}, [
+        el('span.marca', { texto: '✔' }),
+        el('span', {}, [el('strong', { texto: 'Ya lo tienes: ' }), p.texto.replace(/^Usa tu /, '')]),
+        p.aviso ? el('span.porque', { texto: `⚠ ${p.aviso}` }) : null,
+      ]);
+
+    if (p.tipo === 'conseguir')
+      return el('li.conseguir', {}, [
+        el('span.marca', { texto: '○' }),
+        el('span', {}, [p.texto]),
+        el('button.boton.mini.secundario', {
+          onclick: () => alFormularioDesde(p.requisito, datos),
+        }, ['Ya lo tengo']),
+      ]);
+
+    const listo = nodo && nodo.hijos.every((h) => h.tipo === 'inventario');
+    return el(`li.cruzar${listo ? '.listo' : ''}`, {}, [
+      el('span.marca', { texto: listo ? '▸' : '·' }),
+      el('span', {}, [p.texto]),
+      p.explicacion ? el('span.porque', { texto: p.explicacion }) : null,
+      listo
+        ? el('button.boton.mini', {
+            onclick: () => completarCruce(nodo, objetivo, datos),
+          }, ['Hecho: quitar los padres'])
+        : el('span.porque', { texto: 'Primero los dos padres de este cruce.' }),
+    ]);
+  });
+
+  return tarjeta('Pasos, para ir tachando', [
+    el('p.nota', {}, [
+      'De abajo hacia arriba. Un cruce se puede marcar cuando sus dos padres están en el ',
+      'inventario; al marcarlo se gastan —en PokeMMO los padres se consumen— y la cría entra ',
+      'en el inventario con los 31 que el cruce garantiza. El plan se recalcula solo.',
+    ]),
+    deshacer
+      ? el('div.aviso', {}, [
+          `${deshacer.texto} `,
+          el('button.boton.mini.secundario', {
+            id: 'deshacer-paso',
+            onclick: () => fijarYGuardar({ inventario: deshacer.inventario, deshacer: null }),
+          }, ['Deshacer']),
+        ])
+      : null,
+    el('ol.pasos', {}, filas),
+    hechos.length
+      ? el('details.registro', {}, [
+          el('summary', { texto: `Lo que ya has hecho · ${hechos.length}` }),
+          el('ol', {}, hechos.map((h) => el('li', { texto: h }))),
+          el('button.boton.mini.secundario', {
+            onclick: () => fijarYGuardar((st) => ({
+              crianzas: st.crianzas.map((c) =>
+                (c.id === st.crianzaActiva ? { ...c, hechos: [] } : c)),
+            })),
+          }, ['Vaciar el registro']),
+        ])
+      : null,
+  ]);
+}
+
+/**
+ * Marca un cruce como hecho: los dos padres se gastan y la cría entra.
+ *
+ * Se guarda el inventario de antes para poder deshacerlo, porque marcar un paso
+ * por error borra dos Pokémon y eso duele.
+ */
+function completarCruce(nodo, objetivo, datos) {
+  const cria = criaDe(nodo, objetivo, datos);
+  if (!cria) return;
+  const { padres, ...limpio } = cria;
+  const nuevo = normalizar({ ...ejemplarNuevo(), ...limpio, id: undefined });
+  const texto = `${cria.nota} → ${cria.especie} ${cria.sexo}` +
+    ` (${STATS.filter((s) => nuevo.ivs[s] >= IV_MAX).length}×31` +
+    `${cria.naturaleza ? `, ${cria.naturaleza}` : ''})`;
+
+  fijarYGuardar((st) => ({
+    inventario: [...st.inventario.filter((e) => !padres.includes(e.id)), nuevo],
+    deshacer: { inventario: st.inventario, texto: `Hecho: ${texto}.` },
+    seleccion: st.seleccion.filter((x) => !padres.includes(x)),
+    crianzas: st.crianzas.map((c) =>
+      (c.id === st.crianzaActiva ? { ...c, hechos: [...(c.hechos ?? []), texto] } : c)),
+  }));
+}
+
+/**
+ * "Ya lo tengo" lleva al formulario del inventario con lo que pedía el paso ya
+ * puesto. No lo guarda: un padre anotado de menos rompe el plan en silencio, así
+ * que lo confirma el usuario mirando la ficha del juego.
+ */
+function alFormularioDesde(req, datos) {
+  const ivs = Object.fromEntries(STATS.map((s) => [s, req.stats.includes(s) ? IV_MAX : 0]));
+  const especie = req.especieLibre ? (req.especieSugerida ?? '') : req.especieSugerida;
+  fijar({
+    vista: 'inventario',
+    alFormulario: ejemplarNuevo({
+      especie: datos.pokedex[especie] ? especie : '',
+      sexo: req.sexo ?? undefined,
+      naturaleza: req.naturaleza ?? null,
+      ivs,
+      movimientos: [...(req.movimientos ?? [])],
+    }),
+  });
 }

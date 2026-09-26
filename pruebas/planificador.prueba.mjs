@@ -6,7 +6,7 @@ import { bloque, prueba, igual, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
 import {
   planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
-  movimientosSoloDeHuevo, medirArbol, ROL,
+  movimientosSoloDeHuevo, medirArbol, criaDe, ROL,
 } from '../src/nucleo/planificador.js';
 import { ivsGarantizados, naturalezaGarantizada, perfectos } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
@@ -552,5 +552,69 @@ bloque('planificador: el inventario reestructura el árbol', () => {
     };
     const p = plan([buena]);
     falso(nodos(p.arbol).some((n) => n.alargadaPorEspecie));
+  });
+});
+
+
+bloque('planificador: la cría de un cruce, para el checklist', () => {
+  const objetivo = objetivoDe({ ivs: ivs({ ataque: 31, velocidad: 31 }) });
+  const ejemplar = (p) => ({ evs: {}, movimientos: [], naturaleza: null, ...p });
+
+  const conLosDosPadres = () => {
+    const madre = ejemplar({
+      id: 'm', especie: 'Larvitar', sexo: SEXOS.HEMBRA, ivs: ivs({ ataque: 31 }),
+    });
+    const padre = ejemplar({
+      id: 'p', especie: 'Charmander', sexo: SEXOS.MACHO, ivs: ivs({ velocidad: 31 }),
+    });
+    const plan = planear(objetivo, datos, {
+      inventario: [madre, padre], regionesDisponibles: REGIONES,
+    });
+    return plan;
+  };
+
+  prueba('un cruce sin los dos padres en el inventario todavía no da cría', () => {
+    const plan = planear(objetivo, datos, { regionesDisponibles: REGIONES });
+    igual(criaDe(plan.arbol, objetivo, datos), null);
+  });
+
+  prueba('la cría sale de la especie de la madre y con los 31 garantizados', () => {
+    const plan = conLosDosPadres();
+    igual(plan.sobrantes.length, 0, 'los dos deberían encajar');
+    const cria = criaDe(plan.arbol, objetivo, datos);
+    cierto(cria, 'con los dos padres puestos tiene que haber cría');
+    igual(cria.especie, 'Larvitar', 'la especie la pone la madre');
+    igual([...perfectos(cria.ivs)].sort(), ['ataque', 'velocidad']);
+    igual(cria.padres.sort(), ['m', 'p']);
+  });
+
+  prueba('sin Piedraeterna la cría sale sin naturaleza anotada, aunque los padres la compartan', () => {
+    const madre = ejemplar({
+      id: 'm', especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: 'Agitada',
+      ivs: ivs({ ataque: 31 }),
+    });
+    const padre = ejemplar({
+      id: 'p', especie: 'Charmander', sexo: SEXOS.MACHO, naturaleza: 'Agitada',
+      ivs: ivs({ velocidad: 31 }),
+    });
+    const plan = planear(objetivo, datos, {
+      inventario: [madre, padre], regionesDisponibles: REGIONES,
+    });
+    const cria = criaDe(plan.arbol, objetivo, datos);
+    igual(cria.naturaleza, null, 'compartir naturaleza no la transmite');
+  });
+
+  prueba('un 31 de más que comparten los dos padres también se anota', () => {
+    const madre = ejemplar({
+      id: 'm', especie: 'Larvitar', sexo: SEXOS.HEMBRA, ivs: ivs({ ataque: 31, defensa: 31 }),
+    });
+    const padre = ejemplar({
+      id: 'p', especie: 'Charmander', sexo: SEXOS.MACHO, ivs: ivs({ velocidad: 31, defensa: 31 }),
+    });
+    const plan = planear(objetivo, datos, {
+      inventario: [madre, padre], regionesDisponibles: REGIONES,
+    });
+    const cria = criaDe(plan.arbol, objetivo, datos);
+    cierto(perfectos(cria.ivs).has('defensa'), 'la defensa la tienen los dos: sale a 31 seguro');
   });
 });

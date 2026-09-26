@@ -94,6 +94,7 @@ body {
 }
 
 .vista { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+.barra-seleccion { align-items: center; margin-bottom: 10px; min-height: 30px; }
 .pie {
   max-width: 1100px; margin: 0 auto; padding: 16px;
   border-top: 1px solid var(--borde); color: var(--texto-tenue); font-size: 0.85rem;
@@ -199,6 +200,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pasos li.usar::before { background: var(--bien); }
 .pasos li.conseguir::before { background: var(--ojo); color: #000; }
 .pasos .porque { display: block; color: var(--texto-tenue); font-size: 0.82rem; margin-top: 4px; }
+
+/* Checklist: un paso hecho se apaga, y el que ya se puede hacer se enciende. */
+.pasos li.hecho { opacity: 0.6; }
+.pasos li.listo { border-color: var(--acento); }
+.pasos li.cruzar:not(.listo) { opacity: 0.75; }
+.pasos .marca { display: none; }
+.pasos li .boton.mini { margin-top: 8px; }
+.registro { margin-top: 12px; font-size: 0.86rem; color: var(--texto-tenue); }
+.registro summary { cursor: pointer; }
+.registro ol { margin: 8px 0; padding-left: 20px; }
 
 .arbol { list-style: none; padding-left: 0; margin: 0; }
 .arbol ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--borde); }

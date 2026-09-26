@@ -24,6 +24,9 @@ import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
 
 let borrador = ejemplarNuevo();
 let resolutores = null;
+// Vaciar el inventario entero no puede ser un clic suelto: el segundo clic es
+// la confirmación. Es de esta vista y de nadie más.
+let confirmandoVaciar = false;
 
 const res = (datos) => (resolutores ??= crearResolutores(datos));
 
@@ -39,7 +42,7 @@ function learnsetDe(especie, datos) {
 }
 
 export function vistaInventario(datos) {
-  const { inventario, plan, ultimaEvaluacion, avisoPersistencia, alFormulario } = obtener();
+  const { inventario, plan, ultimaEvaluacion, avisoPersistencia, alFormulario, seleccion } = obtener();
 
   // La revisión puede mandar un ejemplar al formulario para corregirlo a mano.
   if (alFormulario) {
@@ -53,7 +56,7 @@ export function vistaInventario(datos) {
     seccionRevisar(datos, DESTINOS.INVENTARIO),
     bloqueManual(datos),
     ultimaEvaluacion ? bloqueEvaluacion(ultimaEvaluacion) : null,
-    bloqueLista(inventario),
+    bloqueLista(inventario, seleccion),
     bloqueCopia(inventario, avisoPersistencia),
   ]);
 }
@@ -182,8 +185,20 @@ function bloqueEvaluacion(ev) {
 
 // -------------------------------------------------------------------- lista
 
-function bloqueLista(inventario) {
+function bloqueLista(inventario, seleccion) {
+  const marcados = new Set(seleccion);
+  const todos = inventario.length > 0 && inventario.every((e) => marcados.has(e.id));
+
+  const marcar = (id, si) => fijar((st) => ({
+    seleccion: si ? [...new Set([...st.seleccion, id])] : st.seleccion.filter((x) => x !== id),
+  }));
+
   const filas = inventario.map((e) => [
+    el('input', {
+      type: 'checkbox', checked: marcados.has(e.id), id: `sel-${e.id}`,
+      'aria-label': `Seleccionar ${e.especie}`,
+      onchange: (ev) => marcar(e.id, ev.target.checked),
+    }),
     e.especie || '(sin especie)',
     e.sexo,
     `${cuantosPerfectos(e)}×31`,
@@ -192,15 +207,62 @@ function bloqueLista(inventario) {
     e.naturaleza ?? '—',
     (e.movimientos ?? []).join(', ') || '—',
     el('button.boton.mini.peligro', {
-      onclick: () => fijarYGuardar((st) => ({ inventario: st.inventario.filter((x) => x.id !== e.id) })),
+      onclick: () => fijarYGuardar((st) => ({
+        inventario: st.inventario.filter((x) => x.id !== e.id),
+        seleccion: st.seleccion.filter((x) => x !== e.id),
+      })),
     }, ['Borrar']),
+  ]);
+
+  const cabeceraMarcar = el('input', {
+    type: 'checkbox', checked: todos, id: 'sel-todos', 'aria-label': 'Seleccionar todos',
+    onchange: (ev) => fijar({ seleccion: ev.target.checked ? inventario.map((e) => e.id) : [] }),
+  });
+
+  const nSel = inventario.filter((e) => marcados.has(e.id)).length;
+
+  const barra = el('div.fila.barra-seleccion', {}, [
+    nSel
+      ? el('button.boton.mini.peligro', {
+          id: 'borrar-seleccion',
+          onclick: () => fijarYGuardar((st) => ({
+            inventario: st.inventario.filter((x) => !marcados.has(x.id)),
+            seleccion: [],
+          })),
+        }, [`Borrar los ${nSel} marcados`])
+      : null,
+    nSel
+      ? el('button.boton.mini.secundario', { onclick: () => fijar({ seleccion: [] }) }, ['Quitar la marca'])
+      : null,
+    confirmandoVaciar
+      ? frag([
+          el('span.nota', { texto: `¿Seguro? Se van los ${inventario.length}, no se puede deshacer.` }),
+          el('button.boton.mini.peligro', {
+            id: 'vaciar-si',
+            onclick: () => { confirmandoVaciar = false; fijarYGuardar({ inventario: [], seleccion: [] }); },
+          }, ['Sí, vaciar']),
+          el('button.boton.mini.secundario', {
+            onclick: () => { confirmandoVaciar = false; fijar({}); },
+          }, ['Cancelar']),
+        ])
+      : el('button.boton.mini.secundario', {
+          id: 'vaciar-inventario',
+          title: 'Cuando termines una crianza y los padres ya se hayan gastado',
+          onclick: () => { confirmandoVaciar = true; fijar({}); },
+        }, ['Vaciar el inventario']),
   ]);
 
   return tarjeta(`Tu inventario · ${inventario.length}`, [
     inventario.length
-      ? tabla(['Especie', 'Sexo', 'Perfectos', 'IVs a 31', 'Total', 'Naturaleza', 'Movimientos', ''], filas, [4])
+      ? frag([
+          barra,
+          tabla(
+            [cabeceraMarcar, 'Especie', 'Sexo', 'Perfectos', 'IVs a 31', 'Total', 'Naturaleza', 'Movimientos', ''],
+            filas, [5],
+          ),
+        ])
       : el('p.vacio', { texto: 'Vacío. Anota lo que tengas y el plan se recalculará con ello.' }),
-  ]);
+  ], 'inventario-lista');
 }
 
 function bloqueCopia(inventario, avisoPersistencia) {

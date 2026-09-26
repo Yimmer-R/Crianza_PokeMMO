@@ -165,6 +165,96 @@ await paso('todos los cruces con naturaleza llevan Piedraeterna', async () => {
   console.log(`       ${(await pagina.textContent('.total')).trim()}`);
 });
 
+await paso('el checklist: marcar un cruce gasta los padres y anota la cría', async () => {
+  // Inventario limpio y una crianza propia y pequeña, para que esta prueba no
+  // dependa de lo que hayan dejado las de arriba.
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('#vaciar-inventario');
+  await pagina.click('#vaciar-inventario');
+  await pagina.click('#vaciar-si');
+  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
+
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Larvitar');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.check('#iv-velocidad');
+
+  const anotar = async (especie, sexo, stat) => {
+    await pagina.click('button[data-vista="inventario"]');
+    await pagina.waitForSelector('#b-especie');
+    await pagina.fill('#b-especie', especie);
+    await confirmarCampo('#b-especie');
+    await pagina.selectOption('#b-sexo', sexo);
+    await pagina.fill(`#b-iv-${stat}`, '31');
+    await pagina.dispatchEvent(`#b-iv-${stat}`, 'change');
+    await pagina.click('text=Añadir al inventario');
+    await pagina.waitForTimeout(150);
+  };
+  await anotar('Larvitar', '♀', 'ataque');
+  await anotar('Charmander', '♂', 'velocidad');
+
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForSelector('.pasos li.cruzar.listo', { timeout: 5000 });
+  await pagina.click('text=Hecho: quitar los padres');
+  await pagina.waitForSelector('#deshacer-paso', { timeout: 5000 });
+
+  await pagina.click('button[data-vista="inventario"]');
+  const inv = await pagina.textContent('.inventario-lista');
+  if (inv.includes('Charmander'))
+    throw new Error('el padre debería haberse gastado en el cruce');
+  if (!/Tu inventario · 1/.test(await pagina.textContent('.inventario-lista h2')))
+    throw new Error(`deberían quedar sólo la cría; dice "${inv.slice(0, 80)}"`);
+  if (!inv.includes('2×31'))
+    throw new Error('la cría tendría que llevar los dos 31 garantizados');
+
+  // Y se puede deshacer: los dos padres vuelven.
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.click('#deshacer-paso');
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('.inventario-lista tbody tr:nth-child(2)', { timeout: 5000 });
+  console.log('       cruce hecho y deshecho, con los padres de vuelta');
+
+  await pagina.click('text=Borrar');  // se lleva esta crianza de prueba
+  await pagina.waitForTimeout(200);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+});
+
+await paso('Inventario: marcar varios y borrarlos por tandas', async () => {
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForSelector('#sel-todos');
+  // Hay varias tablas en la vista: sólo cuenta la del inventario.
+  const cuantos = () => pagina.locator('.inventario-lista tbody tr').count();
+  const antes = await cuantos();
+  if (antes < 1) throw new Error('hace falta algo en el inventario para esta prueba');
+
+  await pagina.check('#sel-todos');
+  await pagina.waitForSelector('#borrar-seleccion');
+  const etiqueta = await pagina.textContent('#borrar-seleccion');
+  if (!etiqueta.includes(String(antes)))
+    throw new Error(`el botón dice "${etiqueta}" y hay ${antes} marcados`);
+
+  await pagina.click('text=Quitar la marca');
+  await pagina.waitForTimeout(120);
+  if (await pagina.locator('#borrar-seleccion').count())
+    throw new Error('quitar la marca debería esconder el botón de borrar');
+
+  // Vaciar pide confirmación: un clic no basta.
+  await pagina.click('#vaciar-inventario');
+  await pagina.waitForSelector('#vaciar-si');
+  await pagina.click('text=Cancelar');
+  await pagina.waitForTimeout(120);
+  if (await cuantos() !== antes) throw new Error('cancelar no debería borrar nada');
+
+  await pagina.click('#vaciar-inventario');
+  await pagina.click('#vaciar-si');
+  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
+  console.log(`       ${antes} -> 0 tras confirmar`);
+});
+
 await paso('dos crianzas a la vez, con inventario compartido y sin pisarse', async () => {
   const cuantas = () => pagina.locator('.crianza').count();
   await pagina.click('button[data-vista="objetivo"]');
@@ -191,10 +281,10 @@ await paso('dos crianzas a la vez, con inventario compartido y sin pisarse', asy
 
   // Y el inventario es el mismo para las dos.
   await pagina.click('button[data-vista="inventario"]');
-  const inv = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const inv = await pagina.textContent('.inventario-lista');
   await pagina.click('.crianza:has-text("Bulbasaur")');
   await pagina.waitForTimeout(150);
-  const inv2 = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const inv2 = await pagina.textContent('.inventario-lista');
   if (inv.replace(/\s+/g, '') !== inv2.replace(/\s+/g, ''))
     throw new Error('el inventario debería ser el mismo en las dos crianzas');
 
@@ -247,7 +337,7 @@ await paso('importar por texto rellena la revisión y guarda tras confirmar', as
   const despues = await contarInventario();
   if (despues !== antes + 1) throw new Error(`inventario ${antes} -> ${despues}`);
 
-  const fila = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const fila = await pagina.textContent('.inventario-lista');
   if (!fila.includes('Rodar')) throw new Error('el movimiento no se ha guardado');
   console.log(`       inventario ${antes} -> ${despues}, con los movimientos`);
 });
@@ -444,7 +534,7 @@ if (process.env.OCR === '1') {
 }
 
 async function contarInventario() {
-  const t = await pagina.textContent('.tarjeta:has-text("Tu inventario")');
+  const t = await pagina.textContent('.inventario-lista');
   return Number((t.match(/Tu inventario · (\d+)/) ?? [0, 0])[1]);
 }
 

@@ -17,7 +17,9 @@
 // puede recortar media cadena, y por eso el plan se recalcula entero al tocarlo.
 
 import { STATS, NOMBRE_STAT, IV_MAX, PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, SEXOS } from './constantes.js';
-import { RECIO_DE, PIEDRAETERNA, perfectos } from './herencia.js';
+import {
+  RECIO_DE, PIEDRAETERNA, perfectos, ivsGarantizados, naturalezaGarantizada, ivsVacios,
+} from './herencia.js';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
   costeElegirSexo, sirveComoLineaMaterna,
@@ -756,6 +758,59 @@ export function etiqueta(nodo, objetivo = null) {
   if (n) partes.push(`${n}×31 (${nodo.stats.map((s) => NOMBRE_STAT[s] ?? s).join(', ')})`);
   if (nodo.naturaleza) partes.push(`naturaleza ${objetivo?.naturaleza ?? ''}`.trim());
   return partes.join(' + ') || 'cualquiera';
+}
+
+/**
+ * El Pokémon que sale de un cruce, con lo que la regla de herencia GARANTIZA y
+ * nada más.
+ *
+ * Es lo que se anota en el inventario al marcar un cruce como hecho. Se calcula
+ * con `ivsGarantizados()`, o sea con la regla de verdad y no con lo que el nodo
+ * prometía: si los dos padres que has acabado usando comparten un 31 de más, la
+ * cría lo lleva y el inventario tiene que saberlo.
+ *
+ * Lo que NO se pone es lo que sale al azar: un IV no garantizado queda a 0
+ * («sin anotar»), y la naturaleza a null si nadie lleva Piedraeterna. Anotar un
+ * 31 que no está garantizado sería inventarse un dato, y un IV mal anotado
+ * produce un árbol plausible y equivocado.
+ *
+ * Devuelve null si el cruce todavía no se puede hacer: hacen falta los dos
+ * padres de verdad, en el inventario.
+ */
+export function criaDe(nodo, objetivo, datos) {
+  if (nodo.tipo !== 'cruce' || nodo.hijos.length !== 2) return null;
+  const [madre, padre] = nodo.hijos;
+  if (madre.tipo !== 'inventario' || padre.tipo !== 'inventario') return null;
+
+  const eMadre = madre.ejemplar;
+  const ePadre = padre.ejemplar;
+
+  // La especie la pone la madre; si la madre es Ditto, el otro.
+  const especie = esDitto(eMadre.especie) ? ePadre.especie : eMadre.especie;
+  const base = datos.pokedex[especie]?.base ?? especie;
+
+  const g = ivsGarantizados(eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre);
+  const ivs = ivsVacios();
+  for (const st of g.garantizados) ivs[st] = IV_MAX;
+
+  const nat = naturalezaGarantizada(eMadre, ePadre, nodo.objetos.madre, nodo.objetos.padre);
+
+  // Movimientos huevo: los pasa el padre, y sólo los que la cría pueda aprender.
+  const pBase = datos.pokedex[base];
+  const movimientos = pBase
+    ? (ePadre.movimientos ?? []).filter((m) => vias(pBase, m).length > 0)
+    : [];
+
+  return {
+    especie: base,
+    sexo: nodo.sexoNecesario ?? (nodo.rol === ROL.RAIZ ? (objetivo.sexo ?? SEXOS.MACHO) : SEXOS.MACHO),
+    naturaleza: nat.naturaleza,
+    ivs,
+    evs: ivsVacios(),
+    movimientos,
+    nota: `cría de ${eMadre.especie} ♀ × ${ePadre.especie} ♂`,
+    padres: [eMadre.id, ePadre.id],
+  };
 }
 
 /** Cuenta nodos por tipo: sirve para el resumen y para el coste. */
