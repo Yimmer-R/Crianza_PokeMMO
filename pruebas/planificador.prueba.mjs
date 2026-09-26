@@ -488,3 +488,69 @@ bloque('planificador: la naturaleza sólo viaja con Piedraeterna', () => {
     igual(m.objetos.reduce((a, o) => a + o.cuantos, 0), contar(plan.arbol).cruces * 2);
   });
 });
+
+
+bloque('planificador: el inventario reestructura el árbol', () => {
+  const conNat = objetivoDe({
+    ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }),
+    naturaleza: 'Agitada',
+  });
+  const plan = (inventario) => planear(conNat, datos, { inventario, regionesDisponibles: REGIONES });
+
+  prueba('la cadena de naturaleza es libre, no la espina: la Piedraeterna la lleva el padre', () => {
+    const p = plan([]);
+    for (const n of nodos(p.arbol)) {
+      if (n.tipo !== 'cruce' || !n.naturaleza) continue;
+      igual(n.objetos.padre, 'Piedraeterna', `el cruce ${n.id} debería llevarla en el padre`);
+      const conNaturaleza = n.hijos.find((h) => h.naturaleza);
+      igual(conNaturaleza.rol, ROL.LIBRE, 'la cadena de naturaleza no puede ir atada a la especie');
+    }
+  });
+
+  prueba('un ejemplar de otra especie con la naturaleza y un 31 se aprovecha', () => {
+    const sin = plan([]);
+    const bicho = {
+      id: 'x', especie: 'Charmander', sexo: SEXOS.MACHO, naturaleza: 'Agitada',
+      ivs: ivs({ velocidad: 31 }), evs: {}, movimientos: [],
+    };
+    const con = plan([bicho]);
+    igual(con.sobrantes.length, 0, 'debería haberlo colocado en algún hueco');
+    cierto(
+      contar(con.arbol).conseguir < contar(sin.arbol).conseguir,
+      'usarlo tiene que quitar al menos una captura',
+    );
+    cierto(arbolSolido(con.arbol));
+  });
+
+  prueba('una hembra de la especie que no aporta nada más alarga la espina', () => {
+    const hembra = {
+      id: 'h', especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: 'Miedosa',
+      ivs: ivs(), evs: {}, movimientos: [],
+    };
+    const con = plan([hembra]);
+    igual(con.sobrantes.length, 0, 'la hembra difícil de capturar no puede quedarse sin usar');
+
+    const alargado = nodos(con.arbol).find((n) => n.alargadaPorEspecie);
+    cierto(alargado, 'debería haber un cruce que alarga la espina');
+    const [madre, padre] = alargado.hijos;
+    igual(madre.tipo, 'inventario', 'la hembra tiene que ser la madre del cruce nuevo');
+    igual(madre.ejemplar.id, 'h');
+    igual(padre.rol, ROL.LIBRE, 'el padre ya no está atado a la especie');
+    igual(alargado.objetos.madre, null, 'la madre no aporta ningún IV que forzar');
+    cierto(arbolSolido(con.arbol));
+  });
+
+  prueba('sin una hembra así no se alarga nada: sería un cruce regalado', () => {
+    const p = plan([]);
+    falso(nodos(p.arbol).some((n) => n.alargadaPorEspecie));
+  });
+
+  prueba('tampoco se alarga si la hembra ya cumple el hueco de la espina', () => {
+    const buena = {
+      id: 'b', especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: 'Agitada',
+      ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }), evs: {}, movimientos: [],
+    };
+    const p = plan([buena]);
+    falso(nodos(p.arbol).some((n) => n.alargadaPorEspecie));
+  });
+});

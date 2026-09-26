@@ -12,6 +12,7 @@
 import { STATS, IV_MAX, SEXOS } from './constantes.js';
 import { perfectos } from './herencia.js';
 import { cumple, hojasBajo, ROL } from './planificador.js';
+import { sirveComoLineaMaterna } from './compatibilidad.js';
 
 const CLAVE = 'crianza-pokemmo:inventario:v1';
 
@@ -167,11 +168,28 @@ export function evaluar(ejemplar, plan, datos) {
   const faltanMovs = [...new Set(rechazos.flatMap((r) => r.faltanMovimientos ?? []))];
   const ivsQueSalvarian = [...new Set(rechazos.flatMap((r) => r.faltanIvs ?? []))];
 
+  // Antes de decir que no sirve: una hembra de la especie objetivo SIEMPRE sirve,
+  // aunque no tenga ni un 31. La especie la pone la madre, así que puede ser la
+  // madre de un cruce extra al final de la espina y ahorrarte la captura difícil
+  // (esa especie, hembra, y además con el IV). Ver extenderEspinaPorEspecie().
+  const comoMadre = sirveComoLineaMaterna(ejemplar, plan.objetivo.especie, datos.pokedex);
+  if (comoMadre.sirve && !comoMadre.necesitaDitto) {
+    return {
+      sirve: true,
+      soloEspecie: true,
+      huecos: [],
+      mensaje:
+        `No cumple ningún hueco tal cual, pero es una hembra de ${plan.objetivo.especie} y eso ya ` +
+        'vale: la especie la pone la madre. Añádela y el plan alarga la cadena por abajo con un ' +
+        'cruce en el que ella sólo pone la especie y el padre trae el IV con su objeto. Te ahorra ' +
+        `tener que cazar una ${plan.objetivo.especie} hembra que ADEMÁS cumpla.`,
+    };
+  }
+
   let mensaje;
   if (soloNaturaleza) {
-    mensaje = `Los IVs valen, pero todos los huecos libres piden naturaleza ${plan.objetivo.naturaleza}. ` +
-      'En la pestaña Objetivo puedes cambiar a la estrategia de Piedraeterna: deja media cadena ' +
-      'sin naturaleza y ahí este sí entraría.';
+    mensaje = `Los IVs valen, pero todos los huecos con naturaleza ${plan.objetivo.naturaleza} ya están ` +
+      'ocupados. Guárdalo: si el plan cambia puede volver a entrar.';
   } else if (faltanMovs.length && rechazos.every((r) => r.faltanMovimientos)) {
     mensaje = `No sirve: los huecos libres tienen que pasar ${faltanMovs.join(', ')} y este no lo sabe. ` +
       'Anótale los movimientos si de verdad los tiene.';

@@ -303,7 +303,14 @@ function construir(nodoPedido, ctx, profundidad = 0) {
     const resto = nodo.stats.filter((st) => st !== forzado);
 
     nodo.tipo = 'cruce';
-    nodo.objetos = { madre: PIEDRAETERNA, padre: RECIO_DE[forzado] };
+    // La Piedraeterna la lleva el PADRE, no la madre, y esto no es un detalle.
+    // Da igual quién la lleve —pasa la naturaleza de quien la tenga puesta—,
+    // pero el hueco de la madre es el de la espina: especie objetivo y hembra.
+    // Colgando de ahí la cadena de naturaleza, todos sus huecos quedaban atados
+    // a la especie y ningún Pokémon del inventario con la naturaleza buena
+    // entraba en ellos. Con la Piedraeterna en el padre, la cadena entera de
+    // naturaleza es LIBRE: cualquier especie del grupo huevo, cualquier sexo.
+    nodo.objetos = { madre: RECIO_DE[forzado], padre: PIEDRAETERNA };
     nodo.forzados = [forzado];
     nodo.compartidos = resto;
     nodo.explicacion =
@@ -314,8 +321,8 @@ function construir(nodoPedido, ctx, profundidad = 0) {
         : 'No queda ningún IV que tengan que compartir.');
 
     nodo.hijos = [
-      construir({ stats: resto, naturaleza: true, objeto: PIEDRAETERNA, ...hijoA }, ctx, profundidad + 1),
-      construir({ stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado], ...hijoB }, ctx, profundidad + 1),
+      construir({ stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado], ...hijoA }, ctx, profundidad + 1),
+      construir({ stats: resto, naturaleza: true, objeto: PIEDRAETERNA, ...hijoB }, ctx, profundidad + 1),
     ];
     return nodo;
   }
@@ -355,6 +362,92 @@ function restriccionesDeLosHijos(rolDelCruce) {
   return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
     ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.HEMBRA }, { rol: ROL.LIBRE, sexoNecesario: SEXOS.MACHO }]
     : [{ rol: ROL.LIBRE, sexoNecesario: null }, { rol: ROL.LIBRE, sexoNecesario: null }];
+}
+
+/**
+ * Alarga la espina por abajo para poder usar una hembra que SÓLO aporta la especie.
+ *
+ * El caso, que es el del usuario: tienes una hembra de la especie objetivo con
+ * los IVs que sea —una captura difícil que costó encontrar— y el plan la ignora,
+ * porque el hueco de abajo de la espina pide esa especie **y** un 31 concreto.
+ *
+ * Pero la especie la pone la madre y nada más: si esa hembra se cruza con un
+ * macho libre que traiga el 31 (o la naturaleza) en su objeto, la cría sale de
+ * la especie objetivo **y** con lo que pedía el hueco. Se cambia una captura
+ * difícil (especie concreta + sexo + 31) por una fácil (cualquier especie del
+ * grupo huevo + 31) más un cruce.
+ *
+ * Sólo cabe una cosa en el objeto del padre, así que esto vale mientras al hueco
+ * le falte un único requisito. Al hueco de abajo de la espina siempre le falta
+ * exactamente uno: un 31, o la naturaleza. Y sólo se alarga si en el inventario
+ * hay de verdad una hembra así sin usar; si no, sería un cruce regalado.
+ */
+export function extenderEspinaPorEspecie(arbol, ctx) {
+  const { datos, objetivo, inventarioLibre } = ctx;
+
+  // El hueco de abajo de la espina: el único 'conseguir' con la especie atada.
+  let hoja = null;
+  (function recorre(n) {
+    if (n.tipo === 'conseguir' && (n.rol === ROL.ESPINA || n.rol === ROL.RAIZ)) hoja = n;
+    n.hijos.forEach(recorre);
+  })(arbol);
+  if (!hoja) return arbol;
+
+  // Un objeto, un requisito.
+  const pide = hoja.stats.length + (hoja.naturaleza ? 1 : 0);
+  if (pide !== 1) return arbol;
+
+  // ¿Hay alguna hembra de la línea que el plan esté tirando a la basura?
+  const soloEspecie = inventarioLibre.filter((e) => {
+    if (!sirveComoLineaMaterna(e, objetivo.especie, datos.pokedex).sirve) return false;
+    return !cumple(e, hoja, datos, objetivo).ok;
+  });
+  if (!soloEspecie.length) return arbol;
+
+  const objetoDelPadre = hoja.naturaleza ? PIEDRAETERNA : RECIO_DE[hoja.stats[0]];
+  const loQueTrae = hoja.naturaleza
+    ? `la naturaleza ${objetivo.naturaleza}`
+    : `31 en ${NOMBRE_STAT[hoja.stats[0]]}`;
+
+  const madre = {
+    id: nuevoId(),
+    tipo: 'conseguir',
+    stats: [],
+    naturaleza: false,
+    rol: ROL.ESPINA,
+    profundidad: hoja.profundidad + 1,
+    objeto: null,
+    sexoNecesario: SEXOS.HEMBRA,
+    soloEspecie: true,
+    hijos: [],
+  };
+  const padre = {
+    id: nuevoId(),
+    tipo: 'conseguir',
+    stats: [...hoja.stats],
+    naturaleza: hoja.naturaleza,
+    rol: ROL.LIBRE,
+    profundidad: hoja.profundidad + 1,
+    objeto: objetoDelPadre,
+    sexoNecesario: SEXOS.MACHO,
+    movimientosNecesarios: hoja.movimientosNecesarios ?? [],
+    hijos: [],
+  };
+
+  hoja.tipo = 'cruce';
+  hoja.objetos = { madre: null, padre: objetoDelPadre };
+  hoja.forzados = hoja.naturaleza ? [] : [hoja.stats[0]];
+  hoja.compartidos = [];
+  hoja.alargadaPorEspecie = true;
+  hoja.explicacion =
+    `La especie la pone la madre y nada más, así que aquí basta una hembra de ` +
+    `${objetivo.especie} aunque no tenga nada: el padre trae ${loQueTrae} con su ` +
+    `${objetoDelPadre}. Sale más barato que cazar una hembra de ${objetivo.especie} ` +
+    `que además cumpla.`;
+  hoja.hijos = [madre, padre];
+  delete hoja.movimientosNecesarios;
+
+  return arbol;
 }
 
 /** Cuántas capturas cuelgan de un nodo: es lo que se ahorra si el inventario lo cubre. */
@@ -505,7 +598,9 @@ export function medirArbol(arbol) {
       esfuerzo += (IV_MAX + 1) ** n.stats.length * (n.naturaleza ? 25 : 1);
     }
     if (n.tipo === 'cruce') {
-      for (const o of [n.objetos.madre, n.objetos.padre]) {
+      // El cruce alargado de la espina deja el hueco de la madre a null: ella
+      // sólo aporta la especie y un Recio suyo no forzaría nada.
+      for (const o of [n.objetos.madre, n.objetos.padre].filter(Boolean)) {
         objetos.set(o, (objetos.get(o) ?? 0) + 1);
         dinero += PRECIO_RESPALDO[o] ?? 10000;
       }
@@ -552,6 +647,10 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
     if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
   }
+
+  // Antes de colocar el inventario: si hay una hembra de la especie objetivo que
+  // el árbol tal cual tiraría a la basura, se alarga la espina para darle uso.
+  extenderEspinaPorEspecie(crudo, ctx);
 
   const arbol = asignarSexos(asignarInventario(crudo, ctx), objetivo);
 
@@ -637,7 +736,7 @@ export function aPasos(arbol, objetivo, datos, relleno = []) {
       explicacion: nodo.explicacion,
       sexoCria: sexoNecesario,
       texto: `Cruza los dos padres de ${etiqueta(nodo, objetivo)}` +
-        ` · ${nodo.objetos.madre} + ${nodo.objetos.padre}` +
+        ` · ${[nodo.objetos.madre, nodo.objetos.padre].filter(Boolean).join(' + ') || 'sin objetos'}` +
         (sexoNecesario && !esRaiz ? ` · paga por que la cría salga ${sexoNecesario}` : ''),
     });
   })(arbol);

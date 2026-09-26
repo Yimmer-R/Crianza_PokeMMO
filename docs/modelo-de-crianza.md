@@ -96,6 +96,17 @@ Que la naturaleza entre por abajo tiene una ventaja que se aprovecha en
 `asignarInventario()`: **media cadena queda sin naturaleza**, y ahí encaja
 cualquier ejemplar que ya tengas aunque su naturaleza no sea la buena.
 
+### La Piedraeterna la lleva el PADRE, y eso no es un detalle
+
+Puede llevarla cualquiera de los dos: pasa la naturaleza de quien la tenga
+puesta. Pero el hueco de la madre es el de la **espina** —especie objetivo,
+hembra—, así que colgar de ahí la cadena de naturaleza ataba **todos** sus
+huecos a la especie, y ningún Pokémon del inventario con la naturaleza buena
+entraba en ninguno. Con la Piedraeterna en el padre, la cadena de naturaleza
+entera es `ROL.LIBRE`: cualquier especie del grupo huevo, cualquier sexo. La
+espina pasa a bajar por la cadena de sólo IVs, y su hoja de abajo es un 1×31 de
+la especie objetivo en vez de una de sólo naturaleza.
+
 ## La especie: sólo la espina materna la tiene atada
 
 > La cría hereda la especie de la madre (o del progenitor que no sea Ditto).
@@ -120,6 +131,32 @@ colocado el inventario.
 Un **Ditto** rompe la regla en el buen sentido: cría con cualquiera y la especie
 sale del otro padre, así que permite usar un **macho** de la especie objetivo como
 línea materna. También es la única forma de criar una especie sin género.
+
+### Una hembra que sólo aporta la especie alarga la espina
+
+Si la especie objetivo es difícil de encontrar, la hoja de abajo de la espina es
+la captura cara del árbol entero: esa especie, **hembra**, y además con el 31
+que pide el hueco. Pero la madre aporta **sólo** la especie. Una hembra de la
+especie con los IVs que sea —una que ya tengas— sirve igual si se le pone
+delante un cruce más:
+
+```
+        [hueco de la espina: 1×31 (PS), ♀, especie objetivo]
+                              ↓ se convierte en
+                            cruce
+                   ┌──────────┴──────────┐
+        tu hembra (sólo especie)   1×31 (PS) ♂, cualquier especie
+              sin objeto                 + Pesa Recia
+```
+
+Se cambia una captura difícil por una fácil más un cruce. Sólo cabe **un**
+requisito, porque sólo hay un objeto útil en ese cruce (el de la madre no
+forzaría nada: ella no tiene ningún 31). Al hueco de abajo de la espina siempre
+le falta exactamente uno —un 31, o la naturaleza—, así que siempre cabe.
+
+`extenderEspinaPorEspecie()` lo hace **antes** de colocar el inventario, y sólo
+si en el inventario hay de verdad una hembra así que si no se quedaría sin usar:
+en vacío sería un cruce regalado.
 
 ## Emparejar el inventario
 
