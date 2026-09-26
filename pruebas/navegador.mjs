@@ -369,6 +369,35 @@ await paso('importar por texto rellena la revisión y guarda tras confirmar', as
   console.log(`       inventario ${antes} -> ${despues}, con los movimientos`);
 });
 
+await paso('importar varios de golpe, y quitar uno antes de guardar', async () => {
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.click('text=📋 Texto');
+  await pagina.waitForSelector('#texto-importar-inventario');
+  await pagina.fill('#texto-importar-inventario', [
+    'Rattata ♂ Nv. 5',
+    'IVs: 31/12/9/4/7/20',
+    '',
+    'Charmander ♀ Nv. 5',
+    'IVs: 8/31/11/6/9/14',
+    '',
+    'Bulbasaur ♂ Nv. 5',
+    'IVs: 5/7/31/12/8/19',
+  ].join('\n'));
+  await pagina.click('text=Leer el texto');
+  await pagina.waitForSelector('text=Revisar antes de guardar · 3', { timeout: 5000 });
+
+  // Una tanda de tres no puede obligar a descartar las tres por una mal leída.
+  await pagina.click('.tarjeta:has-text("Revisar antes de guardar") tbody tr:nth-child(2) button');
+  await pagina.waitForSelector('text=Revisar antes de guardar · 2', { timeout: 5000 });
+
+  const antes = await contarInventario();
+  await pagina.click('text=Guardar 2 en el inventario');
+  await pagina.waitForTimeout(250);
+  const despues = await contarInventario();
+  if (despues !== antes + 2) throw new Error(`inventario ${antes} -> ${despues}, esperaba +2`);
+  console.log(`       3 leídos, 1 quitado, inventario ${antes} -> ${despues}`);
+});
+
 await paso('un texto que no se entiende se avisa y no se guarda nada', async () => {
   await pagina.click('text=📋 Texto');
   await pagina.fill('#texto-importar-inventario', 'Pikachurin ♂\nIVs: 31/0/0/0/0/0');
