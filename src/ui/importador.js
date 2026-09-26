@@ -72,6 +72,7 @@ export function seccionImportar(datos, destino) {
         `La primera vez descarga el modelo de español (~${PESO_MODELO_MB} MB) y se queda guardado. `,
         'Si estás con datos del móvil, mejor la vía de texto.',
       ]),
+      varios ? notaSinExport() : null,
     ]),
 
     texto: () => frag([
@@ -113,6 +114,7 @@ export function seccionImportar(datos, destino) {
         }),
       ]),
       el('p.nota', {}, ['El formato completo está en ', el('code', { texto: 'docs/formato-de-importacion.md' }), '.']),
+      varios ? notaSinExport() : null,
     ]),
   }[sub] ?? (() => null);
 
@@ -265,6 +267,25 @@ function revisarObjetivo(datos, imp, todosLosIvs) {
         })),
       }, ['Usar como objetivo y ver el plan']),
       el('button.boton.secundario', { onclick: () => fijar({ importacion: null }) }, ['Descartar']),
+    ]),
+  ]);
+}
+
+/**
+ * Por qué hay que fotografiar o teclear en vez de exportar las cajas.
+ *
+ * La pregunta sale sola en cuanto uno tiene veinte Pokéman que anotar, así que
+ * la respuesta está en la propia pantalla y no sólo en los documentos.
+ */
+function notaSinExport() {
+  return el('details.registro', {}, [
+    el('summary', { texto: '¿No se pueden sacar las cajas del juego de golpe?' }),
+    el('p', {}, [
+      'No: PokeMMO no tiene export ni API que devuelva tus Pokémon, y leerlos de la memoria ',
+      'del juego o del tráfico de red lo prohíben sus términos de servicio — el cliente vigila ',
+      'la RAM mientras juegas, así que es un riesgo de baneo y esta app no va por ahí. ',
+      'Fotografiar la pantalla sí vale, y por eso puedes subir varias capturas de golpe. ',
+      'Está explicado en ', el('code', { texto: 'docs/exportar-el-pc.md' }), '.',
     ]),
   ]);
 }

@@ -159,8 +159,9 @@ Ver [pruebas/LEEME.md](pruebas/LEEME.md).
 
 | documento | de qué va |
 |---|---|
-| [modelo-de-crianza.md](docs/modelo-de-crianza.md) | la deducción del árbol, las dos vías de la naturaleza, los movimientos huevo |
+| [modelo-de-crianza.md](docs/modelo-de-crianza.md) | la deducción del árbol, la naturaleza, la espina materna, los movimientos huevo |
 | [formato-de-importacion.md](docs/formato-de-importacion.md) | el formato de texto y CSV, y qué tolera |
+| [exportar-el-pc.md](docs/exportar-el-pc.md) | por qué no se pueden sacar las cajas del juego de golpe |
 | [despliegue.md](docs/despliegue.md) | publicar en Pages, también desde el móvil |
 | [datos-y-fuentes.md](docs/datos-y-fuentes.md) | de dónde sale cada JSON y las trampas del formato |
 | [decisiones.md](docs/decisiones.md) | por qué está hecho así |
