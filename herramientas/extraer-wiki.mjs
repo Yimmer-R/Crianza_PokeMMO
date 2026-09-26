@@ -204,11 +204,38 @@ function cuandoDe(fm) {
 
 /**
  * «Ruta 39 (noche/verano)» -> «Ruta 39». El paréntesis ya está en `horas` y
- * `estaciones`, así que repetirlo en el nombre sólo estorba. Un sufijo que NO
- * sea de hora/estación —«Altering Cave (2)», tablas distintas del mismo
- * mapa— no lleva paréntesis en el `title`, así que esto no lo toca.
+ * `estaciones`, así que repetirlo en el nombre sólo estorba.
+ *
+ * Tres cosas que costaron cuatro nombres mal:
+ *
+ * - hay zonas con DOS paréntesis —«Ruta 13 (noche) (2)», la variante 2 de la
+ *   tabla nocturna—, así que se quitan en bucle y no de uno en uno;
+ * - sólo se quita un paréntesis que de verdad sea de hora, de estación o un
+ *   número de variante. Si algún día una zona se llama «Cueva (Grande)», ese
+ *   paréntesis es parte del nombre y se queda;
+ * - el número de variante se quita también. Distingue tablas del mismo mapa y
+ *   al jugador le da igual: va a «Calle Victoria», no a «Calle Victoria (4)».
  */
-const zonaSinSufijo = (titulo) => titulo.replace(/\s*\([^)]*\)\s*$/, '').trim();
+const TOKENS_DE_CUANDO = [
+  ...HORAS, 'dia', 'day', 'morning', 'night', 'nocturno',
+  ...ESTACIONES, 'spring', 'summer', 'autumn', 'winter', 'season',
+];
+
+function zonaSinSufijo(titulo) {
+  let n = String(titulo).trim();
+  for (;;) {
+    const m = n.match(/^(.*?)\s*\(([^()]*)\)$/);
+    if (!m) return n;
+    const dentro = m[2].toLowerCase().replace(/[\s/·,]+/g, '');
+    const esVariante = /^\d+$/.test(dentro);
+    // Se van quitando tokens conocidos; si queda algo, el paréntesis no es de
+    // cuándo y hay que dejarlo donde está.
+    let resto = dentro;
+    for (const t of TOKENS_DE_CUANDO) resto = resto.split(t).join('');
+    if (!esVariante && resto !== '') return n;
+    n = m[1].trim();
+  }
+}
 
 /**
  * Junta filas que son la misma salvo por cuándo.

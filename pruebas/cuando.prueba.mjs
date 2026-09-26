@@ -73,11 +73,16 @@ bloque('cuándo: los datos reales lo traen', () => {
     cierto(hordas.filter(tieneRestriccion).length > 50);
   });
 
-  prueba('el nombre de la zona ya no arrastra el sufijo', () => {
-    const conSufijo = Object.values(datos.encuentros).flat()
-      .filter((e) => /\((noche|día|mañana|night|day|morning|primavera|verano|otoño|invierno)/i.test(e.zona));
-    igual(conSufijo.length, 0, `todavía hay zonas con el sufijo dentro del nombre: ${
-      conSufijo.slice(0, 3).map((z) => z.zona).join(', ')}`);
+  prueba('el nombre de la zona ya no arrastra ningún paréntesis', () => {
+    // Ni el de hora/estación ni el número de variante, y hay zonas con LOS DOS
+    // a la vez («Ruta 13 (noche) (2)»), que es lo que se colaba quitando sólo
+    // el último paréntesis.
+    const zonas = [
+      ...Object.values(datos.encuentros).flat(),
+      ...Object.values(datos.dondeEntrenar).flat(),
+    ].map((e) => e.zona);
+    const sucias = [...new Set(zonas.filter((z) => z.includes('(')))];
+    igual(sucias, [], `zonas con paréntesis en el nombre: ${sucias.slice(0, 5).join(' · ')}`);
   });
 });
 
