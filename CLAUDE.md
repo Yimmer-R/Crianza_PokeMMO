@@ -22,9 +22,13 @@ sortea igual entre las 25 (`wiki/mecanicas/Crianza.md`). La app tuvo esto al
 revés hasta el 23-09-2026, con una vía «compartida» y un selector de estrategia
 que ya no existen; si ves rastros de eso en algún sitio, es código viejo.
 
-Lo único que hay que recordar: la Piedraeterna **ocupa el hueco de objeto**, así
-que un cruce que prometa naturaleza sólo fuerza **un** IV con Recio en vez de
-dos, y la hoja de sólo naturaleza entra por abajo de la espina.
+Dos cosas más de la Piedraeterna. **Ocupa el hueco de objeto**, así que un cruce
+que prometa naturaleza sólo fuerza **un** IV con Recio en vez de dos, y la hoja
+de sólo naturaleza entra por abajo de la espina. Y **no se vende en ninguna
+tienda**, por mucho que el volcado la dé a 4.000 en las cinco guarderías: se
+farmea a Pokémon salvajes o se compra en el GTL, así que el presupuesto usa un
+precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
+`constantes.js`).
 
 ## Reglas de este repositorio
 
@@ -58,7 +62,7 @@ dos, y la hoja de sólo naturaleza entra por abajo de la espina.
 
 ## Cómo está montada la app
 
-Tres cosas que no son evidentes leyendo un archivo suelto:
+Siete cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -79,7 +83,17 @@ Tres cosas que no son evidentes leyendo un archivo suelto:
    `planear()`.
 5. **La hora y la estación se ordenan, no se esconden.** Con las regiones
    esconder está bien; con la hora no, porque un día del juego son 6 horas
-   reales. Lo que no toca ahora se queda en la tabla marcado con cuándo sí.
+   reales. Lo que no toca ahora se queda en la tabla marcado con cuándo sí. El
+   selector vive en Capturas y en Entrenamiento, no en Objetivo: es «cuándo
+   estás jugando», no una propiedad del Pokémon que quieres.
+6. **Un movimiento se busca en la LÍNEA EVOLUTIVA, no en la forma final.** El
+   huevo eclosiona en la base, así que los movimientos huevo son los de la base.
+   Mirando sólo la forma final, un Amoonguss con Polvo Veneno salía como «no lo
+   aprende por ninguna vía». Usa `viasEnLaLinea()`, no `vias()` a secas.
+7. **Sin género ≠ sólo con Ditto.** En PokeMMO un sin género cría con **su
+   propia línea evolutiva** o con un Ditto (`wiki/mecanicas/Crianza.md`), al
+   contrario que en los juegos originales. Y no tiene sexos: ningún hueco del
+   árbol puede pedir ♀ ni ♂, o salen capturas de «1 de cada 0».
 
 ## Al tocar la interfaz
 
@@ -134,7 +148,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 188 pruebas unitarias
+node pruebas/ejecutar.mjs             # 217 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

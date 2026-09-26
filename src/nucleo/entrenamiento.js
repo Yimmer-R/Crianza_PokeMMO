@@ -251,7 +251,12 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
       vitamina: {
         nombre: VITAMINA_DE[stat],
         cuantas: Math.ceil(faltan / EV_POR_VITAMINA),
-        nota: 'la wiki las desaconseja: con hordas los EVs salen gratis',
+        // El hueco va pegado al número al que afecta, y no en una tarjeta
+        // aparte: la wiki no dice si las vitaminas tienen tope de EVs en
+        // PokeMMO, así que esta cuenta es una división y puede no valer a
+        // partir de cierto punto.
+        nota: 'la wiki las desaconseja (con hordas los EVs salen gratis) y tampoco dice si '
+          + 'tienen tope, así que este número sale de dividir',
       },
       sinHordasAlAlcance: hordas.length === 0,
       hayHordasEnOtraRegion:

@@ -85,14 +85,28 @@ export function validarObjetivo(objetivo, datos) {
       problemas.push(`${objetivo.especie} no puede tener la habilidad ${objetivo.habilidad}`);
   }
 
-  // Movimientos
+  // Movimientos. Se mira la línea evolutiva entera, no sólo la forma final: el
+  // huevo eclosiona en la base, así que un movimiento huevo de la base llega a
+  // la evolución sin más que no sobrescribirlo.
   for (const mov of objetivo.movimientos ?? []) {
-    if (!vias(p, mov).length)
+    const enLaLinea = viasEnLaLinea(objetivo.especie, mov, pokedex);
+    if (!enLaLinea.length) {
       problemas.push(`${objetivo.especie} no aprende ${mov} por ninguna vía que traiga la wiki`);
+      continue;
+    }
+    if (!enLaLinea.some((v) => v.especie === objetivo.especie))
+      avisos.push(
+        `${mov} no está en las listas de ${objetivo.especie}: lo aprende `
+        + `${enLaLinea[0].especie} y hay que llevarlo hasta arriba sin sobrescribirlo. `
+        + 'Mira el orden en la pestaña Entrenamiento.',
+      );
   }
 
   if (sinGenero(p))
-    avisos.push(`${objetivo.especie} no tiene género: toda la cadena necesita un Ditto en cada cruce`);
+    avisos.push(
+      `${objetivo.especie} no tiene género: cada cruce es con otro de su misma línea evolutiva `
+      + '(o con un Ditto), y no hay sexos que pagar ni que elegir',
+    );
 
   return { valido: problemas.length === 0, problemas, avisos };
 }
@@ -114,9 +128,35 @@ export function movimientosSoloDeHuevo(objetivo, pokedex) {
   const p = pokedex[objetivo.especie];
   if (!p) return [];
   return (objetivo.movimientos ?? []).filter((mov) => {
-    const v = vias(p, mov);
+    const v = viasEnLaLinea(objetivo.especie, mov, pokedex);
     return v.length > 0 && v.every((x) => x.via === 'huevo');
   });
+}
+
+/**
+ * Vías por las que un movimiento puede llegar, mirando la línea evolutiva
+ * ENTERA y no sólo la forma final.
+ *
+ * Hace falta porque el huevo eclosiona en la forma base: los movimientos huevo
+ * son los de la BASE, no los de la evolución. Mirando sólo la forma final, un
+ * Amoonguss con Polvo Veneno salía como «no lo aprende por ninguna vía» cuando
+ * es un movimiento huevo de Foongus y se consigue sin problema — se cría el
+ * Foongus con él y se evoluciona después.
+ *
+ * Cada vía viene con la fase en la que está, que es lo que luego permite decir
+ * en qué orden hacerlo (ver src/nucleo/aprendizaje.js).
+ */
+export function viasEnLaLinea(especie, movimiento, pokedex) {
+  const out = [];
+  const vistos = new Set();
+  // De la forma final hacia atrás hasta la base.
+  let actual = especie;
+  while (actual && pokedex[actual] && !vistos.has(actual)) {
+    vistos.add(actual);
+    for (const v of vias(pokedex[actual], movimiento)) out.push({ ...v, especie: actual });
+    actual = pokedex[actual].evoluciona?.de ?? null;
+  }
+  return out;
 }
 
 /** Por qué vías aprende una especie un movimiento. */
@@ -170,14 +210,21 @@ export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuand
     puntos += Math.min(enc.length, 8);                       // muchos sitios = fácil
     puntos += new Set(enc.map((e) => e.region)).size * 2;    // en varias regiones = flexible
     // Los huecos de relleno necesitan macho Y hembra, así que un 50/50 vale más
-    // que un 87,5/12,5 aunque sea más común.
-    const min = Math.min(p.genero?.macho ?? 0, p.genero?.hembra ?? 0);
-    if (min <= 0) return -Infinity;
-    puntos += min / 5;
+    // que un 87,5/12,5 aunque sea más común. Un sin género se salta esto: no
+    // tiene sexos, y exigírselos lo descartaba con -Infinity.
+    if (!sinGenero(p)) {
+      const min = Math.min(p.genero?.macho ?? 0, p.genero?.hembra ?? 0);
+      if (min <= 0) return -Infinity;
+      puntos += min / 5;
+    }
     return puntos;
   };
 
-  const candidatos = padresCompatibles(especieObjetivo, pokedex, { incluirDitto: false })
+  // Con una especie sin género el Ditto SÍ entra: la pareja sólo puede ser su
+  // propia línea evolutiva o un Ditto, y a veces el Ditto es lo fácil.
+  const candidatos = padresCompatibles(especieObjetivo, pokedex, {
+    incluirDitto: sinGenero(pokedex[especieObjetivo]),
+  })
     .map((c) => ({ ...c, facilidad: facilidad(c) }))
     .filter((c) => Number.isFinite(c.facilidad))
     .sort((a, b) => b.facilidad - a.facilidad);
@@ -299,7 +346,7 @@ function construir(nodoPedido, ctx, profundidad = 0) {
   const orden = ordenarPorEscasez(nodo.stats, ctx.inventarioOriginal);
 
   if (nodo.naturaleza) {
-    const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol);
+    const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.sinGeneroObjetivo);
 
     // La naturaleza sólo la pasa la Piedraeterna, y ocupa el hueco de objeto de
     // quien la lleva: el cruce se queda con un solo Recio, así que sólo fuerza un
@@ -347,7 +394,7 @@ function construir(nodoPedido, ctx, profundidad = 0) {
       ? `${compartidos.map((s) => NOMBRE_STAT[s]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''} porque los dos padres lo tienen a 31, y el promedio de 31 y 31 es 31.`
       : 'No hay IVs compartidos: los dos forzados son todo el objetivo.');
 
-  const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol);
+  const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.sinGeneroObjetivo);
   nodo.hijos = [
     construir({ stats: [...compartidos, f1], naturaleza: false, objeto: RECIO_DE[f1], ...hijoA }, ctx, profundidad + 1),
     construir({ stats: [...compartidos, f2], naturaleza: false, objeto: RECIO_DE[f2], ...hijoB }, ctx, profundidad + 1),
@@ -366,7 +413,17 @@ function construir(nodoPedido, ctx, profundidad = 0) {
  * En un cruce libre los dos van sin sexo (null) y lo reparte asignarSexos()
  * después, respetando el de lo que haya colocado el inventario.
  */
-function restriccionesDeLosHijos(rolDelCruce) {
+function restriccionesDeLosHijos(rolDelCruce, especieSinGenero = false) {
+  // Sin género no hay sexos que repartir: cada cruce es la especie con su misma
+  // línea evolutiva o con un Ditto, y ninguno de los dos huecos pide sexo.
+  // Pedir ♀ y ♂ aquí dejaba el plan con capturas imposibles (1 de cada 0).
+  if (especieSinGenero)
+    return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
+      ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.SIN_GENERO },
+         { rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO }]
+      : [{ rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO },
+         { rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO }];
+
   return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
     ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.HEMBRA }, { rol: ROL.LIBRE, sexoNecesario: SEXOS.MACHO }]
     : [{ rol: ROL.LIBRE, sexoNecesario: null }, { rol: ROL.LIBRE, sexoNecesario: null }];
@@ -542,7 +599,13 @@ export function asignarInventario(arbol, ctx) {
  * se queda con el contrario; si ninguno viene del inventario, se reparte ♀/♂ por
  * defecto.
  */
-export function asignarSexos(arbol, objetivo) {
+export function asignarSexos(arbol, objetivo, especieSinGenero = false) {
+  // Sin género: los huecos ya vienen marcados desde la construcción y no hay
+  // ♀/♂ que repartir. Repartirlos pondría un sexo que la especie no tiene.
+  if (especieSinGenero) {
+    arbol.sexoNecesario = SEXOS.SIN_GENERO;
+    return arbol;
+  }
   arbol.sexoNecesario = objetivo.sexo ?? null;
   const opuesto = (s) => (s === SEXOS.HEMBRA ? SEXOS.MACHO : SEXOS.HEMBRA);
 
@@ -641,6 +704,7 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   const ctx = {
     datos,
     objetivo,
+    sinGeneroObjetivo: sinGenero(datos.pokedex[objetivo.especie]),
     inventarioOriginal: inventario,
     // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco y
     // desaparece de la reserva.
@@ -670,7 +734,7 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   asignarInventario(crudo, ctx);
   if (extenderEspinaPorEspecie(crudo, ctx).alargada) asignarInventario(crudo, ctx);
 
-  const arbol = asignarSexos(crudo, objetivo);
+  const arbol = asignarSexos(crudo, objetivo, ctx.sinGeneroObjetivo);
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
   const pasos = aPasos(arbol, objetivo, datos, relleno);

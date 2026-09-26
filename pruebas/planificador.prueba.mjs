@@ -10,6 +10,8 @@ import {
 } from '../src/nucleo/planificador.js';
 import { ivsGarantizados, naturalezaGarantizada, perfectos } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
+import { planDeCapturas } from '../src/nucleo/capturas.js';
+import { presupuestar } from '../src/nucleo/coste.js';
 
 const objetivoDe = (o) => ({ especie: 'Larvitar', ivs: ivs(), evs: {}, movimientos: [], ...o });
 
@@ -659,5 +661,52 @@ bloque('planificador: la cría de un cruce, para el checklist', () => {
     });
     const cria = criaDe(plan.arbol, objetivo, datos);
     cierto(perfectos(cria.ivs).has('defensa'), 'la defensa la tienen los dos: sale a 31 seguro');
+  });
+});
+
+
+bloque('planificador: un objetivo sin género', () => {
+  // El fallo que esto vigila: con Starmie el plan pedía ♀ y ♂ en los huecos, y
+  // como la especie no tiene sexos salía «1 de cada 0» — captura imposible.
+  const objetivo = {
+    especie: 'Starmie', ivs: ivs({ ps: 31, ataque: 31, velocidad: 31 }), evs: {},
+    movimientos: [], naturaleza: 'Tímida',
+  };
+  const plan = planear(objetivo, datos, { regionesDisponibles: REGIONES });
+
+  prueba('se puede planear', () => {
+    cierto(plan.ok, JSON.stringify(plan.problemas));
+    cierto(arbolSolido(plan.arbol));
+  });
+
+  prueba('ningún hueco pide ♀ ni ♂', () => {
+    const conSexo = nodos(plan.arbol).filter(
+      (n) => n.sexoNecesario === SEXOS.HEMBRA || n.sexoNecesario === SEXOS.MACHO,
+    );
+    igual(conSexo.length, 0, `${conSexo.length} huecos piden un sexo que la especie no tiene`);
+    for (const r of plan.pasos.conseguir) igual(r.sexo, SEXOS.SIN_GENERO);
+  });
+
+  prueba('ninguna captura es imposible', () => {
+    const capturas = planDeCapturas(plan, datos, REGIONES);
+    cierto(capturas.length > 0, 'debería haber capturas que hacer');
+    for (const c of capturas) {
+      falso(c.soloGtl, `«ninguna especie compatible» con ${JSON.stringify(c.requisito.stats)}`);
+      cierto(Number.isFinite(c.recomendada.intentos),
+        `intentos infinitos para ${JSON.stringify(c.requisito.stats)}`);
+    }
+  });
+
+  prueba('el relleno es su línea evolutiva o un Ditto', () => {
+    const especies = plan.relleno.map((r) => r.especie);
+    cierto(especies.length > 0, 'sin relleno no hay huecos libres que rellenar');
+    for (const e of especies)
+      cierto(['Staryu', 'Starmie', 'Ditto'].includes(e), `${e} no cría con un sin género`);
+  });
+
+  prueba('no se paga por elegir el sexo de la cría', () => {
+    const pres = presupuestar(plan, datos);
+    igual(pres.pagosSexo, []);
+    falso(pres.lineas.some((l) => /sexo/i.test(l.concepto)));
   });
 });

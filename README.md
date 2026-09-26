@@ -117,10 +117,28 @@ vez de callarlo.
 
 **Hora del juego y estación.** Muchas tablas de encuentro sólo existen a una hora
 o en una estación: una horda «de noche · invierno» no está si entras de día en
-verano. Dices qué tienes y las capturas y las hordas que sirven ahora salen
-primero. Lo que no toca **no se esconde** —a diferencia de las regiones, esperar
-a la noche son minutos y a otra estación semanas— sino que se marca con cuándo
-sí: verde «ahora», amarillo «espera una franja», rojo «espera una estación».
+verano. El selector está en **Capturas** y en **Entrenamiento**, que es donde se
+usa. Dices qué tienes y lo que sirve ahora sale primero; lo que no toca **no se
+esconde** —a diferencia de las regiones, esperar a la noche son minutos y a otra
+estación semanas— sino que se marca con cuándo sí: verde «ahora», amarillo
+«espera una franja», rojo «espera una estación». Sin elegir nada, la columna
+dice a qué horas sale cada sitio en corto: **M**, **D**, **N** y sus
+combinaciones.
+
+**En qué orden aprender los movimientos.** Un movimiento puede estar en la lista
+de una fase anterior, o en la de la forma final a un nivel que ya habrás pasado
+cuando por fin la tengas. Casi todo lo resuelve el **recordador de movimientos**,
+que en PokeMMO está en todos los centros Pokémon y cobra en Escamas Corazón:
+enseña los de cualquier nivel aunque no hayas llegado, y los de una evolución
+anterior aunque nunca los haya sabido. Lo que **no** arregla es un movimiento
+huevo, que tiene que venir en el huevo — y eso sí lo calcula el plan de crianza.
+Cuando de verdad hay que aprender algo antes de evolucionar, se dice y se
+explica por qué.
+
+**Sin género no es «sólo con Ditto».** En PokeMMO un Pokémon sin género cría con
+**su propia línea evolutiva** o con un Ditto, al contrario que en los juegos
+originales. Y no tiene sexos, así que ningún hueco pide ♀ ni ♂ y el selector de
+sexo desaparece del objetivo.
 
 **Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme. Al lado,
 para los objetos de los que hay un precio de mercado observado, se compara: la
@@ -153,6 +171,7 @@ src/nucleo/             la lógica, sin nada del DOM
   importar.js             parser de texto, CSV y JSON
   capturas.js             dónde conseguir lo que falta, filtrado por región
   cuando.js               hora del juego y estación: si está ahí cuando entras
+  aprendizaje.js          en qué orden se aprende cada movimiento, con evoluciones
   coste.js                el presupuesto, separando lo confirmado de lo estimado
   entrenamiento.js        el plan de EVs
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
@@ -171,7 +190,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                188 pruebas unitarias + una de navegador
+pruebas/                217 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 

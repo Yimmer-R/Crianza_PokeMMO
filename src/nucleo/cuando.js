@@ -55,6 +55,27 @@ export function cuandoLegible(fila) {
   ].filter(Boolean).join(', ');
 }
 
+/**
+ * La etiqueta corta para la columna «Cuándo» cuando no hay hora elegida.
+ *
+ * Con un filtro puesto lo que interesa es «sirve» o «espera a X». Sin filtro
+ * interesa el dato crudo y en una tabla estrecha no cabe «mañana o día»: M, D,
+ * N, y combinadas M/D, M/N, D/N, M/D/N.
+ */
+const INICIAL = { mañana: 'M', 'día': 'D', noche: 'N' };
+
+export function siglaDeHoras(fila) {
+  const horas = fila.horas ?? HORAS;
+  return HORAS.filter((h) => horas.includes(h)).map((h) => INICIAL[h]).join('/');
+}
+
+/** "todo el año" / "invierno" / "primavera/verano", para la misma columna. */
+export function siglaDeEstaciones(fila) {
+  const e = fila.estaciones ?? ESTACIONES;
+  if (e.length >= ESTACIONES.length) return null;
+  return ESTACIONES.filter((x) => e.includes(x)).join('/');
+}
+
 /** ¿Esta fila tiene alguna restricción, mires cuando mires? */
 export const tieneRestriccion = (fila) =>
   (fila.horas ?? HORAS).length < HORAS.length

@@ -60,11 +60,31 @@ export function puedenCriar(a, b, pokedex) {
     return { puede: true, especieCria: pokedex[otro.especie].base, via: 'ditto', madre: otro };
   }
 
-  if (sinGenero(pa) || sinGenero(pb))
+  // Sin género: cría con su PROPIA LÍNEA EVOLUTIVA o con Ditto, y nada más.
+  //
+  // Esto es de PokeMMO y no de los juegos originales, donde un sin género sólo
+  // cría con Ditto. La wiki lo dice en una línea: «Genderless Pokémon can only
+  // breed with their evolution line Pokémon and Ditto»
+  // (wiki/mecanicas/Crianza.md). La app lo tenía como los juegos originales y
+  // por eso un objetivo sin género salía como captura imposible.
+  if (sinGenero(pa) || sinGenero(pb)) {
+    const losDos = sinGenero(pa) && sinGenero(pb);
+    if (losDos && pa.base === pb.base)
+      return {
+        puede: true,
+        especieCria: pa.base,
+        via: 'misma-linea',
+        // Sin sexos no hay madre ni padre: la cría sale de la especie, que es
+        // la misma en los dos.
+        madre: a,
+        padre: b,
+      };
     return {
       puede: false,
-      motivo: `${sinGenero(pa) ? a.especie : b.especie} no tiene género: sólo cría con Ditto`,
+      motivo: `${sinGenero(pa) ? a.especie : b.especie} no tiene género: sólo cría con su misma `
+        + 'línea evolutiva o con un Ditto',
     };
+  }
 
   const comunes = gruposEnComun(pa, pb);
   if (!comunes.length)
@@ -99,6 +119,21 @@ export function padresCompatibles(especieMadre, pokedex, { puntua = null, inclui
   if (!madre || esEsteril(madre)) return [];
 
   const out = [];
+
+  // Un sin género no mira grupos huevo: su lista es su propia línea evolutiva
+  // más el Ditto, y ahí se acaba. Devolver la lista del grupo huevo dejaba al
+  // planificador sin ninguna pareja válida.
+  if (sinGenero(madre)) {
+    for (const [nombre, p] of Object.entries(pokedex)) {
+      if (esEsteril(p) || esDitto(nombre)) continue;
+      if (p.base !== madre.base) continue;
+      out.push({ especie: nombre, via: 'misma-linea', grupos: [] });
+    }
+    if (incluirDitto) out.push({ especie: DITTO, via: 'ditto', grupos: [] });
+    if (puntua) out.sort((a, b) => puntua(b) - puntua(a));
+    return out;
+  }
+
   for (const [nombre, p] of Object.entries(pokedex)) {
     if (nombre === especieMadre) continue;
     if (esEsteril(p)) continue;
@@ -131,7 +166,10 @@ export function sirveComoLineaMaterna(ejemplar, especieObjetivo, pokedex) {
   if (p.base !== objetivo.base)
     return { sirve: false, motivo: `${ejemplar.especie} no es de la línea de ${especieObjetivo}` };
   if (ejemplar.sexo === SEXOS.HEMBRA) return { sirve: true, necesitaDitto: false };
-  if (sinGenero(p)) return { sirve: true, necesitaDitto: true, motivo: 'sin género: hace falta Ditto' };
+  // Sin género no hay madre: la cría sale de la especie, y la pareja es su
+  // misma línea o un Ditto. Cualquiera de los dos vale, así que no hace falta
+  // Ditto de forma obligatoria.
+  if (sinGenero(p)) return { sirve: true, necesitaDitto: false, sinGenero: true };
   return { sirve: true, necesitaDitto: true, motivo: 'es macho: hace falta un Ditto para que la cría sea de su especie' };
 }
 

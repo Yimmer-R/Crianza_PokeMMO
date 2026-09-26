@@ -180,6 +180,81 @@ precio de tienda, que es firme. El precio observado va aparte, en
 vista dice explícitamente que caduca y que hay que volver a mirarlo. Un número
 de mercado sin fecha miente a los dos meses; con fecha, es un dato.
 
+## Sin género no es «sólo con Ditto», y por eso salían capturas imposibles
+
+La app tenía la regla de los juegos originales: un Pokémon sin género sólo cría
+con Ditto. En PokeMMO no es así — `wiki/mecanicas/Crianza.md` lo dice en una
+línea: *«Genderless Pokémon can only breed with their evolution line Pokémon and
+Ditto»*. O sea que dos Staryu crían entre sí.
+
+El síntoma era peor que un dato mal: el árbol pedía ♀ en la espina y ♂ en el
+hueco libre, y como Starmie tiene 0 % de los dos, `intentosEsperados` salía
+infinito y la app mostraba **«captura imposible»** junto a «ninguna de las
+especies compatibles aparece en tus regiones». Un plan correcto presentado como
+imposible es peor que un error visible.
+
+Arreglado en tres sitios, porque el sexo se decide en tres: `puedenCriar()` y
+`padresCompatibles()` (la pareja es su línea o un Ditto),
+`restriccionesDeLosHijos()` y `asignarSexos()` (ningún hueco pide sexo, todos
+`SIN_GENERO`), y el formulario del objetivo (el selector de sexo desaparece y el
+sexo pedido se borra al elegir una especie sin género). Lo vigilan seis pruebas
+de compatibilidad y cinco de planificador.
+
+## Un movimiento se busca en la línea evolutiva, no en la forma final
+
+Pedirle Polvo Veneno a un Amoonguss salía como *«Amoonguss no aprende Polvo
+Veneno por ninguna vía que traiga la wiki»*, y es un objetivo perfectamente
+normal: es movimiento huevo de **Foongus**, que es lo que sale del huevo. El
+error era mirar sólo las listas de la forma final, cuando toda la crianza
+funciona sobre la base.
+
+`viasEnLaLinea()` recorre de la forma final hacia la base y devuelve cada vía con
+la fase en la que está. Eso arregla tres cosas de golpe: la validación deja de
+rechazar el objetivo, `movimientosSoloDeHuevo()` ata el padre del cruce final al
+movimiento —que es lo que había que calcular—, y el campo de «añadir
+movimiento» acepta lo que la línea puede aprender.
+
+## El recordador de movimientos resuelve casi todo el problema del orden
+
+La pregunta era: ¿qué pasa si la fase anterior aprende un movimiento a un nivel
+más alto que el de su evolución, o si la forma final lo tiene a un nivel que ya
+habrás pasado? La respuesta está en `wiki/mundo/conceptos/Relearners.md`, y
+cambia el diseño: el **recordador** está en todos los centros Pokémon, cobra en
+Escamas Corazón y puede enseñar los movimientos de cualquier nivel **aunque no
+hayas llegado** y los de una evolución anterior **aunque nunca los haya sabido**.
+
+Así que «retrasar la evolución» casi nunca hace falta. De hecho, con los datos
+actuales, **cero** Pokémon lo necesitan: no hay ninguna fase anterior que
+aprenda por nivel un movimiento por encima del nivel de su evolución y que la
+final no pueda recuperar. La app tiene la rama por si aparece, pero no se
+inventa el caso.
+
+Lo que el recordador **no** puede es añadir un movimiento huevo después: sólo lo
+recupera si la cría nació con él. Por eso la guía pone lo del huevo en el paso 1
+y el resto detrás, y ese orden no es cosmético.
+
+Sí queda un caso real, y sólo uno en todo el juego con estos datos: un
+movimiento que una fase anterior tiene y la final no puede conseguir por ningún
+medio (Ludicolo y Hoja Afilada). Ahí el orden manda, y la app entra por la fase
+**más tardía** que lo consiga sin huevo para arrastrarlo lo menos posible.
+
+## El precio que no existe: la Piedraeterna
+
+`datos/objetos.json` dice que la venden los cinco encargados de guardería a
+4.000 PokéYen. Sale de un volcado de datos del juego, y jugando no está en
+ninguna tienda: se farmea a Pokémon salvajes o se compra en el GTL.
+
+No se corrige el JSON a mano —regla 1 de este repositorio— sino con una lista
+declarada en `constantes.js` (`NO_SE_VENDE_EN_TIENDA`) que dice cuál es el objeto
+y por qué, con la fecha y la fuente: la experiencia del usuario, que es más
+débil que un dato de la wiki pero es quien está delante del juego. Convendría
+subirlo a la wiki como fuente nueva para que la corrección viva allí.
+
+Consecuencia: la línea de la Piedraeterna en el presupuesto lleva un precio de
+mercado (4.957 el 22-09-2026) marcado como estimado, y el rango del último año
+al lado, para que se vea que cuatro Piedraeternas pueden costar entre 13.920 y
+22.912 según cuándo compres.
+
 ## Tesseract.js es la única excepción a «sin dependencias»
 
 El OCR necesita un motor, y escribirlo no es razonable. Se carga desde CDN, **sólo

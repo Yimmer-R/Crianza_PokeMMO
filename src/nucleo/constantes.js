@@ -118,6 +118,26 @@ export const PRECIO_RESPALDO = {
 };
 
 /**
+ * Objetos que el volcado de la wiki dice que venden las tiendas del juego, pero
+ * que en realidad NO se venden.
+ *
+ * La Piedraeterna es el caso: `datos/objetos.json` la da a 4.000 PokéYen en los
+ * cinco encargados de guardería, y eso sale de un volcado de datos del juego,
+ * pero jugando no está en ninguna tienda. Se consigue **farmeando objetos a
+ * Pokémon salvajes o comprándola en el GTL**.
+ * (experiencia propia del usuario, 26-09-2026 — más débil que un dato de la
+ * wiki, pero es quien está delante del juego; convendría subirlo a la wiki como
+ * fuente nueva para que la corrección quede allí y no aquí)
+ *
+ * Tenerlo en cuenta cambia el presupuesto de verdad: el precio bueno es el del
+ * GTL, que se mueve, en vez de un precio de tienda fijo que no existe.
+ */
+export const NO_SE_VENDE_EN_TIENDA = {
+  Piedraeterna: 'no está en ninguna tienda del juego: se farmea a Pokémon salvajes o se compra '
+    + 'en el GTL (experiencia propia, 26-09-2026)',
+};
+
+/**
  * Precios de mercado observados en el GTL, con su fecha.
  *
  * Esto **no** sale de la wiki y no puede salir: la wiki no guarda precios de
@@ -126,9 +146,10 @@ export const PRECIO_RESPALDO = {
  * fecha pegada y se muestra siempre como estimación caducable, nunca sumado al
  * total como si fuera un dato firme.
  *
- * Sirve para una cosa concreta y útil: comparar con el precio de tienda. La
- * Piedraeterna la venden los cinco encargados de guardería a 4.000 fijos, y el
- * GTL lleva un año oscilando **por encima** casi todo el tiempo.
+ * Para la Piedraeterna esto **es** el precio, no una comparación: no se vende en
+ * ninguna tienda (ver `NO_SE_VENDE_EN_TIENDA`), así que el GTL es la vía real y
+ * el presupuesto tiene que usar este número — marcado como estimación con
+ * fecha, no como dato firme.
  */
 export const PRECIO_GTL_OBSERVADO = {
   Piedraeterna: {

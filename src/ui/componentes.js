@@ -1,5 +1,7 @@
 // Ayudas de render. No hay framework: se construyen nodos y se pintan.
 
+/* eslint-disable no-use-before-define -- `el` se define aquí abajo. */
+
 /** el('div.tarjeta', {onclick}, [hijos]) */
 export function el(selector, props = {}, hijos = []) {
   const [etiqueta, ...clases] = selector.split('.');

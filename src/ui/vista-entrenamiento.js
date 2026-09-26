@@ -4,7 +4,10 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla } from './componentes.j
 import { NOMBRE_STAT, EV_MAX_TOTAL } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { planearEvs } from '../nucleo/entrenamiento.js';
-import { cuandoLegible } from '../nucleo/cuando.js';
+import { cuandoLegible, siglaDeHoras, siglaDeEstaciones } from '../nucleo/cuando.js';
+import { selectorCuando } from './selector-cuando.js';
+import { guiaDeAprendizaje, RECORDADOR, PAGO_RECORDADOR } from '../nucleo/aprendizaje.js';
+import { planearHabilidad } from '../nucleo/habilidades.js';
 
 export function vistaEntrenamiento(datos) {
   const { objetivo, regionesDisponibles, cuando } = obtener();
@@ -17,10 +20,20 @@ export function vistaEntrenamiento(datos) {
     cuando,
   });
 
+  // La guía de movimientos y habilidad va aquí y no en el Plan porque es lo que
+  // se hace DESPUÉS de tener la cría: subir niveles, enseñar MT, pasar por el
+  // recordador. El Plan es la crianza; esto es el entrenamiento.
+  const guia = bloqueGuia(objetivo, datos);
+
   if (!plan.porStat.length)
-    return tarjeta('Sin EVs que repartir', [
-      el('p.vacio', {}, ['Pon los EVs que quieres en la pestaña Objetivo. El reparto típico es 252 + 252 + 6.']),
+    return frag([
+      guia,
+      tarjeta('Sin EVs que repartir', [
+        el('p.vacio', {}, ['Pon los EVs que quieres en la pestaña Objetivo. El reparto típico es 252 + 252 + 6.']),
+      ]),
     ]);
+
+  const barraCuando = tarjeta('Cuándo estás jugando', [selectorCuando('ent')]);
 
   const resumen = tarjeta(`EVs · ${plan.total} de ${EV_MAX_TOTAL}`, [
     el('div.etiquetas', {}, [
@@ -71,7 +84,10 @@ export function vistaEntrenamiento(datos) {
       ]),
       el('p.nota', {}, [
         'La mejor: ', el('strong', { texto: `${s.mejor.especie} +${s.mejor.ev}` }),
-        ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}), ${cuandoLegible(s.mejor)}. `,
+        ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}), `,
+        cuando.hora || cuando.estacion
+          ? `${cuandoLegible(s.mejor)}. `
+          : `${siglaDeHoras(s.mejor)}${siglaDeEstaciones(s.mejor) ? ` · ${siglaDeEstaciones(s.mejor)}` : ''}. `,
         `Una horda son 5 Pokémon, así que cada ronda da ${s.mejor.ev} × 5`,
         plan.objeto.factor > 1 ? ` × ${plan.objeto.factor}` : '',
         ` = ${s.evsPorHorda} EVs. Salen con Dulce Aroma.`,
@@ -90,7 +106,7 @@ export function vistaEntrenamiento(datos) {
             tabla(
               ['EV', 'Especie', 'Región', 'Zona', 'Nivel', 'Cuándo'],
               s.hordas.slice(1).map((h) => [
-                `+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel, celdaCuando(h),
+                `+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel, celdaCuando(h, cuando),
               ]),
             ),
           ], { pequeno: true, id: `hordas-${s.stat}` })
@@ -102,11 +118,12 @@ export function vistaEntrenamiento(datos) {
     ]);
   });
 
-  const huecos = plegable('Lo que no sé', [
-    el('ul', {}, plan.huecos.map((x) => el('li', { texto: x }))),
-  ], { extra: `${plan.huecos.length} huecos de la wiki` });
+  // La tarjeta «Lo que no sé» ya no está: los huecos siguen declarados en el
+  // README y en `planearEvs().huecos`, pero una tarjeta fija que repite lo
+  // mismo en cada visita es ruido. Lo que de verdad afecta a un número concreto
+  // se dice en su sitio (las vitaminas, los escalones).
 
-  return frag([resumen, bloqueOptimizar(plan.optimizacion), ...bloques, huecos]);
+  return frag([guia, barraCuando, resumen, bloqueOptimizar(plan.optimizacion), ...bloques]);
 }
 
 
@@ -197,10 +214,112 @@ function bloqueOptimizar(o) {
 }
 
 
-/** Igual que en Capturas: siempre / ahora sí / cuánto hay que esperar. */
-function celdaCuando(h) {
+/** Igual que en Capturas: siglas sin filtro, y con filtro si sirve o qué esperar. */
+function celdaCuando(h, cuando) {
+  if (!cuando?.hora && !cuando?.estacion) {
+    const horas = siglaDeHoras(h);
+    const est = siglaDeEstaciones(h);
+    return el('span.sig', {}, [
+      chip(horas, horas === 'M/D/N' ? '' : 'ojo'),
+      est ? chip(est, 'ojo') : null,
+    ]);
+  }
   const texto = cuandoLegible(h);
   if (texto === 'siempre') return chip('siempre');
   if (h.ahora !== false && !h.noAhora) return chip(texto, 'bien');
   return chip(texto, h.noAhora?.espera === 'estacion' ? 'mal' : 'ojo');
+}
+
+
+// ------------------------------------------- guía de movimientos y habilidad
+
+const ETIQUETA_SITUACION = {
+  nivel: ['sube de nivel', 'bien'],
+  mt: ['MT/MO', 'bien'],
+  tutor: ['tutor', 'bien'],
+  especial: ['evento', 'ojo'],
+  alEvolucionar: ['al evolucionar', 'bien'],
+  prevo: ['recordador', 'si'],
+  antesDeEvolucionar: ['antes de evolucionar', 'ojo'],
+  huevo: ['de huevo: al criar', 'ojo'],
+  imposible: ['no se puede', 'mal'],
+};
+
+/**
+ * Cómo conseguir los movimientos pedidos y la habilidad, en orden de juego.
+ *
+ * El nudo que resuelve: un movimiento puede estar en la lista de una fase
+ * ANTERIOR, o en la de la final a un nivel que ya habrás pasado. Casi todo lo
+ * arregla el recordador de movimientos, que en PokeMMO está en todos los
+ * centros Pokémon; lo que no, hay que aprenderlo antes de evolucionar. Ver
+ * src/nucleo/aprendizaje.js.
+ */
+function bloqueGuia(objetivo, datos) {
+  if (!objetivo.especie) return null;
+  if (!objetivo.movimientos?.length && !objetivo.habilidad) return null;
+
+  const g = guiaDeAprendizaje(objetivo, datos);
+  const hab = objetivo.habilidad ? planearHabilidad(objetivo, datos) : null;
+
+  const linea = g.linea.map((f) => f.especie).join(' → ');
+  const saltos = g.linea.filter((f) => f.desde).map((f) => `${f.especie}: ${f.condicion}`);
+
+  return tarjeta('Movimientos y habilidad, en orden', [
+    g.linea.length > 1
+      ? el('p.nota', {}, [
+          el('strong', { texto: 'Línea evolutiva: ' }), linea,
+          saltos.length ? ` · ${saltos.join(' · ')}` : '',
+        ])
+      : null,
+
+    g.entradas.length
+      ? tabla(
+          ['Movimiento', 'Cómo', 'Qué hacer'],
+          g.entradas.map((e) => {
+            const [etq, clase] = ETIQUETA_SITUACION[e.situacion] ?? [e.situacion, ''];
+            return [el('strong', { texto: e.movimiento }), chip(etq, clase), e.texto];
+          }),
+        )
+      : null,
+
+    g.orden.length
+      ? el('div', {}, [
+          el('h3', { texto: 'El orden' }),
+          el('ol.pasos', {}, g.orden.map((o) => el('li.usar', {}, [
+            el('span', {}, [el('strong', { texto: `${o.cuando}: ` }), o.texto]),
+          ]))),
+        ])
+      : null,
+
+    g.antesDeEvolucionar.length
+      ? aviso(
+          `${g.antesDeEvolucionar.map((e) => e.movimiento).join(', ')}: aquí el orden importa. `
+          + 'Si lo sobrescribes después de evolucionar no hay forma de recuperarlo, porque no '
+          + 'sale en la lista del recordador.',
+        )
+      : null,
+
+    g.conRecordador.length
+      ? el('p.nota', {}, [
+          el('strong', { texto: `${RECORDADOR}: ` }),
+          'está en todos los centros Pokémon y cobra en ',
+          el('strong', { texto: PAGO_RECORDADOR }),
+          ' (de 1 a 4 según la potencia del movimiento). Puede enseñar los de cualquier nivel '
+          + 'aunque no hayas llegado, y los de una evolución anterior aunque nunca los haya '
+          + 'sabido. Lo único que NO puede es añadir un movimiento huevo después: ése tiene '
+          + 'que venir en el huevo.',
+        ])
+      : null,
+
+    hab
+      ? el('div', {}, [
+          el('h3', { texto: `Habilidad · ${objetivo.habilidad}` }),
+          el('ul', {}, hab.pasos.map((x) => el('li', { texto: x }))),
+          hab.objetos.length ? el('div.etiquetas', {}, hab.objetos.map((o) => chip(o, 'si'))) : null,
+          hab.huecos.length
+            ? el('p.nota', {}, [hab.huecos.join(' ')])
+            : null,
+        ])
+      : null,
+  ]);
 }

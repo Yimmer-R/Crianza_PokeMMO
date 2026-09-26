@@ -7,10 +7,13 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunida
 import { NOMBRE_STAT } from '../nucleo/constantes.js';
 import { obtener } from './estado.js';
 import { planDeCapturas, regionesQueHacenFalta } from '../nucleo/capturas.js';
-import { cuandoLegible } from '../nucleo/cuando.js';
+import { sinGenero } from '../nucleo/compatibilidad.js';
+import { cuandoLegible, siglaDeHoras, siglaDeEstaciones } from '../nucleo/cuando.js';
+import { selectorCuando } from './selector-cuando.js';
 
 export function vistaCapturas(datos) {
   const { plan, regionesDisponibles, objetivo, cuando } = obtener();
+  const sinGeneroObjetivo = sinGenero(datos.pokedex[objetivo.especie]);
 
   if (!plan?.ok)
     return tarjeta('Sin plan no hay capturas', [el('p.vacio', { texto: 'Define el objetivo primero.' })]);
@@ -23,7 +26,11 @@ export function vistaCapturas(datos) {
       el('p', {}, [chip('el inventario ya cubre la cadena entera', 'bien')]),
     ]);
 
-  const cabecera = tarjeta('Resumen', [
+  const cabecera = tarjeta('Cuándo estás jugando', [
+    selectorCuando('cap'),
+  ]);
+
+  const resumen = tarjeta('Resumen', [
     el('div.etiquetas', {}, [
       chip(`${capturas.reduce((a, c) => a + c.cuantos, 0)} padres por conseguir`, 'ojo'),
       ...regiones.usadas.map((r) => chip(r, 'si')),
@@ -71,7 +78,10 @@ export function vistaCapturas(datos) {
     return tarjeta(`${especie} · ${cuantos} ${cuantos === 1 ? 'captura' : 'capturas'}`, [
       el('div.etiquetas', {}, [
         libre
-          ? chip('hueco libre: la especie no está atada', 'si')
+          ? chip(
+              sinGeneroObjetivo ? 'hueco libre: su línea o un Ditto' : 'hueco libre: la especie no está atada',
+              'si',
+            )
           : chip('espina materna: tiene que ser esta especie', 'ojo'),
         rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
         chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
@@ -90,8 +100,14 @@ export function vistaCapturas(datos) {
         : null,
       libre
         ? el('p.nota', {}, [
-            'Como la cría saca la especie de la MADRE, estos padres pueden ser de cualquier especie ',
-            `que comparta grupo huevo con ${objetivo.especie}. Se propone la más fácil de pillar.`,
+            sinGeneroObjetivo
+              // Sin género la regla es otra y más estrecha: sólo su propia
+              // línea evolutiva o un Ditto, no el grupo huevo entero.
+              ? `${objetivo.especie} no tiene género, así que su pareja sólo puede ser otro de su `
+                + 'misma línea evolutiva o un Ditto. Se propone el más fácil de pillar de esos.'
+              : 'Como la cría saca la especie de la MADRE, estos padres pueden ser de cualquier '
+                + `especie que comparta grupo huevo con ${objetivo.especie}. Se propone la más `
+                + 'fácil de pillar.',
           ])
         : null,
 
@@ -114,7 +130,7 @@ export function vistaCapturas(datos) {
       tabla(
         ['Región', 'Zona', 'Método', 'Nivel', 'Rareza', 'Cuándo'],
         rec.zonas.map((z) => [
-          chip(z.region, 'si'), z.zona, z.metodo, z.nivel, z.rareza, celdaCuando(z),
+          chip(z.region, 'si'), z.zona, z.metodo, z.nivel, z.rareza, celdaCuando(z, cuando),
         ]),
       ),
 
@@ -155,7 +171,7 @@ export function vistaCapturas(datos) {
     ]);
   });
 
-  return frag([cabecera, ...bloques, ...bloquesGtl]);
+  return frag([cabecera, resumen, ...bloques, ...bloquesGtl]);
 }
 
 
@@ -167,7 +183,17 @@ export function vistaCapturas(datos) {
  * lo que hay que esperar — que no es lo mismo esperar a la noche (minutos) que
  * a otra estación (semanas).
  */
-function celdaCuando(z) {
+function celdaCuando(z, cuando) {
+  // Sin filtro puesto interesa el dato crudo y abreviado: M, D, N y sus
+  // combinaciones. Con filtro interesa si sirve o cuánto hay que esperar.
+  if (!cuando?.hora && !cuando?.estacion) {
+    const horas = siglaDeHoras(z);
+    const est = siglaDeEstaciones(z);
+    return el('span.sig', {}, [
+      chip(horas, horas === 'M/D/N' ? '' : 'ojo'),
+      est ? chip(est, 'ojo') : null,
+    ]);
+  }
   const texto = cuandoLegible(z);
   if (texto === 'siempre') return chip('siempre');
   if (z.ahora !== false && !z.noAhora) return chip(texto, 'bien');

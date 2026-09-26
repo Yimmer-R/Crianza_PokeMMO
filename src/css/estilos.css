@@ -94,6 +94,8 @@ body {
 }
 
 .vista { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+.cuando-barra .fila { align-items: flex-end; }
+.sig { display: inline-flex; gap: 4px; }
 .barra-seleccion { align-items: center; margin-bottom: 10px; min-height: 30px; }
 .pie {
   max-width: 1100px; margin: 0 auto; padding: 16px;

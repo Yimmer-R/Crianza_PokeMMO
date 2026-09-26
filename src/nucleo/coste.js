@@ -6,7 +6,9 @@
 // que los padres que haya que comprar salen aparte, como "lo pones tú", y nunca
 // mezclados con el total confirmado.
 
-import { PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, PRECIO_GTL_OBSERVADO, SEXOS } from './constantes.js';
+import {
+  PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, PRECIO_GTL_OBSERVADO, NO_SE_VENDE_EN_TIENDA, SEXOS,
+} from './constantes.js';
 import { costeElegirSexo } from './compatibilidad.js';
 import { ROL } from './planificador.js';
 
@@ -25,8 +27,29 @@ const ES_YEN = (moneda) => /yen/i.test(moneda);
 /** 346000 -> "346.000". Se usa aquí y en las vistas. */
 export const formatearYen = (n) => new Intl.NumberFormat('es-ES').format(Math.round(n));
 
-/** Precio en PokéYen de un objeto, leído de datos/objetos.json. */
+/**
+ * Precio en PokéYen de un objeto, leído de datos/objetos.json.
+ *
+ * Con una excepción que va primero: hay objetos que el volcado da como «se
+ * vende en la guardería» y que jugando no están en ninguna tienda. Para esos el
+ * precio bueno es el del GTL, y se devuelve marcado como estimación con su
+ * fecha: es un precio de mercado y caduca. Ver `NO_SE_VENDE_EN_TIENDA`.
+ */
 export function precioEnYen(nombre, objetos) {
+  if (NO_SE_VENDE_EN_TIENDA[nombre]) {
+    const gtl = PRECIO_GTL_OBSERVADO[nombre];
+    if (gtl)
+      return {
+        cantidad: gtl.ultimo,
+        moneda: 'PokéYen',
+        donde: 'GTL',
+        fuente: 'estimado',
+        porQue: NO_SE_VENDE_EN_TIENDA[nombre],
+        observado: gtl,
+      };
+    return null;
+  }
+
   for (const grupo of Object.values(objetos)) {
     const ficha = grupo?.[nombre];
     if (!ficha) continue;
@@ -165,39 +188,36 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
 /** Formatea 1234567 como "1.234.567". */
 
 /**
- * Tienda contra GTL, para los objetos de los que tenemos un precio observado.
+ * De dónde sale el precio de cada objeto que tiene precio de mercado.
  *
- * El caso que motiva esto: la Piedraeterna la venden los cinco encargados de
- * guardería a 4.000 fijos, y el GTL lleva un año oscilando entre 3.480 y 5.728
- * — casi siempre por encima. O sea que comprarla en el GTL, que es lo que uno
- * hace por costumbre, suele salir más caro.
- *
- * El total del presupuesto sigue usando el precio de TIENDA: es un dato firme
- * que no caduca. Esto es una nota al lado, con su fecha, porque un precio de
- * mercado apuntado miente a los dos meses.
+ * Para la Piedraeterna no hay tienda: no se vende en ninguna, así que el número
+ * del presupuesto **es** el del GTL, con su fecha y su rango. Se enseña aparte
+ * porque un precio de mercado caduca y hay que volver a mirarlo; el resto del
+ * presupuesto son precios de tienda, que no se mueven.
  */
 export function comparaConElGtl(objetosUsados, objetos) {
   const salida = [];
   for (const [nombre, cuantos] of objetosUsados) {
     const gtl = PRECIO_GTL_OBSERVADO[nombre];
     if (!gtl) continue;
-    const tienda = precioEnYen(nombre, objetos);
-    if (!tienda || !ES_YEN(tienda.moneda)) continue;
-    const masCaroEnGtl = gtl.ultimo > tienda.cantidad;
+    const soloGtl = !!NO_SE_VENDE_EN_TIENDA[nombre];
+    const precio = precioEnYen(nombre, objetos);
+    if (!precio || !ES_YEN(precio.moneda)) continue;
+
     salida.push({
       objeto: nombre,
       cuantos,
-      tienda: tienda.cantidad,
-      donde: tienda.donde,
+      soloGtl,
+      porQue: NO_SE_VENDE_EN_TIENDA[nombre] ?? null,
+      // Lo que se está usando en el total, y a qué precio de mercado.
+      usado: precio.cantidad,
       gtl,
-      masCaroEnGtl,
-      // Lo que te ahorras comprando en la tienda, al último precio visto.
-      diferencia: (gtl.ultimo - tienda.cantidad) * cuantos,
-      consejo: masCaroEnGtl
-        ? `Cómprala en la guardería: ${formatearYen(tienda.cantidad)} fijos frente a ` +
-          `${formatearYen(gtl.ultimo)} en el GTL el ${gtl.fecha}.`
-        : `El GTL estaba a ${formatearYen(gtl.ultimo)} el ${gtl.fecha}, por debajo de los ` +
-          `${formatearYen(tienda.cantidad)} de la guardería: esta vez sale mejor comprarla ahí.`,
+      total: precio.cantidad * cuantos,
+      consejo: soloGtl
+        ? `No se vende en ninguna tienda: o la farmeas a Pokémon salvajes o la compras en el GTL. `
+          + `El presupuesto usa ${formatearYen(gtl.ultimo)}, que es lo que valía el ${gtl.fecha}.`
+        : `El GTL estaba a ${formatearYen(gtl.ultimo)} el ${gtl.fecha}; en la tienda, `
+          + `${formatearYen(precio.cantidad)}.`,
     });
   }
   return salida;

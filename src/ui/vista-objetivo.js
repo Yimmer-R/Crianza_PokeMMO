@@ -2,11 +2,12 @@
 
 import { el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor } from './componentes.js';
 import {
-  STATS, NOMBRE_STAT, REGIONES, HORAS, ESTACIONES,
-  EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS,
+  STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS,
 } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { validarObjetivo } from '../nucleo/planificador.js';
+import { sinGenero } from '../nucleo/compatibilidad.js';
+import { lineaEvolutiva } from '../nucleo/aprendizaje.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
 import { crearResolutores } from '../nucleo/nombres.js';
 import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
@@ -15,8 +16,9 @@ let resolutores = null;
 const res = (datos) => (resolutores ??= crearResolutores(datos));
 
 export function vistaObjetivo(datos) {
-  const { objetivo, regionesDisponibles, cuando } = obtener();
+  const { objetivo, regionesDisponibles } = obtener();
   const p = datos.pokedex[objetivo.especie];
+  const sinGeneroObjetivo = sinGenero(p);
 
   // Acepta un objeto o una función del objetivo ACTUAL. La forma de función es
   // la importante: el `objetivo` del cierre es del último pintado, y si se
@@ -33,19 +35,35 @@ export function vistaObjetivo(datos) {
         'especie', 'Especie', objetivo.especie, datos.especies,
         (v) => {
           const especie = v ? (res(datos).especie(v).valor ?? v) : '';
-          // Al cambiar de especie, habilidad y movimientos dejan de valer.
-          cambiaObjetivo((o) => (o.especie === especie ? {} : { especie, habilidad: null, movimientos: [] }));
+          // Al cambiar de especie, habilidad y movimientos dejan de valer. Y si
+          // la nueva no tiene género, el sexo pedido se quita solo: si no, se
+          // quedaba un «quiero una hembra» imposible de cumplir.
+          const nueva = datos.pokedex[especie];
+          cambiaObjetivo((o) => (o.especie === especie ? {} : {
+            especie,
+            habilidad: null,
+            movimientos: [],
+            sexo: sinGenero(nueva) ? null : o.sexo,
+          }));
         },
         { placeholder: 'Larvitar, Chimchar…' },
       ),
-      el('div', { style: 'flex:0 0 150px' }, [
-        el('label', { for: 'sexo', texto: 'Sexo que quieres' }),
-        el('select', { id: 'sexo', onchange: (e) => cambiaObjetivo({ sexo: e.target.value || null }) }, [
-          el('option', { value: '', selected: !objetivo.sexo }, ['Me da igual']),
-          el('option', { value: SEXOS.MACHO, selected: objetivo.sexo === SEXOS.MACHO }, ['♂ Macho']),
-          el('option', { value: SEXOS.HEMBRA, selected: objetivo.sexo === SEXOS.HEMBRA }, ['♀ Hembra']),
-        ]),
-      ]),
+      // Una especie sin género no tiene sexo que elegir, así que el selector
+      // no se enseña: dejarlo ahí invitaba a pedir una hembra de Starmie, que
+      // el plan tenía que resolver como captura imposible.
+      sinGeneroObjetivo
+        ? el('div', { style: 'flex:0 0 150px' }, [
+            el('label', { texto: 'Sexo' }),
+            el('p', { style: 'margin:0', texto: '— sin género' }),
+          ])
+        : el('div', { style: 'flex:0 0 150px' }, [
+            el('label', { for: 'sexo', texto: 'Sexo que quieres' }),
+            el('select', { id: 'sexo', onchange: (e) => cambiaObjetivo({ sexo: e.target.value || null }) }, [
+              el('option', { value: '', selected: !objetivo.sexo }, ['Me da igual']),
+              el('option', { value: SEXOS.MACHO, selected: objetivo.sexo === SEXOS.MACHO }, ['♂ Macho']),
+              el('option', { value: SEXOS.HEMBRA, selected: objetivo.sexo === SEXOS.HEMBRA }, ['♀ Hembra']),
+            ]),
+          ]),
     ]),
     p ? el('div.etiquetas', { style: 'margin-top:10px' }, [
       chip(`Grupo huevo: ${p.gruposHuevo.join(' / ')}`, 'si'),
@@ -164,20 +182,35 @@ export function vistaObjetivo(datos) {
     ) : null,
   ]);
 
+  // La lista sale de la LÍNEA EVOLUTIVA entera, no sólo de la forma final.
+  // El huevo eclosiona en la base, así que un movimiento huevo de la base llega
+  // a la evolución: pedirle Polvo Veneno a un Amoonguss es legítimo —lo trae
+  // Foongus— y el campo lo rechazaba por mirar sólo a Amoonguss.
   const movsPosibles = p
-    ? [...new Set([
-        ...p.movimientos.nivel.map((m) => m.nombre),
-        ...p.movimientos.mt, ...p.movimientos.tutor, ...p.movimientos.huevo,
-        ...p.movimientos.huevoEspecial, ...p.movimientos.especial,
-        ...p.movimientos.alEvolucionar, ...p.movimientos.dePreevolucion,
-      ])].sort()
+    ? [...new Set(
+        lineaEvolutiva(objetivo.especie, datos.pokedex)
+          .map((f) => datos.pokedex[f.especie])
+          .filter(Boolean)
+          .flatMap((x) => [
+            ...x.movimientos.nivel.map((m) => m.nombre),
+            ...x.movimientos.mt, ...x.movimientos.tutor, ...x.movimientos.huevo,
+            ...x.movimientos.huevoEspecial, ...x.movimientos.especial,
+            ...x.movimientos.alEvolucionar, ...x.movimientos.dePreevolucion,
+          ]),
+      )].sort()
     : [];
 
   const bloqueMovimientos = frag([
     el('h3', { texto: `Movimientos · ${objetivo.movimientos.length} de 4` }),
     p
       ? frag([
-          el('p.nota', {}, [`${movsPosibles.length} movimientos posibles para ${objetivo.especie}.`]),
+          el('p.nota', {}, [
+            `${movsPosibles.length} movimientos posibles para ${objetivo.especie}`,
+            lineaEvolutiva(objetivo.especie, datos.pokedex).length > 1
+              ? ' y su línea evolutiva: los de una fase anterior también valen, y el orden para '
+                + 'conseguirlos sale en Entrenamiento.'
+              : '.',
+          ]),
           el('div.etiquetas', { style: 'margin-bottom:10px' }, objetivo.movimientos.map((m) =>
             el('button.boton.mini.secundario', {
               onclick: () => cambiaObjetivo((o) => ({ movimientos: o.movimientos.filter((x) => x !== m) })),
@@ -197,7 +230,7 @@ export function vistaObjetivo(datos) {
                     const nombre = r.valor;
                     if (!nombre || !movsPosibles.includes(nombre)) {
                       fijarYGuardar({ avisoMovimiento:
-                        `${objetivo.especie} no aprende "${v}"` +
+                        `Ni ${objetivo.especie} ni su línea evolutiva aprenden "${v}"` +
                         (nombre && nombre !== v ? ` (lo he leído como ${nombre})` : '') + '.' });
                       return;
                     }
@@ -215,39 +248,6 @@ export function vistaObjetivo(datos) {
         ])
       : el('p.vacio', { texto: 'Elige una especie primero.' }),
   ]);
-
-  // --------------------------------------------------------- dónde y cuándo
-  //
-  // Hora y estación van con las regiones porque son el mismo tipo de cosa: un
-  // filtro global sobre dónde puedes cazar y entrenar hoy, que no pertenece a
-  // ninguna crianza en concreto.
-  const selectorCuando = (clave, etiqueta, opciones, ninguna) => el('div', { style: 'flex:1 1 160px' }, [
-    el('label', { for: `cuando-${clave}`, texto: etiqueta }),
-    el('select', {
-      id: `cuando-${clave}`,
-      onchange: (ev) => fijarYGuardar((e) => ({
-        cuando: { ...e.cuando, [clave]: ev.target.value || null },
-      })),
-    }, [
-      el('option', { value: '', selected: !cuando[clave] }, [ninguna]),
-      ...opciones.map((o) => el('option', { value: o, selected: cuando[clave] === o }, [o])),
-    ]),
-  ]);
-
-  const bloqueCuando = plegable('Cuándo estás jugando', [
-    el('p.nota', {}, [
-      'Muchas tablas de encuentro sólo existen a una hora o en una estación. Si dices cuál ',
-      'tienes, las capturas y las hordas que sirven ahora salen primero; el resto no se ',
-      'esconde, se marca con cuándo sí. En PokeMMO un día del juego son 6 horas reales, así ',
-      'que la franja rota cuatro veces al día; las estaciones van por mes real.',
-    ]),
-    el('div.fila', {}, [
-      selectorCuando('hora', 'Hora del juego', HORAS, 'Me da igual'),
-      selectorCuando('estacion', 'Estación', ESTACIONES, 'Me da igual'),
-    ]),
-  ], {
-    extra: [cuando.hora, cuando.estacion].filter(Boolean).join(' · ') || 'sin filtrar',
-  });
 
   // ------------------------------------------------------------- regiones
   const bloqueRegiones = plegable('Regiones desbloqueadas', [
@@ -311,7 +311,6 @@ export function vistaObjetivo(datos) {
     p ? tarjeta('Habilidad y movimientos', [bloqueHabilidad, bloqueMovimientos]) : null,
     bloqueEvs,
     bloqueRegiones,
-    bloqueCuando,
     validacion ? (sueltoAlFinal ? validacion : tarjeta(null, [validacion])) : null,
   ]);
 }

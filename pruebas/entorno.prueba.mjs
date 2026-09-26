@@ -35,8 +35,14 @@ bloque('coste: precios', () => {
     igual(p.fuente, 'wiki');
   });
 
-  prueba('la Piedraeterna cuesta 4.000 PokéYen', () => {
-    igual(precioEnYen('Piedraeterna', datos.objetos).cantidad, 4000);
+  prueba('la Piedraeterna NO coge el precio de tienda del volcado', () => {
+    // El volcado la da a 4.000 en los cinco encargados de guardería, pero
+    // jugando no está en ninguna tienda: el precio bueno es el del GTL.
+    const p = precioEnYen('Piedraeterna', datos.objetos);
+    igual(p.donde, 'GTL');
+    igual(p.fuente, 'estimado');
+    cierto(p.cantidad !== 4000, 'no puede ser el precio de guardería que no existe');
+    cierto(/tienda/.test(p.porQue), p.porQue);
   });
 
   prueba('prefiere el precio en PokéYen antes que el de BP', () => {
@@ -337,7 +343,7 @@ bloque('entrenamiento: los escalones de EVs', () => {
   });
 });
 
-bloque('coste: tienda contra GTL', () => {
+bloque('coste: la Piedraeterna no se vende en tienda', () => {
   const objetivo = {
     especie: 'Larvitar', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {},
     movimientos: [], naturaleza: 'Audaz',
@@ -345,18 +351,27 @@ bloque('coste: tienda contra GTL', () => {
   const plan = planear(objetivo, datos, { regionesDisponibles: REGIONES });
   const pres = presupuestar(plan, datos);
 
-  prueba('la Piedraeterna sale más cara en el GTL que en la guardería', () => {
-    const d = pres.dondeComprar.find((x) => x.objeto === 'Piedraeterna');
-    cierto(d, 'un plan con naturaleza tiene que usar Piedraeterna');
-    igual(d.tienda, 4000, 'la guardería la vende a 4.000 fijos en las cinco regiones');
-    cierto(d.masCaroEnGtl, `el GTL estaba a ${d.gtl.ultimo}, no por debajo de 4.000`);
-    cierto(d.diferencia > 0);
-    cierto(/guardería/.test(d.consejo));
+  prueba('el precio sale del GTL, no de la guardería del volcado', () => {
+    // `datos/objetos.json` la da a 4.000 en los cinco encargados de guardería,
+    // pero jugando no está en ninguna tienda: se farmea o se compra en el GTL.
+    const linea = pres.lineas.find((l) => l.concepto === 'Piedraeterna');
+    cierto(linea, 'un plan con naturaleza tiene que usar Piedraeterna');
+    igual(linea.precioUnidad, 4957, 'el último precio observado del GTL');
+    igual(linea.fuente, 'estimado', 'un precio de mercado no es un dato firme');
   });
 
-  prueba('el total NO usa el precio de mercado, que caduca', () => {
-    const conGtl = pres.lineas.find((l) => l.concepto === 'Piedraeterna');
-    igual(conGtl.precioUnidad, 4000, 'el presupuesto suma el precio de tienda');
+  prueba('los Recios sí siguen siendo precio de tienda', () => {
+    const recio = pres.lineas.find((l) => /Recio|Recia/.test(l.concepto));
+    igual(recio.precioUnidad, 10000);
+    igual(recio.fuente, 'wiki');
+  });
+
+  prueba('se dice que no hay tienda, y con qué precio se ha contado', () => {
+    const d = pres.dondeComprar.find((x) => x.objeto === 'Piedraeterna');
+    cierto(d.soloGtl);
+    cierto(/farmeas|GTL/.test(d.consejo), d.consejo);
+    igual(d.usado, 4957);
+    igual(d.total, 4957 * d.cuantos);
   });
 
   prueba('el precio observado viene con su fecha, para poder desconfiar de él', () => {

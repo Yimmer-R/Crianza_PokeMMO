@@ -130,18 +130,24 @@ await paso('Capturas respeta el filtro de regiones', async () => {
 });
 
 await paso('hora y estación ordenan las capturas, y no esconden nada', async () => {
+  // Con 0 EVs la pestaña de Entrenamiento no tiene nada que filtrar y no pinta
+  // el selector, así que primero se le pone algo que entrenar.
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#ev-velocidad');
+  await pagina.fill('#ev-velocidad', '252');
+  await pagina.dispatchEvent('#ev-velocidad', 'change');
+  await pagina.waitForTimeout(200);
+
   await pagina.click('button[data-vista="capturas"]');
   await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
   const filas = () => pagina.locator('.tarjeta:has-text("Dónde") tbody tr').count();
   const sinFiltro = await filas();
 
-  await pagina.click('button[data-vista="objetivo"]');
-  await abrir('Cuándo estás jugando');
-  await pagina.selectOption('#cuando-hora', 'noche');
-  await pagina.selectOption('#cuando-estacion', 'invierno');
+  // El selector vive en la propia pestaña de Capturas: es «cuándo estás
+  // jugando», no una propiedad del Pokémon que quieres.
+  await pagina.selectOption('#cuando-hora-cap', 'noche');
+  await pagina.selectOption('#cuando-estacion-cap', 'invierno');
   await pagina.waitForTimeout(300);
-
-  await pagina.click('button[data-vista="capturas"]');
   await pagina.waitForSelector('.tarjeta:has-text("Dónde")', { timeout: 5000 });
   if (await filas() !== sinFiltro)
     throw new Error('el filtro de hora no puede quitar filas, sólo reordenarlas y marcarlas');
@@ -162,11 +168,83 @@ await paso('hora y estación ordenan las capturas, y no esconden nada', async ()
   if (/La mejor:/.test(ent) && !/(siempre|noche)/.test(ent))
     throw new Error('la mejor horda propuesta no sirve de noche');
 
+  // Y el mismo estado se ve desde Entrenamiento: es uno solo, no dos.
+  if (await pagina.inputValue('#cuando-hora-ent') !== 'noche')
+    throw new Error('el filtro tiene que ser el mismo en las dos pestañas');
+  await pagina.selectOption('#cuando-hora-ent', '');
+  await pagina.selectOption('#cuando-estacion-ent', '');
+  await pagina.waitForTimeout(200);
+
+  // Se deja el objetivo como estaba para no descolocar las pruebas de abajo.
   await pagina.click('button[data-vista="objetivo"]');
-  await pagina.selectOption('#cuando-hora', '');
-  await pagina.selectOption('#cuando-estacion', '');
+  await pagina.fill('#ev-velocidad', '0');
+  await pagina.dispatchEvent('#ev-velocidad', 'change');
   await pagina.waitForTimeout(200);
   console.log(`       ${sinFiltro} filas de zonas, las mismas con y sin filtro`);
+});
+
+await paso('un objetivo sin género: sin selector de sexo y sin capturas imposibles', async () => {
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Starmie');
+  await confirmarCampo('#especie');
+  await pagina.waitForSelector('text=Grupo huevo: Sin género', { timeout: 5000 });
+
+  if (await pagina.locator('#sexo').count())
+    throw new Error('Starmie no tiene sexo: el selector no debería estar');
+  await pagina.check('#iv-velocidad');
+  await pagina.check('#iv-at-esp');
+  await pagina.waitForTimeout(400);
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
+  const t = await pagina.textContent('#vista');
+  if (/imposible/.test(t)) throw new Error('sigue habiendo capturas imposibles');
+  if (/ninguna de las especies compatibles/i.test(t))
+    throw new Error('sigue diciendo que ninguna especie es compatible');
+  if (!/su línea o un Ditto/.test(t))
+    throw new Error('debería decir que la pareja es su línea evolutiva o un Ditto');
+  const primera = await pagina.locator('.tarjeta h2').nth(2).textContent();
+  console.log(`       ${primera.trim()} · sin sexo y sin imposibles`);
+
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+});
+
+await paso('Entrenamiento guía los movimientos contando con la evolución', async () => {
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Amoonguss');
+  await confirmarCampo('#especie');
+  await pagina.waitForTimeout(400);
+
+  // Polvo Veneno NO está en ninguna lista de Amoonguss: es movimiento huevo de
+  // Foongus, que es lo que sale del huevo. Antes el campo lo rechazaba.
+  await pagina.waitForSelector('#nuevo-mov');
+  await pagina.fill('#nuevo-mov', 'Polvo Veneno');
+  await confirmarCampo('#nuevo-mov');
+  await pagina.waitForTimeout(400);
+  const chips = await pagina.locator('.tarjeta:has-text("Habilidad y movimientos") .etiquetas .boton').allTextContents();
+  if (!chips.some((c) => /Polvo Veneno/.test(c)))
+    throw new Error(`no ha aceptado el movimiento huevo de la fase base: ${chips.join(', ')}`);
+
+  await pagina.click('button[data-vista="entrenamiento"]');
+  await pagina.waitForSelector('.tarjeta:has-text("Movimientos y habilidad, en orden")', { timeout: 5000 });
+  const g = (await pagina.textContent('.tarjeta:has-text("Movimientos y habilidad, en orden")')).replace(/\s+/g, ' ');
+  for (const esperado of ['Foongus → Amoonguss', 'de huevo: al criar', 'recordador de movimientos']) {
+    if (!g.includes(esperado)) throw new Error(`la guía no dice "${esperado}"`);
+  }
+  if (!/al criar/.test(g)) throw new Error('el orden debería empezar por lo del huevo');
+  console.log(`       ${g.slice(0, 90)}`);
+
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
 });
 
 await paso('Inventario: anotar una captura que NO encaja lo dice', async () => {

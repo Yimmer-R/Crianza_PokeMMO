@@ -165,3 +165,57 @@ bloque('compatibilidad: precio de elegir el sexo', () => {
     igual(costeElegirSexo('Magnemite', SEXOS.HEMBRA, pokedex, PRECIO_ELEGIR_SEXO), null);
   });
 });
+
+bloque('sin género: cría con su línea o con Ditto, y nada más', () => {
+  // Regla de PokeMMO, no de los juegos originales: «Genderless Pokémon can only
+  // breed with their evolution line Pokémon and Ditto» (wiki/mecanicas/Crianza.md).
+  const sg = { especie: 'Staryu', sexo: SEXOS.SIN_GENERO };
+  const sg2 = { especie: 'Starmie', sexo: SEXOS.SIN_GENERO };
+  const otroSg = { especie: 'Magnemite', sexo: SEXOS.SIN_GENERO };
+  const ditto = { especie: 'Ditto', sexo: SEXOS.SIN_GENERO };
+
+  prueba('dos de la misma línea evolutiva crían', () => {
+    const r = puedenCriar(sg, sg2, datos.pokedex);
+    cierto(r.puede, r.motivo);
+    igual(r.especieCria, 'Staryu', 'la cría sale en la forma base de la línea');
+    igual(r.via, 'misma-linea');
+  });
+
+  prueba('con Ditto también', () => {
+    cierto(puedenCriar(sg, ditto, datos.pokedex).puede);
+  });
+
+  prueba('con otro sin género de OTRA línea, no', () => {
+    const r = puedenCriar(sg, otroSg, datos.pokedex);
+    falso(r.puede);
+    cierto(/línea evolutiva/.test(r.motivo), r.motivo);
+  });
+
+  prueba('con una especie cualquiera de su grupo huevo, tampoco', () => {
+    const r = puedenCriar(sg, { especie: 'Rattata', sexo: SEXOS.MACHO }, datos.pokedex);
+    falso(r.puede);
+  });
+
+  prueba('padresCompatibles devuelve la línea y el Ditto, no el grupo huevo', () => {
+    const lista = padresCompatibles('Staryu', datos.pokedex).map((x) => x.especie).sort();
+    // La propia especie ENTRA, al contrario que con una especie con sexos: dos
+    // Staryu crían entre sí porque están en la misma línea evolutiva.
+    igual(lista, ['Ditto', 'Starmie', 'Staryu'], `devolvió ${lista.join(', ')}`);
+    cierto(!lista.includes('Rattata'), 'nada del grupo huevo que no sea de su línea');
+  });
+
+  prueba('dos de la MISMA especie sin género crían', () => {
+    const r = puedenCriar(sg, { especie: 'Staryu', sexo: SEXOS.SIN_GENERO }, datos.pokedex);
+    cierto(r.puede, r.motivo);
+  });
+
+  prueba('sirve como línea materna sin necesitar Ditto obligatorio', () => {
+    const r = sirveComoLineaMaterna(sg, 'Starmie', datos.pokedex);
+    cierto(r.sirve);
+    falso(r.necesitaDitto, 'sin sexos no hace falta un Ditto por fuerza');
+  });
+
+  prueba('no se paga por el sexo de algo que no tiene sexo', () => {
+    igual(costeElegirSexo('Staryu', SEXOS.HEMBRA, datos.pokedex, PRECIO_ELEGIR_SEXO), null);
+  });
+});

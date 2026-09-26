@@ -133,25 +133,24 @@ export function vistaPlan(datos) {
       ? aviso('Hay líneas estimadas. La wiki sólo publica los extremos del pago por sexo (5.000 y 25.000); los tramos de en medio no están en ninguna fuente.')
       : null,
 
-    // El total usa el precio de TIENDA, que es firme y no caduca. Lo del GTL va
-    // aparte y con fecha, porque un precio de mercado miente a los dos meses.
+    // Casi todo el presupuesto son precios de tienda, que no se mueven. La
+    // Piedraeterna es la excepción: no se vende en ninguna tienda, así que su
+    // línea lleva un precio de mercado, y un precio de mercado caduca.
     pres.dondeComprar?.length
       ? el('div.nota', {}, [
-          el('strong', { texto: 'Tienda o GTL: ' }),
           ...pres.dondeComprar.flatMap((d) => [
             el('span', {}, [
-              `${d.objeto} × ${d.cuantos}. ${d.consejo} `,
+              el('strong', { texto: `${d.objeto} × ${d.cuantos}: ` }),
+              `${d.consejo} `,
               `En el último año se movió entre ${numero(d.gtl.min)} (${d.gtl.minFecha}) y `,
-              `${numero(d.gtl.max)} (${d.gtl.maxFecha}). `,
-              d.masCaroEnGtl && d.diferencia > 0
-                ? el('strong', { texto: `Comprarla en la guardería te ahorra ${numero(d.diferencia)} PokéYen.` })
-                : null,
+              `${numero(d.gtl.max)} (${d.gtl.maxFecha}), así que las ${d.cuantos} pueden salirte `,
+              `desde ${numero(d.gtl.min * d.cuantos)} hasta ${numero(d.gtl.max * d.cuantos)} PokéYen.`,
             ]),
             el('br'),
           ]),
           el('span.tenue', {
-            texto: `Los precios de GTL salen de ${pres.dondeComprar[0].gtl.fuente} y caducan: `
-              + 'la wiki no los guarda a propósito. Vuelve a mirarlos antes de comprar.',
+            texto: `El precio de mercado sale de ${pres.dondeComprar[0].gtl.fuente} y caduca: `
+              + 'vuelve a mirarlo antes de comprar. Lo demás son precios de tienda, que no se mueven.',
           }),
         ])
       : null,
