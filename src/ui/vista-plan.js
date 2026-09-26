@@ -1,7 +1,7 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
 import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero } from './componentes.js';
-import { NOMBRE_STAT, STATS, IV_MAX } from '../nucleo/constantes.js';
+import { NOMBRE_STAT, STATS, IV_MAX, INCUBADORAS, ACELERAR_HUEVO } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
 import { contar, criaDe, ROL } from '../nucleo/planificador.js';
 import { normalizar, ejemplarNuevo, loQueFalta } from '../nucleo/inventario.js';
@@ -173,6 +173,13 @@ function bloqueAhora(plan, objetivo, datos) {
     listos.length
       ? el('div', {}, [
           el('h3', { texto: `Cruces que ya puedes hacer · ${listos.length}` }),
+          listos.length > INCUBADORAS
+            ? el('p.nota', {}, [
+                `Tienes ${listos.length} listos pero sólo ${INCUBADORAS} incubadoras, que son `,
+                `${INCUBADORAS} huevos a la vez: el techo de la crianza en paralelo. `,
+                'Van por tandas.',
+              ])
+            : null,
           el('ul.listos', {}, listos.map((n) => el('li', {}, [
             el('span', {}, [
               el('strong', { texto: etiquetaBonita(n, objetivo) }),
@@ -273,6 +280,13 @@ function bloquePasos(plan, objetivo, datos) {
       'De abajo hacia arriba. Un cruce se puede marcar cuando sus dos padres están en el ',
       'inventario; al marcarlo se gastan —en PokeMMO los padres se consumen— y la cría entra ',
       'en el inventario con los 31 que el cruce garantiza. El plan se recalcula solo.',
+    ]),
+    el('p.nota', {}, [
+      `Los huevos eclosionan en incubadora, y tienes ${INCUBADORAS}: `,
+      `${INCUBADORAS} a la vez como mucho. Se aceleran con `,
+      ACELERAR_HUEVO.map((a) => `${a.que} (−${Math.round(a.rebaja * 100)} %)`).join(' y con '),
+      ', y las dos cosas se suman. El de Cuerpo Llama va DENTRO de la incubadora, no en el ',
+      'equipo: no es como en los juegos originales.',
     ]),
     deshacer
       ? el('div.aviso', {}, [

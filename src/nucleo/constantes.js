@@ -27,6 +27,27 @@ export const EV_POR_BAYA = 10;
 export const EVS_POR_PUNTO = { 50: 8, 100: 4 };
 
 /**
+ * Incubadoras: un huevo no eclosiona en el equipo, se mete en una incubadora.
+ * Son un desbloqueo permanente de la cuenta y hay OCHO en total (cinco de los
+ * encargados de guardería, una del Alto Mando de Kanto, una de la revancha a
+ * Ho-Oh y una de Red). Ocho incubadoras son ocho huevos a la vez, que es el
+ * techo real de la crianza en paralelo.
+ * wiki/mecanicas/Incubadoras.md (añadidas el 10-07-2025, Shiny Wars 2025)
+ */
+export const INCUBADORAS = 8;
+
+/**
+ * Lo que acelera una incubadora, y se suma: −10 % con un Pokémon de Cuerpo
+ * Llama o Escudo Magma DENTRO de la incubadora —no en el equipo, que es como
+ * funciona en los juegos originales— y −10 % más con el estado de donador.
+ * wiki/mecanicas/Incubadoras.md
+ */
+export const ACELERAR_HUEVO = [
+  { que: 'un Pokémon con Cuerpo Llama o Escudo Magma dentro de la incubadora', rebaja: 0.10 },
+  { que: 'estado de donador activo', rebaja: 0.10 },
+];
+
+/**
  * wiki/mecanicas/Crianza.md — reparto de cada IV no forzado según cuántos
  * objetos de crianza haya en juego. Tres IVs se heredan tal cual y tres salen
  * del promedio redondeado hacia abajo; esta tabla es la probabilidad por IV.
