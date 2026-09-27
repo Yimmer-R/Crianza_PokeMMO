@@ -11,7 +11,7 @@
 
 import { GRUPOS_ESTERILES, GRUPO_DITTO, GRUPO_SIN_GENERO, SEXOS } from './constantes.js';
 
-const DITTO = 'Ditto';
+export const DITTO = 'Ditto';
 
 export const esDitto = (especie) => especie === DITTO;
 
@@ -22,6 +22,7 @@ export const sinGenero = (p) =>
 
 /** Sexos que puede tener una especie, según su ratio. */
 export function sexosPosibles(p) {
+  if (!p) return [];
   if (sinGenero(p)) return [SEXOS.SIN_GENERO];
   const out = [];
   if ((p.genero?.macho ?? 0) > 0) out.push(SEXOS.MACHO);
@@ -183,4 +184,109 @@ export function costeElegirSexo(especie, sexoQuerido, pokedex, tabla) {
     .sort((a, b) => b.ratioMinoritario - a.ratioMinoritario)
     .find((t) => ratio >= t.ratioMinoritario) ?? tabla[tabla.length - 1];
   return { ratio, precio: tramo.precio, confianza: tramo.confianza };
+}
+
+// ------------------------------------------------- la especie y su línea
+
+/**
+ * Todas las especies de una línea evolutiva: las que comparten forma base.
+ *
+ * Sirve para lo que más cuesta explicar de la crianza: la especie que sale del
+ * huevo es la BASE de la madre, así que para la espina materna da exactamente
+ * igual capturar un Staryu que un Starmie — los dos ponen un huevo de Staryu.
+ * Lo que cambia es lo que cuesta encontrarlos.
+ */
+export const mismaLinea = (especie, pokedex) => {
+  const base = pokedex[especie]?.base;
+  if (!base) return [];
+  return Object.keys(pokedex)
+    .filter((n) => pokedex[n].base === base)
+    .sort((a, b) => (pokedex[a].dex ?? 0) - (pokedex[b].dex ?? 0));
+};
+
+/**
+ * Qué hacer con un Pokémon de la línea que no cría: evolucionarlo.
+ *
+ * Los 18 bebés (Pichu, Igglybuff, Riolu…) están en el grupo «No cría» y no
+ * ponen huevos, pero su evolución sí. Se capturan igual de bien, así que no hay
+ * que descartarlos: hay que decir que antes de criar hay que evolucionarlos.
+ * Devuelve null cuando no hay salida, que es el caso de los legendarios.
+ */
+export function comoLlegaACriar(especie, pokedex) {
+  const cola = [especie];
+  const vistos = new Set(cola);
+  while (cola.length) {
+    const actual = cola.shift();
+    for (const salto of pokedex[actual]?.evoluciona?.a ?? []) {
+      if (vistos.has(salto.especie) || !pokedex[salto.especie]) continue;
+      if (!esEsteril(pokedex[salto.especie]))
+        return { especie: salto.especie, condicion: salto.condicion ?? null, desde: actual };
+      vistos.add(salto.especie);
+      cola.push(salto.especie);
+    }
+  }
+  return null;
+}
+
+/**
+ * Quién puede poner la especie objetivo en la cría, y con qué pareja.
+ *
+ * Tres casos, y los tres salen de la misma regla («la especie la pone la madre,
+ * o el progenitor que no sea Ditto»):
+ *
+ *   - lo normal: cualquier HEMBRA de la línea evolutiva;
+ *   - sin género: cualquiera de la línea, sin sexo que pedir, y la pareja es
+ *     otro de su línea o un Ditto;
+ *   - una línea sin ninguna hembra (Nidoran♂, Tauros, Rufflet, Throh, Sawk,
+ *     Volbeat y la de Tyrogue): NO hay madre posible, así que la especie sólo
+ *     pasa con un MACHO y un Ditto de pareja. Y como un Ditto no se puede
+ *     criar, ese Ditto hay que capturarlo o comprarlo ya con los IVs.
+ */
+export function quienPoneLaEspecie(especieObjetivo, pokedex) {
+  const p = pokedex[especieObjetivo];
+  if (!p) return { linea: [], candidatas: [], sexo: null, conDitto: false, motivo: 'especie desconocida' };
+
+  const linea = mismaLinea(especieObjetivo, pokedex);
+  const ficha = (especie, sexo) => {
+    const q = pokedex[especie];
+    const cria = !esEsteril(q);
+    return {
+      especie,
+      cria,
+      // Un bebé no cría, pero se captura y se evoluciona: sigue valiendo.
+      evolucionar: cria ? null : comoLlegaACriar(especie, pokedex),
+      ratio: sexo === SEXOS.HEMBRA ? (q.genero?.hembra ?? 0)
+        : sexo === SEXOS.MACHO ? (q.genero?.macho ?? 0)
+        : 100,
+    };
+  };
+  const utiles = (sexo) => linea.map((n) => ficha(n, sexo))
+    .filter((c) => c.ratio > 0 && (c.cria || c.evolucionar));
+
+  const nadieCria = `ningún Pokémon de la línea de ${especieObjetivo} puede criar`;
+
+  if (sinGenero(p)) {
+    const c = utiles(SEXOS.SIN_GENERO);
+    return {
+      linea, candidatas: c, sexo: SEXOS.SIN_GENERO, conDitto: false,
+      motivo: c.length ? null : nadieCria,
+    };
+  }
+
+  const hembras = utiles(SEXOS.HEMBRA);
+  if (hembras.length)
+    return { linea, candidatas: hembras, sexo: SEXOS.HEMBRA, conDitto: false, motivo: null };
+
+  const machos = utiles(SEXOS.MACHO);
+  return {
+    linea,
+    candidatas: machos,
+    sexo: machos.length ? SEXOS.MACHO : null,
+    conDitto: machos.length > 0,
+    motivo: machos.length
+      ? `en la línea de ${especieObjetivo} no hay hembras: la especie sólo pasa criando un macho `
+        + 'con un Ditto, y como los Ditto no se crían, cada Ditto hay que capturarlo o comprarlo '
+        + 'ya con los IVs que pida el cruce'
+      : nadieCria,
+  };
 }

@@ -214,6 +214,36 @@ await paso('un objetivo sin género: sin selector de sexo y sin capturas imposib
   await pagina.waitForTimeout(150);
 });
 
+await paso('una línea sin hembras: macho y Ditto, no una captura imposible', async () => {
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Nidoking');
+  await confirmarCampo('#especie');
+  await pagina.waitForSelector('text=Del huevo sale Nidoran', { timeout: 5000 });
+
+  // Toda la línea de Nidoran♂ es macho: no hay sexo que elegir.
+  if (await pagina.locator('#sexo').count())
+    throw new Error('en la línea de Nidoking no hay hembras: el selector sobra');
+  await pagina.check('#iv-velocidad');
+  await pagina.check('#iv-at-esp');
+  await pagina.waitForTimeout(400);
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForSelector('.tarjeta', { timeout: 5000 });
+  const t = await pagina.textContent('#vista');
+  if (/imposible/.test(t)) throw new Error('sigue habiendo capturas imposibles');
+  if (/♀/.test(t)) throw new Error('está pidiendo una hembra de una línea sin hembras');
+  if (!/Ditto/.test(t)) throw new Error('debería decir que la pareja es un Ditto');
+  const titulos = await pagina.locator('.tarjeta h2').allTextContents();
+  console.log(`       ${titulos.slice(2).map((x) => x.trim()).join(' · ')}`);
+
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+});
+
 await paso('Entrenamiento guía los movimientos contando con la evolución', async () => {
   await pagina.click('text=+ Nueva');
   await pagina.click('button[data-vista="objetivo"]');

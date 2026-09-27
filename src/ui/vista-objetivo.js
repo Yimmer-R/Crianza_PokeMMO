@@ -6,7 +6,7 @@ import {
 } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { validarObjetivo } from '../nucleo/planificador.js';
-import { sinGenero } from '../nucleo/compatibilidad.js';
+import { sexosPosibles } from '../nucleo/compatibilidad.js';
 import { lineaEvolutiva } from '../nucleo/aprendizaje.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
 import { crearResolutores } from '../nucleo/nombres.js';
@@ -18,7 +18,7 @@ const res = (datos) => (resolutores ??= crearResolutores(datos));
 export function vistaObjetivo(datos) {
   const { objetivo, regionesDisponibles } = obtener();
   const p = datos.pokedex[objetivo.especie];
-  const sinGeneroObjetivo = sinGenero(p);
+  const posibles = p ? sexosPosibles(p) : [];
 
   // Acepta un objeto o una función del objetivo ACTUAL. La forma de función es
   // la importante: el `objetivo` del cierre es del último pintado, y si se
@@ -43,18 +43,19 @@ export function vistaObjetivo(datos) {
             especie,
             habilidad: null,
             movimientos: [],
-            sexo: sinGenero(nueva) ? null : o.sexo,
+            sexo: sexosPosibles(nueva).includes(o.sexo) ? o.sexo : null,
           }));
         },
         { placeholder: 'Larvitar, Chimchar…' },
       ),
-      // Una especie sin género no tiene sexo que elegir, así que el selector
-      // no se enseña: dejarlo ahí invitaba a pedir una hembra de Starmie, que
-      // el plan tenía que resolver como captura imposible.
-      sinGeneroObjetivo
+      // El selector sólo sale cuando de verdad hay algo que elegir. Sin género
+      // no hay sexos; y en una línea de un solo sexo (Starmie, Nidoking,
+      // Tauros) elegir el otro era pedir una captura imposible, que es justo lo
+      // que el usuario veía.
+      posibles.length < 2
         ? el('div', { style: 'flex:0 0 150px' }, [
             el('label', { texto: 'Sexo' }),
-            el('p', { style: 'margin:0', texto: '— sin género' }),
+            el('p', { style: 'margin:0', texto: posibles[0] ?? (p ? '—' : '') }),
           ])
         : el('div', { style: 'flex:0 0 150px' }, [
             el('label', { for: 'sexo', texto: 'Sexo que quieres' }),

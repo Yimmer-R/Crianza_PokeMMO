@@ -62,7 +62,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Siete cosas que no son evidentes leyendo un archivo suelto:
+Ocho cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -90,7 +90,17 @@ Siete cosas que no son evidentes leyendo un archivo suelto:
    huevo eclosiona en la base, así que los movimientos huevo son los de la base.
    Mirando sólo la forma final, un Amoonguss con Polvo Veneno salía como «no lo
    aprende por ninguna vía». Usa `viasEnLaLinea()`, no `vias()` a secas.
-7. **Sin género ≠ sólo con Ditto.** En PokeMMO un sin género cría con **su
+7. **La especie la pone la LÍNEA, no la forma final.** El huevo eclosiona en la
+   base, así que un Staryu y un Starmie ponen el mismo huevo: el hueco de la
+   espina acepta a cualquiera de la línea y se propone el más fácil de pillar
+   (`quienPoneLaEspecie()`, `lineaMaterna()`). Atado a la forma final, un
+   Starmie en Unova salía como «captura imposible» con Staryu a mano. Dos
+   derivadas: los 18 bebés («No cría») valen como captura pero hay que
+   evolucionarlos antes, y las 7 líneas sin ninguna hembra (Nidoran♂, Tauros,
+   Rufflet, Throh, Sawk, Volbeat, Tyrogue) sólo pasan su especie con un macho y
+   un **Ditto** — y como un Ditto no se cría, su hueco es una hoja: se captura o
+   se compra, nunca sale de un cruce.
+8. **Sin género ≠ sólo con Ditto.** En PokeMMO un sin género cría con **su
    propia línea evolutiva** o con un Ditto (`wiki/mecanicas/Crianza.md`), al
    contrario que en los juegos originales. Y no tiene sexos: ningún hueco del
    árbol puede pedir ♀ ni ♂, o salen capturas de «1 de cada 0».
@@ -148,7 +158,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 217 pruebas unitarias
+node pruebas/ejecutar.mjs             # 229 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

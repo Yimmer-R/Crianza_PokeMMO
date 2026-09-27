@@ -140,12 +140,26 @@ explica por qué.
 originales. Y no tiene sexos, así que ningún hueco pide ♀ ni ♂ y el selector de
 sexo desaparece del objetivo.
 
-**Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme. Al lado,
-para los objetos de los que hay un precio de mercado observado, se compara: la
-Piedraeterna la venden las cinco guarderías a 4.000 fijos y el GTL lleva un año
-por encima casi todo el tiempo, así que comprarla ahí —lo que uno hace por
-costumbre— suele salir más caro. El precio observado va con su fecha y avisando
-de que caduca.
+**La especie la pone la línea entera.** Del huevo sale la forma base, así que
+un Staryu y un Starmie ponen el mismo huevo: para la madre de la cadena vale
+cualquiera de la línea y se propone **el más fácil de pillar donde juegas**, con
+los demás al lado. De ahí salen dos avisos que antes no estaban:
+
+- los **bebés** (Pichu, Tyrogue, Riolu…) están en el grupo «No cría»: se
+  capturan, pero hay que evolucionarlos antes de cruzarlos, y se dice con qué
+  condición;
+- hay **siete líneas sin ninguna hembra** (Nidoran♂, Tauros, Rufflet, Throh,
+  Sawk, Volbeat y la de Tyrogue). Ahí la especie sólo pasa con un **macho y un
+  Ditto**, y como un Ditto no se puede criar, ese Ditto hay que capturarlo o
+  comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
+  imposible», que es lo que hacía.
+
+**Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme, y al
+lado compara con el precio de mercado observado cuando lo hay. Con un caso
+aparte: **la Piedraeterna no se vende en ninguna tienda**, por mucho que el
+volcado la dé a 4.000 en las cinco guarderías. Se farmea a Pokémon salvajes o se
+compra en el GTL, así que ahí el presupuesto usa un precio de mercado con fecha
+—y avisando de que caduca— en vez de uno de tienda que no existe.
 
 **Entrenamiento.** Para los EVs que pidas: qué hordas los dan, en qué zona de qué
 región, cuántas rondas con el objeto duplicador, y qué baya usar si te has pasado.

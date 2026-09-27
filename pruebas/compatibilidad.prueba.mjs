@@ -4,6 +4,7 @@ import { datos } from './datos-de-prueba.mjs';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril,
   costeElegirSexo, sirveComoLineaMaterna, sexosPosibles,
+  mismaLinea, comoLlegaACriar, quienPoneLaEspecie,
 } from '../src/nucleo/compatibilidad.js';
 import { PRECIO_ELEGIR_SEXO, SEXOS } from '../src/nucleo/constantes.js';
 
@@ -217,5 +218,48 @@ bloque('sin género: cría con su línea o con Ditto, y nada más', () => {
 
   prueba('no se paga por el sexo de algo que no tiene sexo', () => {
     igual(costeElegirSexo('Staryu', SEXOS.HEMBRA, datos.pokedex, PRECIO_ELEGIR_SEXO), null);
+  });
+});
+
+bloque('la especie la pone la LÍNEA, no la forma final', () => {
+  prueba('mismaLinea devuelve la familia entera, en orden de Pokédex', () => {
+    igual(mismaLinea('Starmie', pokedex), ['Staryu', 'Starmie']);
+    igual(mismaLinea('Raichu', pokedex), ['Pikachu', 'Raichu', 'Pichu']);
+  });
+
+  prueba('cualquiera de la línea vale de madre: del huevo sale la base', () => {
+    const r = quienPoneLaEspecie('Starmie', pokedex);
+    igual(r.candidatas.map((c) => c.especie).sort(), ['Starmie', 'Staryu']);
+    igual(r.sexo, SEXOS.SIN_GENERO);
+    falso(r.conDitto);
+  });
+
+  prueba('un bebé no cría, pero se captura y se evoluciona', () => {
+    cierto(esEsteril(pokedex.Pichu), 'Pichu está en "No cría"');
+    igual(comoLlegaACriar('Pichu', pokedex).especie, 'Pikachu');
+    const r = quienPoneLaEspecie('Raichu', pokedex);
+    const pichu = r.candidatas.find((c) => c.especie === 'Pichu');
+    cierto(pichu, 'Pichu sigue siendo candidata: se captura y se evoluciona');
+    falso(pichu.cria);
+    igual(pichu.evolucionar.especie, 'Pikachu');
+  });
+
+  prueba('una línea sin hembras pasa la especie con un macho y un Ditto', () => {
+    const r = quienPoneLaEspecie('Nidoking', pokedex);
+    igual(r.sexo, SEXOS.MACHO);
+    cierto(r.conDitto, 'en la línea de Nidoran♂ no hay ni una hembra');
+    cierto(/no hay hembras/.test(r.motivo), r.motivo);
+    // Nidoran♀ es otra línea: no sirve para poner un Nidoking.
+    falso(r.candidatas.some((c) => c.especie === 'Nidoran♀'));
+  });
+
+  prueba('un legendario lo dice, en vez de dejarlo en captura imposible', () => {
+    const r = quienPoneLaEspecie('Mewtwo', pokedex);
+    igual(r.candidatas, []);
+    cierto(/puede criar/.test(r.motivo), r.motivo);
+  });
+
+  prueba('comoLlegaACriar no se inventa una salida donde no la hay', () => {
+    igual(comoLlegaACriar('Mewtwo', pokedex), null);
   });
 });

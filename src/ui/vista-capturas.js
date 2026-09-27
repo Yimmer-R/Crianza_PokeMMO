@@ -71,18 +71,30 @@ export function vistaCapturas(datos) {
   };
 
   const bloques = [...porEspecie.entries()].map(([especie, grupo]) => {
-    const rec = grupo[0].recomendada;
+    // En la misma tarjeta pueden caer huecos de la espina y huecos libres: se
+    // agrupa por la especie recomendada, y desde que la espina acepta la línea
+    // entera es normal que coincidan. Manda el más estricto, que es la espina.
+    const base = grupo.find((c) => !c.requisito.especieLibre) ?? grupo[0];
+    const rec = base.recomendada;
     const cuantos = grupo.reduce((a, c) => a + c.cuantos, 0);
-    const libre = grupo.every((c) => c.requisito.especieLibre);
+    const hayLibres = grupo.some((c) => c.requisito.especieLibre);
+    const hayEspina = grupo.some((c) => !c.requisito.especieLibre);
 
     return tarjeta(`${especie} · ${cuantos} ${cuantos === 1 ? 'captura' : 'capturas'}`, [
       el('div.etiquetas', {}, [
-        libre
+        hayLibres
           ? chip(
               sinGeneroObjetivo ? 'hueco libre: su línea o un Ditto' : 'hueco libre: la especie no está atada',
               'si',
             )
-          : chip('espina materna: tiene que ser esta especie', 'ojo'),
+          : null,
+        hayEspina
+          ? chip(
+              rec.noSeCria ? 'sin hembras en la línea: la pareja tiene que ser un Ditto'
+                : `espina materna: ${especie} o cualquiera de su línea`,
+              'ojo',
+            )
+          : null,
         rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
         chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
         (cuando.hora || cuando.estacion)
@@ -92,13 +104,35 @@ export function vistaCapturas(datos) {
             )
           : null,
       ]),
+      // Lo que hay que hacer cuando la especie más fácil de pillar todavía no
+      // puede criar, que es el caso de los 18 bebés.
+      rec.noCria && rec.evolucionar
+        ? aviso(
+            `${especie} no cría: está en el grupo "No cría". Captúralo igual y evoluciónalo a `
+            + `${rec.evolucionar.especie}${rec.evolucionar.condicion ? ` (${rec.evolucionar.condicion})` : ''}`
+            + ' antes de cruzarlo.',
+          )
+        : null,
+      rec.noSeCria
+        ? aviso(
+            'Un Ditto no se puede criar, así que este no sale de ningún cruce: hay que capturarlo '
+            + 'o comprarlo ya con esos IVs. Es lo que hace cara una línea sin hembras.',
+          )
+        : null,
       (cuando.hora || cuando.estacion) && !rec.zonasAhora
         ? aviso(
             `Con ${[cuando.hora, cuando.estacion].filter(Boolean).join(' y ')} no sale en ninguna ` +
             'de estas zonas. La tabla dice cuándo sí: espera a esa franja, o quita el filtro en Objetivo.',
           )
         : null,
-      libre
+      hayEspina && !rec.noSeCria
+        ? el('p.nota', {}, [
+            'Del huevo sale la forma base, así que para la espina da igual cuál de la línea ',
+            `captures: ${base.viables.map((v) => v.especie).join(', ')} ponen el mismo huevo. `,
+            'Se propone el más fácil de pillar donde juegas.',
+          ])
+        : null,
+      hayLibres
         ? el('p.nota', {}, [
             sinGeneroObjetivo
               // Sin género la regla es otra y más estrecha: sólo su propia
@@ -134,12 +168,13 @@ export function vistaCapturas(datos) {
         ]),
       ),
 
-      grupo[0].viables.length > 1
-        ? plegable(`Otras ${grupo[0].viables.length - 1} especies que valen igual`, [
+      base.viables.length > 1
+        ? plegable(`Otras ${base.viables.length - 1} especies que valen igual`, [
             tabla(
               ['Especie', 'Grupo en común', 'Sexo pedido', 'Intentos', 'Zonas al alcance'],
-              grupo[0].viables.slice(1, 6).map((o) => [
-                o.especie, o.gruposEnComun.join(' / '), `${o.ratioSexo} %`,
+              base.viables.slice(1, 6).map((o) => [
+                o.noCria && o.evolucionar ? `${o.especie} (evoluciónalo a ${o.evolucionar.especie})` : o.especie,
+                o.gruposEnComun.join(' / '), `${o.ratioSexo} %`,
                 comoOportunidad(o.intentos), numero(o.zonas.length),
               ]),
               [3, 4],

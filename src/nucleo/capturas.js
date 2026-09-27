@@ -10,7 +10,7 @@
 //    no es un adorno: es lo primero que se aplica.
 
 import { IV_MAX, SEXOS } from './constantes.js';
-import { padresCompatibles, gruposEnComun, sinGenero, esEsteril } from './compatibilidad.js';
+import { padresCompatibles, gruposEnComun, sinGenero, esEsteril, comoLlegaACriar } from './compatibilidad.js';
 import { elegirRelleno } from './planificador.js';
 import { disponibleAhora, porQueNoAhora, ordenarPorCuando, CUANDO_CUALQUIERA } from './cuando.js';
 
@@ -79,13 +79,22 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
   const conNaturaleza = !!requisito.naturaleza;
 
   const opciones = [];
+  // La espina ya no es UNA especie: es la línea evolutiva entera, porque del
+  // huevo sale la forma base y cualquiera de la línea pone la misma. Así un
+  // Starmie deja de pedir un Starmie («Señuelo», 13 sitios) cuando un Staryu
+  // («Común», 33 sitios) vale igual.
   const candidatas = requisito.especieLibre
     ? elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando).slice(0, 6).map((c) => c.especie)
-    : [requisito.especieSugerida];
+    : (requisito.especiesValidas ?? [requisito.especieSugerida]);
 
   for (const especie of candidatas) {
     const p = pokedex[especie];
-    if (!p || esEsteril(p)) continue;
+    if (!p) continue;
+    // Un bebé (Pichu, Tyrogue, Riolu…) no cría, pero se captura igual de bien:
+    // no se descarta, se dice que hay que evolucionarlo antes de criar.
+    const noCria = esEsteril(p);
+    const evolucionar = noCria ? comoLlegaACriar(especie, pokedex) : null;
+    if (noCria && !evolucionar) continue;
     const donde = dondeAparece(especie, datos, regionesDisponibles);
     const ratio = requisito.sexo === SEXOS.HEMBRA ? (p.genero?.hembra ?? 0)
       : requisito.sexo === SEXOS.MACHO ? (p.genero?.macho ?? 0)
@@ -96,6 +105,10 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
       esObjetivo: especie === objetivo.especie,
       gruposEnComun: gruposEnComun(pokedex[objetivo.especie], p),
       sinGenero: sinGenero(p),
+      noCria,
+      evolucionar,
+      // Un Ditto no se cría ni se evoluciona: o se captura, o se compra.
+      noSeCria: !!requisito.noSeCria,
       ratioSexo: ratio,
       // Un ratio de 0 significa que ese sexo no existe en la especie: no sirve.
       viable: ratio > 0 || sinGenero(p),
@@ -114,6 +127,9 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
   viables.sort((a, b) =>
     (b.zonasAhora > 0) - (a.zonasAhora > 0)
     || a.intentos - b.intentos
+    // Con los mismos intentos, mejor el que ya cría que el que hay que
+    // evolucionar antes.
+    || (a.noCria === b.noCria ? 0 : a.noCria ? 1 : -1)
     || b.zonas.length - a.zonas.length);
 
   return {
@@ -126,9 +142,16 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
     // Sin ninguna opción capturable la única salida es el GTL, cuyo precio la
     // wiki deliberadamente no guarda.
     soloGtl: viables.length === 0,
-    nota: viables.length === 0
-      ? 'Ninguna de las especies compatibles aparece en tus regiones: toca el GTL, y ahí el precio lo pones tú.'
-      : null,
+    // Dos «no hay» distintos, y confundirlos manda a buscar algo que no existe:
+    // una cosa es que la especie esté en una región que no tienes, y otra que
+    // no salga en la hierba en ninguna parte (fósiles, regalos, Porygon…). La
+    // wiki no dice de dónde sale cada una, así que no se inventa el método.
+    nota: viables.length !== 0 ? null
+      : opciones.length && opciones.every((o) => o.noSalvaje)
+        ? `Ni ${candidatas[0]} ni el resto de su línea aparecen en estado salvaje: en el juego `
+          + 'salen por otra vía (fósil, regalo, intercambio…) o por el GTL. La wiki no trae esa '
+          + 'vía, así que no me la invento.'
+        : 'Ninguna de las especies compatibles aparece en tus regiones: toca el GTL, y ahí el precio lo pones tú.',
   };
 }
 

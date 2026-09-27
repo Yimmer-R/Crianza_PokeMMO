@@ -22,7 +22,7 @@ import {
 } from './herencia.js';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
-  costeElegirSexo, sirveComoLineaMaterna,
+  costeElegirSexo, sirveComoLineaMaterna, quienPoneLaEspecie, DITTO,
 } from './compatibilidad.js';
 import { disponibleAhora, CUANDO_CUALQUIERA } from './cuando.js';
 
@@ -108,6 +108,19 @@ export function validarObjetivo(objetivo, datos) {
       + '(o con un Ditto), y no hay sexos que pagar ni que elegir',
     );
 
+  // La especie la pone la madre, y hay siete líneas que no tienen ninguna
+  // hembra. No es un caso raro de verdad —Tauros, Nidoking, Hitmonlee…— y hasta
+  // ahora el plan las daba por captura imposible en vez de decir lo que pasa.
+  const quien = quienPoneLaEspecie(objetivo.especie, pokedex);
+  if (quien.motivo && !esEsteril(p)) avisos.push(quien.motivo);
+  if (quien.candidatas.some((c) => !c.cria && c.evolucionar))
+    avisos.push(
+      quien.candidatas.filter((c) => !c.cria).map((c) =>
+        `${c.especie} se captura pero no cría: para usarlo hay que evolucionarlo a `
+        + `${c.evolucionar.especie}${c.evolucionar.condicion ? ` (${c.evolucionar.condicion})` : ''}`,
+      ).join('; '),
+    );
+
   return { valido: problemas.length === 0, problemas, avisos };
 }
 
@@ -177,6 +190,109 @@ export function vias(p, movimiento) {
 // ------------------------------------------------- elegir especie de relleno
 
 /**
+ * Lo fácil que es capturar una especie donde el usuario juega, en puntos.
+ *
+ * No es una probabilidad: es una puntuación para ORDENAR candidatas. Suma por
+ * rareza, por cuántos sitios tiene y por en cuántas regiones está, y castiga
+ * fuerte lo que con la hora y la estación puestas no sale ahora mismo. Devuelve
+ * -Infinity cuando la especie no vale para el hueco (no aparece en tus
+ * regiones, o no puede tener el sexo que se le pide).
+ *
+ * `ambosSexos` es para los huecos de relleno, que necesitan ♀ y ♂; `sexo` es
+ * para la espina, donde sólo hace falta uno y un ratio malo se paga en
+ * intentos, no en imposibilidad.
+ */
+export function facilidadDeCaptura(
+  especie, datos, regionesDisponibles, cuando = CUANDO_CUALQUIERA, { ambosSexos = false, sexo = null } = {},
+) {
+  const { pokedex, encuentros } = datos;
+  const p = pokedex[especie];
+  if (!p) return -Infinity;
+  const regiones = new Set(regionesDisponibles);
+  const enc = (encuentros[especie] ?? []).filter((e) => regiones.has(e.region));
+  if (!enc.length) return -Infinity; // no se puede capturar donde juega el usuario
+
+  let puntos = 0;
+  // Lo que se puede cazar con la hora y la estación que hay puestas pesa
+  // mucho: de poco vale la especie más común si sólo sale en invierno.
+  const ahora = enc.filter((e) => disponibleAhora(e, cuando));
+  if (!ahora.length) puntos -= 20;
+  else puntos += Math.min(ahora.length, 6);
+  for (const e of enc) {
+    const r = (e.rareza ?? '').toLowerCase();
+    if (r.includes('muy común') || r.includes('muy comun')) puntos += 10;
+    else if (r.includes('común') || r.includes('comun')) puntos += 8;
+    else if (r.includes('horda')) puntos += 6;
+    else if (r.includes('poco')) puntos += 3;
+    else if (r.includes('raro')) puntos += 1;
+    else puntos += 2;
+  }
+  puntos += Math.min(enc.length, 8);                       // muchos sitios = fácil
+  puntos += new Set(enc.map((e) => e.region)).size * 2;    // en varias regiones = flexible
+
+  // Un sin género se salta todo esto: no tiene sexos, y exigírselos lo
+  // descartaba con -Infinity.
+  if (sinGenero(p)) return puntos;
+  if (ambosSexos) {
+    // Los huecos de relleno necesitan macho Y hembra, así que un 50/50 vale más
+    // que un 87,5/12,5 aunque sea más común.
+    const min = Math.min(p.genero?.macho ?? 0, p.genero?.hembra ?? 0);
+    if (min <= 0) return -Infinity;
+    return puntos + min / 5;
+  }
+  if (sexo && sexo !== SEXOS.SIN_GENERO) {
+    const ratio = sexo === SEXOS.HEMBRA ? (p.genero?.hembra ?? 0) : (p.genero?.macho ?? 0);
+    if (ratio <= 0) return -Infinity;
+    return puntos + ratio / 10;
+  }
+  return puntos;
+}
+
+/**
+ * La espina materna, resuelta contra las regiones del usuario.
+ *
+ * Quién puede poner la especie lo dice quienPoneLaEspecie(); aquí se ordena esa
+ * lista por lo fácil que es capturar cada uno donde el usuario juega. Es lo que
+ * arregla el caso que se veía raro: para un Starmie el plan pedía un Starmie
+ * («Señuelo», 13 sitios) cuando un Staryu («Común», 33 sitios) pone exactamente
+ * el mismo huevo. Del huevo sale la forma base, así que cualquiera de la línea
+ * vale.
+ */
+export function lineaMaterna(especieObjetivo, datos, regionesDisponibles = [], cuando = CUANDO_CUALQUIERA) {
+  const quien = quienPoneLaEspecie(especieObjetivo, datos.pokedex);
+  const regiones = new Set(regionesDisponibles);
+  const saleAhora = (especie) => (datos.encuentros?.[especie] ?? [])
+    .some((e) => regiones.has(e.region) && disponibleAhora(e, cuando));
+
+  // El mismo orden que la vista de capturas, para que el plan y la tabla no
+  // recomienden cosas distintas: primero lo que sale con la hora y la estación
+  // puestas, luego el sexo menos raro —que es lo que multiplica los intentos—,
+  // y ya después lo común que es. Con todo igual, antes el que ya cría que el
+  // bebé al que hay que evolucionar.
+  const ordenadas = quien.candidatas
+    .map((c) => ({
+      ...c,
+      ahora: saleAhora(c.especie),
+      facilidad: facilidadDeCaptura(c.especie, datos, regionesDisponibles, cuando, { sexo: quien.sexo }),
+    }))
+    .sort((a, b) =>
+      (b.ahora === true) - (a.ahora === true)
+      || b.ratio - a.ratio
+      || b.facilidad - a.facilidad
+      || (a.cria === b.cria ? 0 : a.cria ? -1 : 1));
+
+  const alcanzables = ordenadas.filter((c) => Number.isFinite(c.facilidad));
+  return {
+    ...quien,
+    candidatas: ordenadas,
+    // Si ninguna de la línea aparece en tus regiones, se sugiere la propia
+    // especie objetivo y el consejo de captura ya dirá que toca el GTL.
+    sugerida: (alcanzables[0] ?? ordenadas[0])?.especie ?? especieObjetivo,
+    especies: ordenadas.map((c) => c.especie),
+  };
+}
+
+/**
  * Qué especie usar en los huecos de la línea paterna.
  *
  * Como la cría sale de la especie de la MADRE, el padre puede ser cualquier cosa
@@ -188,44 +304,15 @@ export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuand
   const { pokedex, encuentros } = datos;
   const regiones = new Set(regionesDisponibles);
 
-  const facilidad = (cand) => {
-    const p = pokedex[cand.especie];
-    const enc = (encuentros[cand.especie] ?? []).filter((e) => regiones.has(e.region));
-    if (!enc.length) return -Infinity; // no se puede capturar donde juega el usuario
-    let puntos = 0;
-    // Lo que se puede cazar con la hora y la estación que hay puestas pesa
-    // mucho: de poco vale la especie más común si sólo sale en invierno.
-    const ahora = enc.filter((e) => disponibleAhora(e, cuando));
-    if (!ahora.length) puntos -= 20;
-    else puntos += Math.min(ahora.length, 6);
-    for (const e of enc) {
-      const r = (e.rareza ?? '').toLowerCase();
-      if (r.includes('muy común') || r.includes('muy comun')) puntos += 10;
-      else if (r.includes('común') || r.includes('comun')) puntos += 8;
-      else if (r.includes('horda')) puntos += 6;
-      else if (r.includes('poco')) puntos += 3;
-      else if (r.includes('raro')) puntos += 1;
-      else puntos += 2;
-    }
-    puntos += Math.min(enc.length, 8);                       // muchos sitios = fácil
-    puntos += new Set(enc.map((e) => e.region)).size * 2;    // en varias regiones = flexible
-    // Los huecos de relleno necesitan macho Y hembra, así que un 50/50 vale más
-    // que un 87,5/12,5 aunque sea más común. Un sin género se salta esto: no
-    // tiene sexos, y exigírselos lo descartaba con -Infinity.
-    if (!sinGenero(p)) {
-      const min = Math.min(p.genero?.macho ?? 0, p.genero?.hembra ?? 0);
-      if (min <= 0) return -Infinity;
-      puntos += min / 5;
-    }
-    return puntos;
-  };
-
   // Con una especie sin género el Ditto SÍ entra: la pareja sólo puede ser su
   // propia línea evolutiva o un Ditto, y a veces el Ditto es lo fácil.
   const candidatos = padresCompatibles(especieObjetivo, pokedex, {
     incluirDitto: sinGenero(pokedex[especieObjetivo]),
   })
-    .map((c) => ({ ...c, facilidad: facilidad(c) }))
+    .map((c) => ({
+      ...c,
+      facilidad: facilidadDeCaptura(c.especie, datos, regionesDisponibles, cuando, { ambosSexos: true }),
+    }))
     .filter((c) => Number.isFinite(c.facilidad))
     .sort((a, b) => b.facilidad - a.facilidad);
 
@@ -246,6 +333,9 @@ export function cumple(ejemplar, nodo, datos, objetivo) {
   const p = pokedex[ejemplar.especie];
   if (!p) return { ok: false, motivo: `especie desconocida: ${ejemplar.especie}` };
   if (esEsteril(p)) return { ok: false, motivo: `${ejemplar.especie} no cría` };
+
+  if (nodo.especieFija && ejemplar.especie !== nodo.especieFija)
+    return { ok: false, motivo: `este hueco tiene que ser ${nodo.especieFija}`, especieIncompatible: true };
 
   const suyos = perfectos(ejemplar.ivs ?? {});
   const faltan = nodo.stats.filter((s) => !suyos.has(s));
@@ -329,8 +419,17 @@ function construir(nodoPedido, ctx, profundidad = 0) {
     // null = todavía sin decidir; se rellena en asignarSexos() una vez se sabe
     // qué ha puesto el inventario en cada hueco.
     sexoNecesario: nodoPedido.sexoNecesario ?? null,
+    // Sólo lo lleva el hueco del Ditto de una línea sin hembras.
+    especieFija: nodoPedido.especieFija ?? null,
     hijos: [],
   };
+
+  // Un Ditto no se puede criar de ninguna manera, así que su hueco nunca se
+  // abre en un cruce por muchos 31 que pida: se captura o se compra.
+  if (nodoPedido.hoja) {
+    nodo.tipo = 'conseguir';
+    return nodo;
+  }
 
   // Hoja: un solo IV a 31, o sólo la naturaleza. Eso se captura o se compra.
   // El inventario NO se consulta aquí: se empareja después, sobre el árbol
@@ -346,7 +445,7 @@ function construir(nodoPedido, ctx, profundidad = 0) {
   const orden = ordenarPorEscasez(nodo.stats, ctx.inventarioOriginal);
 
   if (nodo.naturaleza) {
-    const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.sinGeneroObjetivo);
+    const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.espina);
 
     // La naturaleza sólo la pasa la Piedraeterna, y ocupa el hueco de objeto de
     // quien la lleva: el cruce se queda con un solo Recio, así que sólo fuerza un
@@ -394,7 +493,7 @@ function construir(nodoPedido, ctx, profundidad = 0) {
       ? `${compartidos.map((s) => NOMBRE_STAT[s]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''} porque los dos padres lo tienen a 31, y el promedio de 31 y 31 es 31.`
       : 'No hay IVs compartidos: los dos forzados son todo el objetivo.');
 
-  const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.sinGeneroObjetivo);
+  const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.espina);
   nodo.hijos = [
     construir({ stats: [...compartidos, f1], naturaleza: false, objeto: RECIO_DE[f1], ...hijoA }, ctx, profundidad + 1),
     construir({ stats: [...compartidos, f2], naturaleza: false, objeto: RECIO_DE[f2], ...hijoB }, ctx, profundidad + 1),
@@ -413,18 +512,30 @@ function construir(nodoPedido, ctx, profundidad = 0) {
  * En un cruce libre los dos van sin sexo (null) y lo reparte asignarSexos()
  * después, respetando el de lo que haya colocado el inventario.
  */
-function restriccionesDeLosHijos(rolDelCruce, especieSinGenero = false) {
+function restriccionesDeLosHijos(rolDelCruce, espina) {
+  const enLaEspina = rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA;
+
   // Sin género no hay sexos que repartir: cada cruce es la especie con su misma
   // línea evolutiva o con un Ditto, y ninguno de los dos huecos pide sexo.
   // Pedir ♀ y ♂ aquí dejaba el plan con capturas imposibles (1 de cada 0).
-  if (especieSinGenero)
-    return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
+  if (espina.sexo === SEXOS.SIN_GENERO)
+    return enLaEspina
       ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.SIN_GENERO },
          { rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO }]
       : [{ rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO },
          { rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO }];
 
-  return rolDelCruce === ROL.RAIZ || rolDelCruce === ROL.ESPINA
+  // Una línea sin hembras (Nidoking, Tauros, Hitmonlee…) sólo pasa su especie
+  // con un macho y un Ditto. Y el Ditto no es un hueco libre cualquiera: no se
+  // puede criar, así que su rama no se abre en más cruces — va a captura o al
+  // GTL con los IVs ya puestos. Antes esto salía como «captura imposible».
+  if (espina.conDitto)
+    return [
+      { rol: ROL.ESPINA, sexoNecesario: SEXOS.MACHO },
+      { rol: ROL.LIBRE, sexoNecesario: SEXOS.SIN_GENERO, especieFija: DITTO, hoja: true },
+    ];
+
+  return enLaEspina
     ? [{ rol: ROL.ESPINA, sexoNecesario: SEXOS.HEMBRA }, { rol: ROL.LIBRE, sexoNecesario: SEXOS.MACHO }]
     : [{ rol: ROL.LIBRE, sexoNecesario: null }, { rol: ROL.LIBRE, sexoNecesario: null }];
 }
@@ -599,11 +710,14 @@ export function asignarInventario(arbol, ctx) {
  * se queda con el contrario; si ninguno viene del inventario, se reparte ♀/♂ por
  * defecto.
  */
-export function asignarSexos(arbol, objetivo, especieSinGenero = false) {
+export function asignarSexos(arbol, objetivo, espina = null) {
+  // Las líneas sin hembras van igual: la espina es macho y su pareja un Ditto,
+  // los dos decididos al construir el árbol.
+  const yaRepartidos = espina?.sexo === SEXOS.SIN_GENERO || espina?.conDitto === true;
   // Sin género: los huecos ya vienen marcados desde la construcción y no hay
   // ♀/♂ que repartir. Repartirlos pondría un sexo que la especie no tiene.
-  if (especieSinGenero) {
-    arbol.sexoNecesario = SEXOS.SIN_GENERO;
+  if (yaRepartidos) {
+    arbol.sexoNecesario = espina.sexo;
     return arbol;
   }
   arbol.sexoNecesario = objetivo.sexo ?? null;
@@ -705,6 +819,9 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     datos,
     objetivo,
     sinGeneroObjetivo: sinGenero(datos.pokedex[objetivo.especie]),
+    // Quién puede poner la especie, ya ordenado por lo fácil que es pillarlo
+    // donde el usuario juega. Decide el sexo de la espina y si hace falta Ditto.
+    espina: lineaMaterna(objetivo.especie, datos, regionesDisponibles, cuando),
     inventarioOriginal: inventario,
     // Copia: los padres se consumen, así que cada ejemplar se asigna a un hueco y
     // desaparece de la reserva.
@@ -734,10 +851,10 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   asignarInventario(crudo, ctx);
   if (extenderEspinaPorEspecie(crudo, ctx).alargada) asignarInventario(crudo, ctx);
 
-  const arbol = asignarSexos(crudo, objetivo, ctx.sinGeneroObjetivo);
+  const arbol = asignarSexos(crudo, objetivo, ctx.espina);
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
-  const pasos = aPasos(arbol, objetivo, datos, relleno);
+  const pasos = aPasos(arbol, objetivo, datos, relleno, ctx.espina);
 
   return {
     ok: true,
@@ -747,13 +864,14 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     relleno: relleno.slice(0, 8),
     sobrantes: ctx.inventarioLibre,
     medida: medirArbol(arbol),
+    espina: ctx.espina,
     movimientosDeHuevo: movsHuevo,
     ...validacion,
   };
 }
 
 /** Recorre el árbol en post-orden: los padres antes que sus crías, que es el orden real de juego. */
-export function aPasos(arbol, objetivo, datos, relleno = []) {
+export function aPasos(arbol, objetivo, datos, relleno = [], espina = null) {
   const pasos = [];
   const conseguir = [];
 
@@ -767,9 +885,16 @@ export function aPasos(arbol, objetivo, datos, relleno = []) {
 
     // Sólo la espina tiene la especie atada; un hueco libre se rellena con la
     // especie más fácil de conseguir del grupo huevo.
-    const especieSlot = nodo.rol === ROL.LIBRE
-      ? (relleno[0]?.especie ?? objetivo.especie)
-      : objetivo.especie;
+    // Sólo la espina tiene la especie atada, y «atada» quiere decir atada a la
+    // LÍNEA, no a la forma final: del huevo sale la base, así que un Staryu
+    // pone el mismo huevo que un Starmie. Se sugiere el más fácil de pillar.
+    const especieSlot = nodo.especieFija
+      ?? (nodo.rol === ROL.LIBRE
+        ? (relleno[0]?.especie ?? objetivo.especie)
+        : (espina?.sugerida ?? objetivo.especie));
+    const especiesValidas = nodo.especieFija ? [nodo.especieFija]
+      : nodo.rol === ROL.LIBRE ? null
+      : (espina?.especies ?? [objetivo.especie]);
 
     if (nodo.tipo === 'inventario') {
       pasos.push({
@@ -789,7 +914,12 @@ export function aPasos(arbol, objetivo, datos, relleno = []) {
         naturaleza: nodo.naturaleza ? objetivo.naturaleza : null,
         sexo: sexoNecesario,
         especieSugerida: especieSlot,
-        especieLibre: nodo.rol === ROL.LIBRE,
+        especieLibre: nodo.rol === ROL.LIBRE && !nodo.especieFija,
+        // Para la espina: cualquiera de estas pone la misma especie en el
+        // huevo. Null en un hueco libre, donde vale todo el grupo huevo.
+        especiesValidas,
+        // Un Ditto no se cría: este hueco se captura o se compra, punto.
+        noSeCria: !!nodo.especieFija,
         movimientos: nodo.movimientosNecesarios ?? [],
         rol: nodo.rol,
       };
@@ -800,7 +930,7 @@ export function aPasos(arbol, objetivo, datos, relleno = []) {
         texto: `Consigue ${etiqueta(nodo, objetivo)}${sexoNecesario ? ` ${sexoNecesario}` : ''}` +
           (req.especieLibre
             ? ` — cualquier especie del grupo huevo sirve (sugerido: ${especieSlot})`
-            : ` de ${especieSlot}`) +
+            : ` de ${especieSlot}${(especiesValidas?.length ?? 0) > 1 ? ' (o cualquiera de su línea)' : ''}`) +
           (req.movimientos.length ? ` · tiene que saber ${req.movimientos.join(' y ')}` : ''),
         requisito: req,
       });

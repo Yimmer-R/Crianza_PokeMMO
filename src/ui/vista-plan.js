@@ -227,7 +227,10 @@ function bloqueAhora(plan, objetivo, datos) {
                 (f.naturaleza ? `${f.stats.length ? ' + ' : ''}naturaleza ${f.naturaleza}` : '') +
                 ((f.movimientos ?? []).length ? ` · con ${f.movimientos.join(', ')}` : ''),
               f.sexo ?? 'cualquiera',
-              f.especieLibre ? chip(`libre — p. ej. ${f.especieSugerida}`, 'si') : f.especieSugerida,
+              f.especieLibre ? chip(`libre — p. ej. ${f.especieSugerida}`, 'si')
+                : (f.especiesValidas?.length ?? 0) > 1
+                  ? chip(`${f.especieSugerida} o su línea`, 'ojo')
+                  : f.especieSugerida,
               el('button.boton.mini.secundario', {
                 onclick: () => alFormularioDesde(f, datos),
               }, ['Ya lo tengo']),
@@ -236,7 +239,9 @@ function bloqueAhora(plan, objetivo, datos) {
           ),
           el('p.nota', {}, [
             '«Libre» quiere decir que vale cualquier especie que comparta grupo huevo: sólo la ',
-            'madre de la cadena tiene la especie atada, porque la cría sale de ella.',
+            'madre de la cadena tiene la especie atada, porque la cría sale de ella. Y «atada» es ',
+            'a la LÍNEA evolutiva, no a la forma final: del huevo sale la base, así que vale ',
+            'cualquiera de la línea — se sugiere el más fácil de pillar.',
           ]),
         ])
       : null,

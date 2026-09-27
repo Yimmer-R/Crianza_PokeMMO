@@ -6,7 +6,7 @@ import { bloque, prueba, igual, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
 import {
   planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
-  movimientosSoloDeHuevo, medirArbol, criaDe, ROL,
+  movimientosSoloDeHuevo, medirArbol, criaDe, ROL, lineaMaterna,
 } from '../src/nucleo/planificador.js';
 import { ivsGarantizados, naturalezaGarantizada, perfectos } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
@@ -708,5 +708,65 @@ bloque('planificador: un objetivo sin género', () => {
     const pres = presupuestar(plan, datos);
     igual(pres.pagosSexo, []);
     falso(pres.lineas.some((l) => /sexo/i.test(l.concepto)));
+  });
+});
+
+bloque('la espina acepta la línea entera, y lo dice cuando no hay hembras', () => {
+  const objetivoDeEspecie = (especie, extra = {}) => ({
+    especie, ivs: ivs({ ps: 31, ataque: 31, velocidad: 31 }), evs: {}, movimientos: [], ...extra,
+  });
+
+  prueba('para un Starmie se propone un Staryu: pone el mismo huevo y es más común', () => {
+    const l = lineaMaterna('Starmie', datos, REGIONES);
+    igual(l.sugerida, 'Staryu');
+    igual(l.especies.sort(), ['Starmie', 'Staryu']);
+  });
+
+  prueba('sin la región del objetivo, la espina tira de otro de la línea', () => {
+    // Starmie no aparece en Unova y Staryu sí. Antes esto salía como
+    // «ninguna especie compatible: toca el GTL».
+    igual(lineaMaterna('Starmie', datos, ['Unova']).sugerida, 'Staryu');
+    const plan = planear(objetivoDeEspecie('Starmie'), datos, { regionesDisponibles: ['Unova'] });
+    cierto(plan.ok);
+    for (const c of planDeCapturas(plan, datos, ['Unova'], plan.objetivo))
+      falso(c.soloGtl, `hueco sin salida: ${JSON.stringify(c.requisito.stats)}`);
+  });
+
+  prueba('ninguna captura de un sin género sale imposible', () => {
+    const plan = planear(objetivoDeEspecie('Starmie'), datos, { regionesDisponibles: REGIONES });
+    for (const c of planDeCapturas(plan, datos, REGIONES, plan.objetivo))
+      cierto(Number.isFinite(c.recomendada?.intentos), JSON.stringify(c.requisito));
+  });
+
+  prueba('Nidoking: la espina es macho, la pareja un Ditto, y ninguna imposible', () => {
+    const plan = planear(objetivoDeEspecie('Nidoking'), datos, { regionesDisponibles: REGIONES });
+    cierto(plan.ok);
+    cierto(plan.espina.conDitto);
+    cierto(plan.avisos.some((a) => /no hay hembras/.test(a)), plan.avisos.join(' | '));
+
+    const huecos = plan.pasos.conseguir;
+    cierto(huecos.some((r) => r.sexo === SEXOS.MACHO), 'la espina va a macho');
+    falso(huecos.some((r) => r.sexo === SEXOS.HEMBRA), 'no puede pedir ninguna hembra');
+    cierto(huecos.some((r) => r.especieSugerida === 'Ditto' && r.noSeCria), 'falta el Ditto');
+
+    for (const c of planDeCapturas(plan, datos, REGIONES, plan.objetivo))
+      cierto(Number.isFinite(c.recomendada?.intentos), `captura imposible: ${JSON.stringify(c.requisito)}`);
+  });
+
+  prueba('el hueco del Ditto no se abre en más cruces: un Ditto no se cría', () => {
+    const plan = planear(objetivoDeEspecie('Nidoking'), datos, { regionesDisponibles: REGIONES });
+    for (const n of nodos(plan.arbol))
+      if (n.especieFija === 'Ditto') igual(n.tipo, 'conseguir', 'el Ditto no puede ser un cruce');
+  });
+
+  prueba('un bebé de la línea vale de captura, avisando de que hay que evolucionarlo', () => {
+    const plan = planear(objetivoDeEspecie('Raichu'), datos, { regionesDisponibles: REGIONES });
+    const espina = planDeCapturas(plan, datos, REGIONES, plan.objetivo)
+      .find((c) => !c.requisito.especieLibre);
+    const pichu = espina.viables.find((v) => v.especie === 'Pichu');
+    cierto(pichu, 'Pichu debería salir entre las que valen');
+    cierto(pichu.noCria && pichu.evolucionar?.especie === 'Pikachu');
+    falso(espina.recomendada.noCria, 'con todo igual se recomienda el que ya cría');
+    cierto(plan.avisos.some((a) => /Pichu.*evolucionarlo/.test(a)), plan.avisos.join(' | '));
   });
 });

@@ -132,6 +132,34 @@ Un **Ditto** rompe la regla en el buen sentido: cría con cualquiera y la especi
 sale del otro padre, así que permite usar un **macho** de la especie objetivo como
 línea materna. También es la única forma de criar una especie sin género.
 
+### «De la especie» quiere decir *de la línea*, no de la forma final
+
+El huevo eclosiona en la **forma base**. Un Staryu y un Starmie ponen exactamente
+el mismo huevo, así que para la espina da igual cuál captures: lo que cambia es
+lo que cuesta encontrarlo. La app lo tenía atado a la forma final y pedía un
+Starmie («Señuelo», 13 sitios) pudiendo pedir un Staryu («Común», 33 sitios); y
+si la forma final no aparecía en las regiones del jugador —Starmie no está en
+Unova— el hueco salía como **captura imposible** teniendo la línea a mano.
+
+`quienPoneLaEspecie()` devuelve quién puede ocupar ese hueco y `lineaMaterna()`
+los ordena por lo fácil que es pillarlos donde el jugador juega. Tres casos:
+
+| La línea | Quién pone la especie | Qué dice la app |
+|---|---|---|
+| lo normal | cualquier **hembra** de la línea | propone la más fácil, y lista las demás |
+| **sin género** | cualquiera de la línea, sin sexo | la pareja es su línea o un Ditto |
+| **sin ninguna hembra** | un **macho** + un **Ditto** | y el Ditto hay que capturarlo o comprarlo |
+
+Son siete líneas sin hembras (Nidoran♂, Tauros, Rufflet, Throh, Sawk, Volbeat y
+la de Tyrogue) y hasta ahora las siete salían como captura imposible. La regla
+de Ditto no es un adorno: **un Ditto no se puede criar**, así que su hueco no se
+abre en más cruces —es una hoja, sí o sí— y por eso una línea sin hembras sale
+cara de verdad.
+
+Y 18 bebés (Pichu, Tyrogue, Riolu, Igglybuff…) están en el grupo «No cría»: se
+capturan igual de bien, pero hay que **evolucionarlos** antes de cruzarlos, y
+eso lo dice `comoLlegaACriar()` con la condición concreta de cada uno.
+
 ### Una hembra que sólo aporta la especie alarga la espina
 
 Si la especie objetivo es difícil de encontrar, la hoja de abajo de la espina es
@@ -154,9 +182,10 @@ requisito, porque sólo hay un objeto útil en ese cruce (el de la madre no
 forzaría nada: ella no tiene ningún 31). Al hueco de abajo de la espina siempre
 le falta exactamente uno —un 31, o la naturaleza—, así que siempre cabe.
 
-`extenderEspinaPorEspecie()` lo hace **antes** de colocar el inventario, y sólo
-si en el inventario hay de verdad una hembra así que si no se quedaría sin usar:
-en vacío sería un cruce regalado.
+`extenderEspinaPorEspecie()` lo hace **después** de colocar el inventario, y sólo
+si ha sobrado una hembra así. Al revés, una hembra de la especie que además
+traía la naturaleza o un 31 se gastaba como «madre que sólo pone la especie» y
+se tiraba lo bueno que tenía; y en vacío sería un cruce regalado.
 
 ## Emparejar el inventario
 

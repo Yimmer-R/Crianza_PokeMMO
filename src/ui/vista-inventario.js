@@ -78,7 +78,10 @@ function bloqueFaltan(plan) {
             (f.stats.length ? `31 en ${f.stats.map((s) => NOMBRE_STAT[s]).join(' + ')}` : '') +
               (f.naturaleza ? `${f.stats.length ? ' + ' : ''}naturaleza ${f.naturaleza}` : ''),
             f.sexo ?? 'cualquiera',
-            f.especieLibre ? chip('cualquiera del grupo huevo', 'si') : f.especieSugerida,
+            f.especieLibre ? chip('cualquiera del grupo huevo', 'si')
+              : (f.especiesValidas?.length ?? 0) > 1
+                ? chip(`${f.especieSugerida} o su línea`, 'ojo')
+                : f.especieSugerida,
             (f.movimientos ?? []).length ? chip(f.movimientos.join(', '), 'ojo') : '—',
           ]),
           [0],
