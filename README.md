@@ -154,6 +154,15 @@ los demás al lado. De ahí salen dos avisos que antes no estaban:
   comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
   imposible», que es lo que hacía.
 
+**El plan no se queda en una sola forma de criar.** La Piedraeterna la puede
+llevar la madre o el padre, y eso cambia el árbol entero: el que NO la lleva es
+el que tiene que traer todos los IVs. Partiendo de cero conviene en el padre
+(así la cadena de naturaleza acepta cualquier especie); en cuanto tienes un
+macho cargado de 31, conviene en la madre, porque entonces ese macho entra tal
+cual en el cruce final. Así que el plan se monta de las tres formas y se queda
+con la que menos capturas pida **contra tu inventario**. En un caso real eso
+pasó de 5 cruces y 1 captura a 3 cruces y 0 capturas.
+
 **Si lo único que falla es el sexo.** El sexo de un Pokémon no se cambia, pero
 el de una cría sí: se paga en la guardería. Así que un «1×31 en Velocidad ♀»
 que no puedes cubrir se convierte en un cruce entre el ♂ que sí tiene ese 31
@@ -185,6 +194,14 @@ Que no se pierda ninguna letra no se deja al ojo: la prueba de navegador mide el
 contraste real de los ~760 elementos con texto de las cinco vistas y exige el
 mínimo de la WCAG. Dos colores de la paleta se aclararon precisamente por eso, y
 está anotado cuáles y por qué.
+
+**Cada objeto dice para qué es, y cuánto cuesta en PB.** «Franja Recia» a secas
+no dice nada en la tienda, así que el presupuesto pone «Franja Recia
+(Velocidad)», «Piedraeterna (Naturaleza)». Y al lado, la vía sin dinero: los
+seis Recios se venden a 750 BP en la Torre Batalla de Kanto. La Piedraeterna no
+tiene precio en PB, y elegir el sexo de la cría tampoco —es un servicio de la
+guardería, no un objeto—, así que sus líneas lo dicen en vez de quedarse en
+blanco.
 
 **Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme, y al
 lado compara con el precio de mercado observado cuando lo hay. Con un caso

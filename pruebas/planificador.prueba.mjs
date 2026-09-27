@@ -7,7 +7,7 @@ import { datos, ivs } from './datos-de-prueba.mjs';
 import {
   planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
   movimientosSoloDeHuevo, medirArbol, criaDe, ROL, lineaMaterna, ivsDelArbol,
-  extenderPorSexo,
+  extenderPorSexo, comparaPlanes, MODOS_PIEDRA,
 } from '../src/nucleo/planificador.js';
 import { ivsGarantizados, naturalezaGarantizada, perfectos, IV_PSEUDO } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
@@ -893,30 +893,47 @@ bloque('cuando lo único que falla es el sexo, se cruza en vez de capturar', () 
 
   prueba('el 2×31 del sexo contrario entra en el plan', () => {
     cierto(usados.includes('horsea'), `usados: ${usados.join(', ')}`);
-    igual(plan.sobrantes.map((e) => e.id), [], 'no debería sobrar nadie');
+    // Sobra un Magikarp porque con el Horsea dentro ya no hace falta: eso es
+    // que el plan aprovecha lo bueno, no que se le olvide nada.
+    falso(plan.sobrantes.some((e) => e.id === 'horsea'));
   });
 
-  prueba('y la captura que quedaba deja de pedir IVs', () => {
-    igual(plan.pasos.conseguir.length, 1);
-    const [req] = plan.pasos.conseguir;
-    igual(req.stats, [], 'una captura sin IVs es 1 de cada 2, no 1 de cada 64');
-    igual(req.naturaleza, null);
-    cierto(req.especieLibre);
+  prueba('y con eso no queda ni una captura', () => {
+    // Con la Piedraeterna en la madre, el Horsea entra tal cual en el cruce
+    // final: 3 cruces y 0 capturas, que es la cadena que describió el usuario.
+    igual(plan.pasos.conseguir.length, 0, 'no debería quedar nada que capturar');
+    igual(contar(plan.arbol).cruces, 3);
+    igual(plan.modoPiedra, 'raiz');
   });
 
-  prueba('el árbol sigue siendo sólido y el cruce nuevo paga el sexo', () => {
+  prueba('el árbol sigue siendo sólido y los sexos se pagan', () => {
     arbolSolido(plan.arbol);
-    let nuevo = null;
-    (function r(n) { if (n.alargadaPorSexo) nuevo = n; n.hijos.forEach(r); })(plan.arbol);
-    cierto(nuevo, 'tiene que haber un cruce marcado como alargado por sexo');
-    igual(nuevo.sexoNecesario, SEXOS.HEMBRA, 'la cría tiene que salir del sexo que pedía el hueco');
-    // El Recio va en el que trae el 31, que es el único que puede forzarlo.
-    const [madre, padre] = nuevo.hijos;
+    const pres = presupuestar(plan, datos);
+    cierto(pres.pagosSexo.length >= 1);
+  });
+
+  prueba('el cruce que monta extenderPorSexo pone el Recio en el que trae el 31', () => {
+    // Sobre un hueco a mano, porque en el plan de arriba ya no hace falta.
+    const ctx = {
+      datos,
+      objetivo: objetivoGarchomp,
+      inventarioLibre: [{ ...inventarioDelUsuario[4] }],
+    };
+    const hueco = {
+      id: 'x1', tipo: 'conseguir', stats: ['velocidad'], naturaleza: false,
+      rol: ROL.LIBRE, profundidad: 1, sexoNecesario: SEXOS.HEMBRA, hijos: [],
+    };
+    const raiz = {
+      id: 'r', tipo: 'cruce', stats: ['velocidad'], naturaleza: false, rol: ROL.LIBRE,
+      profundidad: 0, objetos: {}, hijos: [hueco],
+    };
+    cierto(extenderPorSexo(raiz, ctx).alargada);
+    cierto(hueco.alargadaPorSexo);
+    igual(hueco.sexoNecesario, SEXOS.HEMBRA, 'la cría sale del sexo que pedía el hueco');
+    const [madre, padre] = hueco.hijos;
     igual(madre.objeto ?? null, null);
     igual(padre.objeto, 'Franja Recia');
     igual(padre.sexoNecesario, SEXOS.MACHO);
-    const pres = presupuestar(plan, datos);
-    cierto(pres.pagosSexo.length >= 1);
   });
 
   prueba('no se monta el truco si no sobra nadie', () => {
@@ -945,5 +962,55 @@ bloque('cuando lo único que falla es el sexo, se cruza en vez de capturar', () 
     extenderPorSexo(raiz, ctx);
     const montados = raiz.hijos.filter((h) => h.alargadaPorSexo).length;
     igual(montados, 1, 'con un solo sobrante sólo puede montarse un cruce');
+  });
+});
+
+bloque('el plan no se queda estancado en una forma de criar', () => {
+  const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+  const objetivoConNaturaleza = {
+    especie: 'Larvitar', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {},
+    movimientos: [], naturaleza: 'Agitada', sexo: null,
+  };
+
+  prueba('partiendo de cero, la Piedraeterna va en el padre', () => {
+    // Sin inventario, la cadena de naturaleza tiene que ser de especie LIBRE:
+    // sus capturas son mucho más fáciles que las de la espina.
+    const plan = planear(objetivoConNaturaleza, datos, { regionesDisponibles: REGIONES });
+    igual(plan.modoPiedra, 'padre');
+    falso(plan.arbol.piedraEnLaMadre);
+  });
+
+  prueba('con un macho cargado de 31, la pone en la madre y se ahorra su rama', () => {
+    const conMacho = [{
+      id: 'crack', especie: 'Slowpoke', sexo: SEXOS.MACHO, naturaleza: 'Afable',
+      ivs: { ...cero, ataque: 31, velocidad: 31 }, evs: {}, movimientos: [],
+    }];
+    const conEl = planear(objetivoConNaturaleza, datos, {
+      inventario: conMacho, regionesDisponibles: REGIONES,
+    });
+    const sinEl = planear(objetivoConNaturaleza, datos, { regionesDisponibles: REGIONES });
+    cierto(conEl.pasos.conseguir.length < sinEl.pasos.conseguir.length,
+      `con el macho ${conEl.pasos.conseguir.length} capturas, sin él ${sinEl.pasos.conseguir.length}`);
+    const usados = [];
+    (function r(n) { if (n.tipo === 'inventario') usados.push(n.ejemplar.id); n.hijos.forEach(r); })(conEl.arbol);
+    igual(usados, ['crack']);
+    arbolSolido(conEl.arbol);
+  });
+
+  prueba('sin naturaleza no hay nada que repartir y no se prueba tres veces', () => {
+    const plan = planear(
+      { especie: 'Larvitar', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {}, movimientos: [] },
+      datos, { regionesDisponibles: REGIONES },
+    );
+    igual(plan.modoPiedra, 'padre');
+  });
+
+  prueba('gana el que menos capturas pide, y a igualdad el de menos cruces', () => {
+    const peor = { pasos: { conseguir: [1, 2] }, arbol: { tipo: 'conseguir', hijos: [] }, ivsCortos: [], sobrantes: [] };
+    const mejor = { pasos: { conseguir: [1] }, arbol: { tipo: 'conseguir', hijos: [] }, ivsCortos: [], sobrantes: [] };
+    igual([peor, mejor].sort(comparaPlanes)[0], mejor);
+    // Un plan que entrega un 30 donde se pidió un 31 pierde aunque ahorre capturas.
+    const conTreinta = { ...mejor, ivsCortos: ['ataque'] };
+    igual([conTreinta, peor].sort(comparaPlanes)[0], peor);
   });
 });

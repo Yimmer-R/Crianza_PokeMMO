@@ -30,9 +30,12 @@ que ya no existen; si ves rastros de eso en algún sitio, es código viejo.
 
 Dos cosas más de la Piedraeterna. **Ocupa el hueco de objeto**, así que un cruce
 que prometa naturaleza sólo fuerza **un** IV con Recio en vez de dos, y la hoja
-de sólo naturaleza entra por abajo de la espina. Y **no se vende en ninguna
-tienda**, por mucho que el volcado la dé a 4.000 en las cinco guarderías: se
-farmea a Pokémon salvajes o se compra en el GTL, así que el presupuesto usa un
+de sólo naturaleza entra por abajo de la espina. Y **quién la lleva ya no es una
+decisión fija**: `planear()` monta el árbol con las tres formas de repartirla
+(`MODOS_PIEDRA`) y se queda con la que menos pida contra tu inventario — ver el
+punto 12 de más abajo. Y **no se vende en ninguna tienda**, por mucho que el
+volcado la dé a 4.000 en las cinco guarderías: se farmea a Pokémon salvajes o se
+compra en el GTL, así que el presupuesto usa un
 precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 `constantes.js`).
 
@@ -68,7 +71,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Once cosas que no son evidentes leyendo un archivo suelto:
+Trece cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -137,6 +140,23 @@ Once cosas que no son evidentes leyendo un archivo suelto:
    Inventario). Un 2×31 en la caja mientras el plan pide capturas parece un
    fallo del plan aunque el motivo sea bueno; callárselo fue exactamente el
    reporte del usuario.
+12. **La Piedraeterna se reparte probando, no por norma.** En el padre, la
+   cadena de naturaleza cuelga de un hueco libre (cualquier especie, cualquier
+   sexo) y es lo mejor partiendo de cero. En la madre, esa cadena cae en la
+   espina, pero entonces **el padre es el que carga con todos los IVs** — y eso
+   es lo mejor en cuanto tienes un macho del inventario cargado de 31: entra tal
+   cual en el cruce final y te ahorra su rama entera. Así que `planear()` monta
+   el árbol tres veces (`padre`, `raiz`, `madre`), lo puntúa con
+   `comparaPlanes()` —primero los IVs que se quedan cortos, luego las capturas,
+   luego los cruces— y devuelve el mejor. Con el inventario del usuario (un
+   Horsea ♂ 2×31) eso pasó de 5 cruces y 1 captura a **3 cruces y 0 capturas**.
+   Si vuelves a fijar el reparto, el plan se queda estancado otra vez.
+13. **El presupuesto trae la vía sin dinero.** Cada objeto lleva para qué es
+   (`paraQueEs()`: «Franja Recia (Velocidad)», «Piedraeterna (Naturaleza)») y su
+   precio en Puntos de Batalla (`precioEnPb()`), que para los seis Recios son
+   750 BP en la Torre Batalla de Kanto. La Piedraeterna **no** tiene precio en
+   PB y elegir el sexo de la cría tampoco —es un servicio, no un objeto—, y eso
+   se dice en su línea en vez de dejarla en blanco (`pres.pbNoCubre`).
 
 ## El aspecto
 
@@ -234,7 +254,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 241 pruebas unitarias
+node pruebas/ejecutar.mjs             # 249 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

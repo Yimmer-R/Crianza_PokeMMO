@@ -3,7 +3,7 @@
 import { bloque, prueba, igual, cerca, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
 import { planear } from '../src/nucleo/planificador.js';
-import { presupuestar, parsearPrecio, precioEnYen } from '../src/nucleo/coste.js';
+import { presupuestar, parsearPrecio, precioEnYen, precioEnPb, paraQueEs } from '../src/nucleo/coste.js';
 import {
   planearEvs, validarEvs, VITAMINA_DE, BAYA_DE,
   puntosPorEvs, escalonInferior, escalonSiguiente, optimizarEvs,
@@ -19,6 +19,45 @@ const objetivoLarvitar = {
   ivs: ivs({ ps: 31, ataque: 31, defensa: 31, velocidad: 31 }),
   evs: {}, movimientos: [], naturaleza: null,
 };
+
+bloque('coste: la vía sin dinero y para qué es cada objeto', () => {
+  prueba('cada objeto de crianza dice qué IV fuerza, y la Piedraeterna la naturaleza', () => {
+    igual(paraQueEs('Franja Recia'), 'Velocidad');
+    igual(paraQueEs('Brazal Recio'), 'Ataque');
+    igual(paraQueEs('Pesa Recia'), 'PS');
+    igual(paraQueEs('Piedraeterna'), 'Naturaleza');
+    igual(paraQueEs('Proteína'), null, 'una vitamina no fuerza ningún IV');
+  });
+
+  prueba('los seis Recios se venden por PB, y la Piedraeterna no', () => {
+    for (const recio of ['Pesa Recia', 'Brazal Recio', 'Cinto Recio', 'Lente Recia', 'Banda Recia', 'Franja Recia']) {
+      const pb = precioEnPb(recio, datos.objetos);
+      cierto(pb, `${recio} debería tener precio en PB`);
+      igual(pb.cantidad, 750, recio);
+    }
+    igual(precioEnPb('Piedraeterna', datos.objetos), null);
+  });
+
+  prueba('el presupuesto suma los PB y dice qué no se puede pagar con ellos', () => {
+    const plan = planear(
+      { ...objetivoLarvitar, naturaleza: 'Agitada' },
+      datos, { regionesDisponibles: TODAS },
+    );
+    const pres = presupuestar(plan, datos);
+    cierto(pres.totalPb > 0, 'los Recios se pagan en PB');
+    // 750 BP cada Recio: el total tiene que ser múltiplo exacto.
+    igual(pres.totalPb % 750, 0, `totalPb ${pres.totalPb}`);
+    cierto(pres.pbNoCubre.includes('Piedraeterna'));
+    cierto(pres.pbNoCubre.includes('elegir el sexo de la cría'));
+    // Y cada línea de objeto trae su «para qué».
+    const franja = pres.lineas.find((l) => l.concepto === 'Franja Recia');
+    if (franja) {
+      igual(franja.para, 'Velocidad');
+      igual(franja.pbUnidad, 750);
+      cierto(/Trainer Tower/.test(franja.pbDonde), franja.pbDonde);
+    }
+  });
+});
 
 bloque('coste: precios', () => {
   prueba('parsea los formatos de precio que trae la wiki', () => {

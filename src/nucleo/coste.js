@@ -11,6 +11,8 @@ import {
 } from './constantes.js';
 import { costeElegirSexo } from './compatibilidad.js';
 import { ROL } from './planificador.js';
+import { statQueFuerza, PIEDRAETERNA } from './herencia.js';
+import { NOMBRE_STAT } from './constantes.js';
 
 /** "10000 PokéYen" -> {cantidad: 10000, moneda: 'PokéYen'} · "1,000 RP" -> 1000 RP */
 export function parsearPrecio(texto) {
@@ -71,6 +73,41 @@ export function precioEnYen(nombre, objetos) {
 }
 
 /**
+ * Para qué sirve un objeto de crianza, en una palabra.
+ *
+ * Los seis Recios fuerzan un IV cada uno y la Piedraeterna pasa la naturaleza,
+ * y a la hora de comprar en la tienda eso es lo único que hay que saber: cuál
+ * es cuál. «Franja Recia» a secas no dice nada; «Franja Recia (Velocidad)», sí.
+ */
+export function paraQueEs(nombre) {
+  if (nombre === PIEDRAETERNA) return 'Naturaleza';
+  const stat = statQueFuerza(nombre);
+  return stat ? NOMBRE_STAT[stat] : null;
+}
+
+/**
+ * Precio en Puntos de Batalla, si la wiki trae uno.
+ *
+ * Los seis Recios se venden a 750 BP en la Torre Batalla de Kanto, y ésa es la
+ * vía sin PokéYen: los PB salen de combatir, no de vender. La Piedraeterna NO
+ * tiene precio en PB en ninguna parte (y además no se vende en tienda), y
+ * elegir el sexo de la cría es un servicio de la guardería, no un objeto: eso
+ * se paga en PokéYen y no hay alternativa.
+ */
+export function precioEnPb(nombre, objetos) {
+  for (const grupo of Object.values(objetos)) {
+    const ficha = grupo?.[nombre];
+    if (!ficha) continue;
+    const enPb = (ficha.compra ?? [])
+      .map((c) => ({ ...c, p: parsearPrecio(c.precio) }))
+      .filter((c) => c.p && /^bp$/i.test(c.p.moneda))
+      .sort((a, b) => a.p.cantidad - b.p.cantidad)[0];
+    if (enPb) return { cantidad: enPb.p.cantidad, moneda: 'BP', donde: enPb.sitio, region: enPb.region };
+  }
+  return null;
+}
+
+/**
  * Presupuesto del plan.
  *
  * Lo que entra en el total: los objetos de crianza (uno por padre y cruce, y se
@@ -85,6 +122,8 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
   const lineas = [];
   const objetosUsados = new Map();
   let yen = 0;
+  let totalPb = 0;
+  const sinPb = new Set();
   const otrasMonedas = new Map();
   let hayEstimados = false;
 
@@ -99,9 +138,17 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
     if (ES_YEN(precio.moneda)) yen += total;
     else otrasMonedas.set(precio.moneda, (otrasMonedas.get(precio.moneda) ?? 0) + total);
     if (precio.fuente === 'respaldo') hayEstimados = true;
+    const pb = precioEnPb(nombre, objetos);
+    if (pb) totalPb += pb.cantidad * cuantos;
+    else sinPb.add(nombre);
     lineas.push({
       concepto: nombre, cuantos, precioUnidad: precio.cantidad, moneda: precio.moneda,
       coste: total, donde: precio.donde, fuente: precio.fuente,
+      // Para qué es el objeto y cuánto costaría en PB, que es la vía sin dinero.
+      para: paraQueEs(nombre),
+      pbUnidad: pb?.cantidad ?? null,
+      pb: pb ? pb.cantidad * cuantos : null,
+      pbDonde: pb ? `${pb.donde} (${pb.region})` : null,
     });
   };
 
@@ -176,6 +223,14 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
     objetosUsados: [...objetosUsados].map(([nombre, cuantos]) => ({ nombre, cuantos })),
     pagosSexo,
     hayEstimados,
+    // La vía sin dinero: lo que costarían en Puntos de Batalla los objetos que
+    // se venden por PB. No es un total alternativo de todo el plan —hay cosas
+    // que en PB no se pueden pagar— y `pbNoCubre` dice exactamente cuáles.
+    totalPb,
+    pbNoCubre: [
+      ...[...sinPb],
+      ...(pagosSexo.length ? ['elegir el sexo de la cría'] : []),
+    ],
     sinPrecio: {
       padres: padresQueComprar,
       nota: `Los ${padresQueComprar} padres de partida no van en el total: o los capturas (gratis, ` +

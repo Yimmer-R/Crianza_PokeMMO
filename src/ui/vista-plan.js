@@ -123,18 +123,33 @@ export function vistaPlan(datos) {
       ? el('p.nota', { texto: `Alternativa en otras monedas: ${pres.otrasMonedas.map((m) => `${numero(m.cantidad)} ${m.moneda}`).join(' · ')}` })
       : null,
     tabla(
-      ['Concepto', 'Cantidad', 'Unidad', 'Total', 'Fuente'],
+      ['Concepto', 'Para qué', 'Cantidad', 'Unidad', 'Total', 'En PB', 'Fuente'],
       pres.lineas.map((l) => [
         l.concepto,
+        // Cuál es cuál: en la tienda «Franja Recia» a secas no dice nada.
+        l.para ?? '—',
         numero(l.cuantos),
         l.precioUnidad != null ? `${numero(l.precioUnidad)} ${l.moneda}` : (l.nota ?? '—'),
         l.coste != null ? numero(l.coste) : '—',
+        // La vía sin dinero. Lo que no se puede pagar en PB se dice, no se deja
+        // en blanco: la Piedraeterna y el pago del sexo no tienen precio en PB.
+        l.pb != null ? `${numero(l.pb)} BP` : chip('no se paga en PB', 'ojo'),
         l.fuente === 'wiki' ? chip('wiki', 'bien')
           : l.fuente === 'estimado' ? chip('estimado', 'ojo')
           : l.fuente === 'respaldo' ? chip('respaldo', 'ojo') : '—',
       ]),
-      [1, 3],
+      [2, 4],
     ),
+    pres.totalPb
+      ? el('p.nota', {}, [
+          el('strong', { texto: `${numero(pres.totalPb)} BP` }),
+          ' es lo que costarían en Puntos de Batalla los objetos que se venden por PB ',
+          `(los Recios, a 750 BP en la ${pres.lineas.find((l) => l.pbDonde)?.pbDonde ?? 'Torre Batalla'}). `,
+          pres.pbNoCubre.length
+            ? `Lo que NO se puede pagar en PB: ${pres.pbNoCubre.join(', ')} — eso va en PokéYen y no hay alternativa.`
+            : '',
+        ])
+      : null,
     pres.hayEstimados
       ? aviso('Hay líneas estimadas. La wiki sólo publica los extremos del pago por sexo (5.000 y 25.000); los tramos de en medio no están en ninguna fuente.')
       : null,

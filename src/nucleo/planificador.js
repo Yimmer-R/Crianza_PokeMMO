@@ -426,6 +426,23 @@ function ordenarPorEscasez(stats, inventario) {
   return [...stats].sort((a, b) => disponibles(a) - disponibles(b) || STATS.indexOf(a) - STATS.indexOf(b));
 }
 
+/**
+ * Las tres formas de repartir la Piedraeterna que se prueban.
+ *
+ * `padre` es la de siempre (la cadena de naturaleza va libre). `raiz` la pone
+ * en la madre SÓLO en el cruce final, que es donde entra un macho del
+ * inventario con todos los 31. `madre` la pone en la madre en toda la cadena.
+ */
+export const MODOS_PIEDRA = ['padre', 'raiz', 'madre'];
+
+/** ¿Lleva la madre la Piedraeterna en este cruce, según el modo del plan? */
+function piedraEnLaMadre(nodo, ctx) {
+  const modo = ctx.modoPiedra ?? 'padre';
+  if (modo === 'madre') return true;
+  if (modo === 'raiz') return nodo.rol === ROL.RAIZ;
+  return false;
+}
+
 function construir(nodoPedido, ctx, profundidad = 0) {
   const nodo = {
     id: nuevoId(),
@@ -475,26 +492,46 @@ function construir(nodoPedido, ctx, profundidad = 0) {
     const resto = nodo.stats.filter((st) => st !== forzado);
 
     nodo.tipo = 'cruce';
-    // La Piedraeterna la lleva el PADRE, no la madre, y esto no es un detalle.
-    // Da igual quién la lleve —pasa la naturaleza de quien la tenga puesta—,
-    // pero el hueco de la madre es el de la espina: especie objetivo y hembra.
-    // Colgando de ahí la cadena de naturaleza, todos sus huecos quedaban atados
-    // a la especie y ningún Pokémon del inventario con la naturaleza buena
-    // entraba en ellos. Con la Piedraeterna en el padre, la cadena entera de
-    // naturaleza es LIBRE: cualquier especie del grupo huevo, cualquier sexo.
-    nodo.objetos = { madre: RECIO_DE[forzado], padre: PIEDRAETERNA };
+    // ¿Quién lleva la Piedraeterna, la madre o el padre? Da igual para la
+    // mecánica —pasa la naturaleza de quien la tenga puesta— pero cambia el
+    // árbol entero, y no hay una respuesta buena siempre:
+    //
+    //   - en el PADRE, la cadena de naturaleza cuelga de un hueco LIBRE:
+    //     cualquier especie, cualquier sexo. Es lo mejor partiendo de cero,
+    //     porque las capturas de esa rama son fáciles;
+    //   - en la MADRE, la cadena de naturaleza cae en la espina (especie
+    //     objetivo, hembra), pero entonces el PADRE es el que tiene que traer
+    //     todos los IVs. Y eso es lo mejor cuando ya tienes un macho cargado de
+    //     31 de cualquier especie: entra tal cual y te ahorra su rama entera.
+    //
+    // Así que no se elige a ciegas: `planear()` monta el árbol de las dos
+    // formas y se queda con la que menos capturas pida contra tu inventario.
+    // Ver planear() y `MODOS_PIEDRA`.
+    const enLaMadre = piedraEnLaMadre(nodo, ctx);
+    const conLaPiedra = enLaMadre ? 'la madre' : 'el padre';
+    nodo.objetos = enLaMadre
+      ? { madre: PIEDRAETERNA, padre: RECIO_DE[forzado] }
+      : { madre: RECIO_DE[forzado], padre: PIEDRAETERNA };
     nodo.forzados = [forzado];
     nodo.compartidos = resto;
+    nodo.piedraEnLaMadre = enLaMadre;
     nodo.explicacion =
       `La Piedraeterna pasa la naturaleza pero ocupa un hueco de objeto, así que este cruce ` +
-      `sólo puede forzar un IV (${NOMBRE_STAT[forzado]}). ` +
+      `sólo puede forzar un IV (${NOMBRE_STAT[forzado]}), y lo fuerza `
+      + `${enLaMadre ? 'el padre' : 'la madre'} con su ${RECIO_DE[forzado]}. ` +
       (resto.length
-        ? `${resto.map((st) => NOMBRE_STAT[st]).join(', ')} tiene${resto.length > 1 ? 'n' : ''} que venir a 31 en los DOS padres.`
-        : 'No queda ningún IV que tengan que compartir.');
+        ? `${resto.map((st) => NOMBRE_STAT[st]).join(', ')} tiene${resto.length > 1 ? 'n' : ''} que venir a 31 en los DOS padres. `
+        : 'No queda ningún IV que tengan que compartir. ') +
+      `La Piedraeterna la lleva ${conLaPiedra}.`;
 
+    // El que NO lleva la Piedraeterna carga con todos los IVs: el forzado,
+    // porque lleva el Recio, y los compartidos, porque tienen que estar en los
+    // dos. El que la lleva sólo necesita los compartidos y la naturaleza.
+    const deLaPiedra = { stats: resto, naturaleza: true, objeto: PIEDRAETERNA };
+    const delRecio = { stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado] };
     nodo.hijos = [
-      construir({ stats: nodo.stats, naturaleza: false, objeto: RECIO_DE[forzado], ...hijoA }, ctx, profundidad + 1),
-      construir({ stats: resto, naturaleza: true, objeto: PIEDRAETERNA, ...hijoB }, ctx, profundidad + 1),
+      construir({ ...(enLaMadre ? deLaPiedra : delRecio), ...hijoA }, ctx, profundidad + 1),
+      construir({ ...(enLaMadre ? delRecio : deLaPiedra), ...hijoB }, ctx, profundidad + 1),
     ];
     return nodo;
   }
@@ -952,6 +989,45 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   const validacion = validarObjetivo(objetivo, datos);
   if (!validacion.valido) return { ok: false, ...validacion };
 
+  // El árbol se monta una vez por cada forma de repartir la Piedraeterna y se
+  // queda la mejor CONTRA EL INVENTARIO. Antes había una sola forma fija —la
+  // Piedraeterna en el padre— y con eso el plan se quedaba estancado: con un
+  // macho del inventario cargado de 31 de cualquier especie, ponerla en la
+  // madre deja que ese macho entre tal cual y se ahorra su rama entera. Es el
+  // caso que describió el usuario y sale a 3 cruces y 0 capturas donde la forma
+  // fija pedía 5 cruces y 1 captura.
+  //
+  // Sin naturaleza no hay nada que repartir, así que no se monta tres veces.
+  const modos = objetivo.naturaleza ? MODOS_PIEDRA : ['padre'];
+  const candidatos = modos.map((modo) => montarPlan(objetivo, datos, {
+    inventario, regionesDisponibles, cuando, modo, validacion,
+  }));
+
+  return candidatos.sort(comparaPlanes)[0];
+}
+
+/**
+ * Cuál de dos planes es mejor.
+ *
+ * En este juego lo que cuesta no es el dinero: son las capturas, porque cada
+ * una es farmeo a ciegas —los IVs no se pueden filtrar— y cada padre se
+ * consume. Así que primero manda cuántas capturas quedan, después cuántos
+ * cruces (cada uno es una eclosión y dos padres gastados) y sólo al final el
+ * dinero, que se consigue mucho más rápido que un 31.
+ */
+export function comparaPlanes(a, b) {
+  const capturas = (p) => p.pasos.conseguir.length;
+  const cruces = (p) => contar(p.arbol).cruces;
+  // Un plan que entrega 30 donde se pidió 31 es peor que uno que entrega el 31.
+  const cortos = (p) => (p.ivsCortos ?? []).length;
+  return cortos(a) - cortos(b)
+    || capturas(a) - capturas(b)
+    || cruces(a) - cruces(b)
+    || (a.sobrantes?.length ?? 0) - (b.sobrantes?.length ?? 0);
+}
+
+/** Monta el árbol entero con una forma concreta de repartir la Piedraeterna. */
+function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, modo, validacion }) {
   const pedidos = statsPedidos(objetivo);
   const movsHuevo = movimientosSoloDeHuevo(objetivo, datos.pokedex);
 
@@ -959,6 +1035,7 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   const ctx = {
     datos,
     objetivo,
+    modoPiedra: modo,
     sinGeneroObjetivo: sinGenero(datos.pokedex[objetivo.especie]),
     // Quién puede poner la especie, ya ordenado por lo fácil que es pillarlo
     // donde el usuario juega. Decide el sexo de la espina y si hace falta Ditto.
@@ -1032,6 +1109,9 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     medida: medirArbol(arbol),
     espina: ctx.espina,
     movimientosDeHuevo: movsHuevo,
+    // Cómo se ha repartido la Piedraeterna en este plan, de las formas que se
+    // probaron. Lo enseña la vista para que se vea que no es un capricho.
+    modoPiedra: modo,
     // Los IVs que el árbol garantiza de verdad (30 donde se usa un pseudo 31),
     // qué cruces van a suerte y cuáles se quedan cortos.
     ivsFinales: entrega.ivs,

@@ -192,6 +192,10 @@ export function evaluar(ejemplar, plan, datos) {
     };
   }
 
+  // Si al plan no le falta ninguna captura, «hay que capturar otro» no tiene
+  // sentido: el ejemplar no entra porque no hace falta, no porque falte algo.
+  const yaEstaTodo = (plan.pasos?.conseguir ?? []).length === 0;
+
   let mensaje;
   if (soloNaturaleza) {
     mensaje = `Los IVs valen, pero todos los huecos con naturaleza ${plan.objetivo.naturaleza} ya están ` +
@@ -214,9 +218,10 @@ export function evaluar(ejemplar, plan, datos) {
     mensaje = `No comparte grupo huevo con ${plan.objetivo.especie}, así que no entra en esta cadena.`;
   } else if (ivsQueSalvarian.length) {
     mensaje = `No sirve para esta cadena: los huecos libres piden 31 en ${ivsQueSalvarian.join(' o ')} ` +
-      `y este no lo tiene. Hay que capturar otro.`;
+      `y este no lo tiene. ${yaEstaTodo ? 'Al plan no le falta nada.' : 'Hay que capturar otro.'}`;
   } else {
-    mensaje = 'No encaja en ningún hueco libre del plan. Hay que capturar otro.';
+    mensaje = `No encaja en ningún hueco libre del plan. ${
+      yaEstaTodo ? 'Que tampoco lo necesita: ya está cubierto entero.' : 'Hay que capturar otro.'}`;
   }
 
   return { sirve: false, rechazos, ivsQueSalvarian, soloSexo, soloEspecie, mensaje };

@@ -107,6 +107,33 @@ entera es `ROL.LIBRE`: cualquier especie del grupo huevo, cualquier sexo. La
 espina pasa a bajar por la cadena de sólo IVs, y su hoja de abajo es un 1×31 de
 la especie objetivo en vez de una de sólo naturaleza.
 
+## ¿Quién lleva la Piedraeterna? Depende de tu inventario
+
+Para la mecánica da igual: pasa la naturaleza de quien la tenga puesta. Para el
+árbol no da igual en absoluto, porque **el que NO la lleva es el que carga con
+todos los IVs** (el forzado, porque lleva el Recio, y los compartidos, porque
+tienen que estar en los dos padres).
+
+| La Piedraeterna va en… | La cadena de naturaleza… | El otro padre… | Cuándo gana |
+|---|---|---|---|
+| **el padre** | cuelga de un hueco **libre**: cualquier especie, cualquier sexo | es la madre, y tiene que traer TODOS los IVs | partiendo de cero: las capturas de la rama libre son fáciles |
+| **la madre** | cae en la **espina**: especie objetivo y hembra | es el padre, y tiene que traer todos los IVs | cuando ya tienes un macho cargado de 31 — entra tal cual y te ahorra su rama entera |
+
+Durante un tiempo esto fue una decisión fija (siempre en el padre) y el plan se
+quedaba estancado: con un Horsea ♂ 2×31 en el inventario seguía pidiendo 5
+cruces y 1 captura, cuando poniendo la Piedraeterna en la madre el mismo
+objetivo sale en **3 cruces y 0 capturas**. Ahora `planear()` monta el árbol de
+las tres formas —`padre`, `raiz` (sólo en el cruce final) y `madre`— y
+`comparaPlanes()` elige:
+
+1. menos IVs que se queden en 30 pudiendo ser 31;
+2. menos capturas, que es lo que de verdad cuesta: farmeo a ciegas;
+3. menos cruces, que son eclosiones y padres gastados;
+4. y a igualdad, el que deja menos inventario sin usar.
+
+El dinero no entra en la comparación a propósito: se consigue mucho más rápido
+que un 31.
+
 ## Cuando lo único que falla es el sexo
 
 El sexo de un Pokémon no se cambia. El de una **cría** sí: se paga en la

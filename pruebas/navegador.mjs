@@ -971,14 +971,15 @@ await paso('un 2×31 del sexo contrario deja de quedarse en la caja', async () =
   await pagina.click('button[data-vista="plan"]');
   await pagina.waitForTimeout(500);
   const t = await pagina.textContent('#vista');
-  if (!/5 del inventario/i.test(t)) throw new Error(`no usa los 4 del inventario: ${(t.match(/\d+ del inventario/i) ?? ['—'])[0]}`);
+  if (!/0 padres por conseguir/.test(t))
+    throw new Error(`debería salir sin capturas: ${(t.match(/\d+ padres por conseguir/) ?? ['—'])[0]}`);
   await abrir('Todos los pasos');
   const pasos = await pagina.textContent('#vista');
   if (!/Horsea/.test(pasos)) throw new Error('el Horsea sigue sin aparecer en los pasos');
-  if (!/el sexo no se cambia/.test(pasos)) throw new Error('no explica por qué monta el cruce');
-  // La captura que queda ya no pide IVs: es 1 de cada 2, no 1 de cada 64.
-  if (!/no le pido IVs ni naturaleza/.test(pasos)) throw new Error('la captura que queda sigue pidiendo IVs');
-  console.log('       Garchomp + Horsea ♂ 2×31: lo usa pagando el sexo, y la captura que queda no pide IVs');
+  // La Piedraeterna acaba en la madre para que el Horsea entre tal cual.
+  if (!/La Piedraeterna la lleva la madre/.test(pasos))
+    throw new Error('no explica dónde va la Piedraeterna');
+  console.log('       Garchomp + Horsea ♂ 2×31: entra en el cruce final y el plan sale sin capturas');
 
   // Es la última prueba: no hace falta devolver el estado a su sitio, sólo no
   // dejar el inventario sembrado en el navegador de la siguiente tanda.
