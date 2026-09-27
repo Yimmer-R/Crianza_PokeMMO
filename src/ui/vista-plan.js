@@ -1,6 +1,6 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, sprite } from './componentes.js';
 import { NOMBRE_STAT, STATS, IV_MAX, INCUBADORAS, ACELERAR_HUEVO } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
 import { contar, criaDe, ROL } from '../nucleo/planificador.js';
@@ -19,10 +19,31 @@ function etiquetaBonita(nodo, objetivo) {
   return partes.join(' + ') || 'cualquiera';
 }
 
-function pintarArbol(nodo, objetivo, esRaiz = true) {
+/**
+ * Qué Pokémon enseña un nodo del árbol.
+ *
+ * La raíz es el objetivo y un nodo del inventario es el ejemplar que ya está en
+ * la caja. Para un hueco por conseguir, la especie NO está en el nodo: la
+ * resuelve `loQueFalta()` mirando la espina, así que aquí llega ya hecha en
+ * `sugeridas`, indexada por id de nodo. Un hueco «libre» no tiene especie y no
+ * enseña ninguna — que es justo lo que «libre» quiere decir.
+ *
+ * Un cruce intermedio tampoco enseña nada: la cría sale de la madre, y quién es
+ * la madre lo dicen sus hijos, un renglón más abajo.
+ */
+const especieDelNodo = (nodo, objetivo, esRaiz, sugeridas) => {
+  if (esRaiz) return objetivo.especie;
+  if (nodo.tipo === 'inventario') return nodo.ejemplar?.especie ?? null;
+  if (nodo.tipo === 'conseguir') return sugeridas.get(nodo.id) ?? null;
+  return null;
+};
+
+function pintarArbol(nodo, objetivo, sugeridas, esRaiz = true) {
   const sexo = nodo.sexoNecesario ?? '';
+  const especie = especieDelNodo(nodo, objetivo, esRaiz, sugeridas);
 
   const cabeza = el('span.nodo', {}, [
+    especie ? sprite(especie, { tam: 'mini', sexo }) : null,
     el('strong', { texto: etiquetaBonita(nodo, objetivo) }),
     !esRaiz && sexo ? chip(sexo) : null,
     nodo.tipo === 'inventario' ? chip(`ya lo tienes: ${nodo.ejemplar.especie}`, 'bien') : null,
@@ -32,7 +53,7 @@ function pintarArbol(nodo, objetivo, esRaiz = true) {
 
   return el('li', {}, [
     cabeza,
-    nodo.hijos.length ? el('ul', {}, nodo.hijos.map((h) => pintarArbol(h, objetivo, false))) : null,
+    nodo.hijos.length ? el('ul', {}, nodo.hijos.map((h) => pintarArbol(h, objetivo, sugeridas, false))) : null,
   ]);
 }
 
@@ -50,6 +71,12 @@ export function vistaPlan(datos) {
     ]);
 
   const cuentas = contar(plan.arbol);
+  // Qué especie propone el plan para cada hueco por conseguir. Se calcula una
+  // vez aquí y se pasa al árbol: el nodo no la lleva encima, la deduce
+  // `loQueFalta()` a partir de la espina.
+  const sugeridas = new Map(
+    plan.pasos.conseguir.filter((r) => !r.especieLibre).map((r) => [r.nodo, r.especieSugerida]),
+  );
   const pres = presupuestar(plan, datos);
   const planMovs = planearMovimientos(objetivo, datos, regionesDisponibles);
   const planHab = planearHabilidad(objetivo, datos);
@@ -91,7 +118,7 @@ export function vistaPlan(datos) {
       'Cada cruce garantiza los 31 que COMPARTEN sus dos padres (el promedio de 31 y 31 es 31), ',
       'más los que fuerce un objeto Recio. De ahí sale la forma del árbol.',
     ]),
-    el('ul.arbol', {}, [pintarArbol(plan.arbol, objetivo)]),
+    el('ul.arbol', {}, [pintarArbol(plan.arbol, objetivo, sugeridas)]),
   ], { extra: `${cuentas.total} nodos` });
 
   // ------------------------------------------------------------ movimientos
@@ -231,7 +258,18 @@ function bloqueAhora(plan, objetivo, datos) {
           el('ul.listos', {}, listos.map((n) => el('li', {}, [
             el('span', {}, [
               el('strong', { texto: etiquetaBonita(n, objetivo) }),
-              ` — ${n.hijos[0].ejemplar.especie} ♀ × ${n.hijos[1].ejemplar.especie} ♂`,
+              ' — ',
+              // Los dos padres con su cara: en una tanda de ocho huevos, leer
+              // seis nombres parecidos seguidos es donde se equivoca uno.
+              el('span.con-sprite', {}, [
+                sprite(n.hijos[0].ejemplar.especie, { tam: 'mini', sexo: '♀' }),
+                el('span', { texto: `${n.hijos[0].ejemplar.especie} ♀` }),
+              ]),
+              ' × ',
+              el('span.con-sprite', {}, [
+                sprite(n.hijos[1].ejemplar.especie, { tam: 'mini', sexo: '♂' }),
+                el('span', { texto: `${n.hijos[1].ejemplar.especie} ♂` }),
+              ]),
               ` · ${[n.objetos.madre, n.objetos.padre].filter(Boolean).join(' + ') || 'sin objetos'}`,
               n.sexoNecesario && n.rol !== ROL.RAIZ ? ` · cría ${n.sexoNecesario}` : '',
             ]),
@@ -255,10 +293,20 @@ function bloqueAhora(plan, objetivo, datos) {
                 : 'cualquiera: no le pido IVs ni naturaleza') +
                 ((f.movimientos ?? []).length ? ` · con ${f.movimientos.join(', ')}` : ''),
               f.sexo ?? 'cualquiera',
-              f.especieLibre ? chip(`libre — p. ej. ${f.especieSugerida}`, 'si')
+              f.especieLibre
+                ? el('span.chip.si.con-sprite', {}, [
+                    sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
+                    el('span', { texto: `libre — p. ej. ${f.especieSugerida}` }),
+                  ])
                 : (f.especiesValidas?.length ?? 0) > 1
-                  ? chip(`${f.especieSugerida} o su línea`, 'ojo')
-                  : f.especieSugerida,
+                  ? el('span.chip.ojo.con-sprite', {}, [
+                      sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
+                      el('span', { texto: `${f.especieSugerida} o su línea` }),
+                    ])
+                  : el('span.con-sprite', {}, [
+                      sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
+                      el('span', { texto: f.especieSugerida ?? '' }),
+                    ]),
               el('button.boton.mini.secundario', {
                 onclick: () => alFormularioDesde(f, datos),
               }, ['Ya lo tengo']),
@@ -383,7 +431,10 @@ function bloqueSobrantes(plan, datos) {
     const v = evaluar(e, plan, datos);
     const perfectos = STATS.filter((s) => (e.ivs?.[s] ?? 0) >= IV_MAX);
     return [
-      `${e.especie}${e.mote ? ` "${e.mote}"` : ''} ${e.sexo ?? ''}`,
+      el('span.con-sprite', {}, [
+        sprite(e.especie, { tam: 'mini', sexo: e.sexo }),
+        el('span', { texto: `${e.especie}${e.mote ? ` "${e.mote}"` : ''} ${e.sexo ?? ''}` }),
+      ]),
       perfectos.length ? `${perfectos.length}×31 (${perfectos.map((s) => NOMBRE_STAT[s]).join(', ')})` : '—',
       e.naturaleza ?? '—',
       // Si encaja en algún hueco es que el plan ya lo tiene cubierto con algo

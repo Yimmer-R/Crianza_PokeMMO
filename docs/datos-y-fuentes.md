@@ -54,8 +54,34 @@ estación restringida, que es lo que pasaría si el sufijo se volviera a perder.
 | `movimientos-huevo.json` | sección «Como movimiento huevo» de cada ficha de movimiento | los 177, con las especies que los traen **y sus grupos huevo**; más las especies que los aprenden por otra vía y sirven igual de padre |
 | `habilidades.json` | `wiki/habilidades/*.md` + cruce con las fichas | 170, con quién las tiene y si es la oculta |
 | `objetos.json` | `wiki/objetos/*.md` | objetos de crianza, entrenamiento, vitaminas, bayas de EV y habilidad, con sus precios de compra documentados |
+| `sprites.json` | `wiki/sprites/*.md` | la imagen de las 667: el render 3D de Pokémon HOME y el sprite animado de 5ª generación, más la variante ♀ de las 97 que se dibujan distintas |
 | `donde-entrenar.json` | `wiki/mecanicas/Dónde entrenar EVs.md` | 581 hordas agrupadas por la característica que dan, con su hora y estación |
 | `meta.json` | — | fecha de extracción, recuentos, regiones, grupos huevo y huecos detectados |
+
+## Los sprites se enlazan, no se copian
+
+Las imágenes **no están en este repositorio ni en la wiki**: son unos 150 MB y las dos
+cosas son texto. La wiki las enlaza al volcado de
+[PokeAPI/sprites](https://github.com/PokeAPI/sprites), lo deja escrito en
+`raw/2026-09-27-sprites-pokeapi.md`, y `sprites.json` guarda ese prefijo **una sola vez**
+en `base` más, de cada Pokémon, la parte que cambia. Repetir la URL entera 1.334 veces
+triplicaba el archivo para no decir nada nuevo.
+
+Tres cosas que la wiki ya comprobó pidiendo el archivo, y que no hay que volver a mirar:
+
+- **de Escarlata/Púrpura y de Leyendas Z-A no hay volcado público.** `other/scarlet-violet/1.png`
+  da 404 y de Z-A no hay carpeta. Lo más nuevo que existe suelto es el render de Pokémon HOME,
+  y ése es el que usa la app;
+- **en 3D no existe el dorso**, y no es un hueco del volcado: desde la 6ª generación el combate
+  se renderiza con el modelo. El único dorso que hay es el 2D de 5ª generación — que es, justo,
+  la generación de PokeMMO. La app no lo usa: esto es un planificador, no un simulador;
+- **97 especies tienen sprite de hembra.** En las demás no falta: es que el juego las dibuja
+  igual.
+
+Una imagen que no carga —sin red, o el volcado movido de sitio— **no es un error de la app**:
+`src/ui/componentes.js` deja el hueco marcado, con el porqué en el `title`, y la vista sigue.
+La prueba de navegador comprueba el `src` aunque no pueda bajar ni una imagen, y dice cuántas
+se quedaron sin cargar.
 
 ## Dos trampas del formato de la wiki
 

@@ -1,9 +1,23 @@
 // Playwright no es dependencia del proyecto: se busca donde esté instalado.
+import { readFileSync } from 'node:fs';
+
 const { chromium } = await import(process.env.PLAYWRIGHT ?? 'playwright');
 
 const BASE = process.env.BASE ?? 'http://localhost:8099';
 const navegador = await chromium.launch({ ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}) });
 const pagina = await navegador.newPage();
+
+// Las imágenes de los Pokémon NO están en este repositorio: las sirve el volcado
+// de PokeAPI que enlaza la wiki. Una máquina sin salida directa a internet —CI,
+// o un proxy con su propia autoridad— no las baja, y Chromium lo apunta como
+// error de consola. Eso no es un fallo de la app: la vista deja el hueco dicho y
+// sigue funcionando, así que se cuentan aparte y se dice cuántas fueron. Lo que
+// sí se comprueba siempre es que el `src` sea el que toca, que es lo que puede
+// romper un cambio de código.
+const HOST_SPRITES = new URL(
+  JSON.parse(readFileSync(new URL('../datos/sprites.json', import.meta.url), 'utf8')).base,
+).host;
+let spritesSinRed = 0;
 
 const errores = [];
 // Hay una prueba que corta la descarga de Tesseract a propósito; el error de red
@@ -13,6 +27,7 @@ pagina.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`));
 pagina.on('console', (m) => {
   if (m.type() !== 'error') return;
   if (esperandoFalloDeRed && /ERR_(FAILED|ABORTED|BLOCKED)/.test(m.text())) return;
+  if ((m.location()?.url ?? '').includes(HOST_SPRITES)) { spritesSinRed++; return; }
   errores.push(`console: ${m.text()}`);
 });
 
@@ -387,6 +402,53 @@ await paso('ningún texto por debajo del contraste mínimo', async () => {
 
   if (malos.length) throw new Error(`${malos.length} por debajo del mínimo:\n       ` + malos.slice(0, 6).join('\n       '));
   console.log(`       ~${medidos} elementos medidos en 5 vistas, todos por encima del mínimo`);
+});
+
+
+await paso('cada Pokémon sale con su sprite, y el que no lo tenga deja su hueco', async () => {
+  // La crianza de Larvitar ya está montada por las pruebas de arriba, así que
+  // hay objetivo, plan y capturas que mirar sin volver a rellenar nada.
+  const sprites = JSON.parse(readFileSync(new URL('../datos/sprites.json', import.meta.url), 'utf8'));
+
+  const visto = new Map();
+  for (const vista of ['objetivo', 'plan', 'capturas', 'entrenamiento', 'inventario']) {
+    await pagina.click(`button[data-vista="${vista}"]`);
+    await pagina.waitForTimeout(300);
+    // `data-sprite` sólo está en las que no han cargado, y guarda su URL buena:
+    // sin red se comprueban igual que con ella.
+    for (const [alt, src] of await pagina.$$eval(
+      'img.sprite', (ns) => ns.map((n) => [n.alt, n.dataset.sprite ?? n.getAttribute('src')]),
+    )) visto.set(`${vista}|${alt}|${src}`, [vista, alt, src]);
+  }
+
+  if (visto.size < 5) throw new Error(`sólo ${visto.size} sprites en cinco vistas`);
+
+  // Que la URL sea la que dice la wiki, no una inventada ni la de otra especie.
+  // Esto se comprueba SIEMPRE, cargue la imagen o no: es lo que puede romper un
+  // cambio de código, y no depende de tener red.
+  for (const [, [vista, alt, src]] of visto) {
+    const especie = alt.replace(/ (hembra|macho)$/, '');
+    const entrada = sprites.de[especie];
+    if (!entrada) throw new Error(`${vista}: "${alt}" no es una especie de datos/sprites.json`);
+    if (!src.startsWith(sprites.base)) throw new Error(`${vista}: ${especie} apunta fuera del volcado (${src})`);
+    const rel = src.slice(sprites.base.length);
+    if (!Object.values(entrada).includes(rel))
+      throw new Error(`${vista}: ${especie} lleva "${rel}", que no es ninguna de sus imágenes`);
+  }
+
+  // El objetivo es Larvitar: su sprite tiene que estar en Objetivo, y grande.
+  const delObjetivo = [...visto.values()].filter(([v, alt]) => v === 'objetivo' && alt === 'Larvitar');
+  if (!delObjetivo.length) throw new Error('Objetivo no enseña el sprite de Larvitar');
+
+  // Y sin red la app no se queda con la imagen rota: pone el hueco. En una
+  // máquina con salida a internet no habrá ninguno, y eso también vale.
+  const rotos = await pagina.$$eval(
+    'img.sprite',
+    (ns) => ns.filter((n) => n.complete && !n.naturalWidth && !n.dataset.sprite).length,
+  );
+  if (rotos) throw new Error(`${rotos} imágenes rotas sin marcar como hueco`);
+
+  console.log(`       ${visto.size} sprites en 5 vistas, todos con la URL de la wiki`);
 });
 
 
@@ -994,6 +1056,9 @@ async function contarInventario() {
 await navegador.close();
 
 console.log('');
+if (spritesSinRed)
+  console.log(`(${spritesSinRed} sprites no han cargado: ${HOST_SPRITES} no es alcanzable desde aquí. `
+    + 'La app deja su hueco y sigue; el `src` sí se ha comprobado.)');
 if (errores.length) {
   console.log(`${errores.length} problema(s):`);
   for (const e of errores) console.log(`  - ${e}`);

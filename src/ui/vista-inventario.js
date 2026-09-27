@@ -12,7 +12,9 @@
 // pantalla de revisión: un OCR que se equivoque en un IV rompería el plan entero
 // en silencio.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla, campoConSugerencias } from './componentes.js';
+import {
+  el, tarjeta, plegable, chip, aviso, frag, tabla, campoConSugerencias, sprite,
+} from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX, SEXOS } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar, fijar } from './estado.js';
 import {
@@ -80,8 +82,14 @@ function bloqueFaltan(plan) {
             f.sexo ?? 'cualquiera',
             f.especieLibre ? chip('cualquiera del grupo huevo', 'si')
               : (f.especiesValidas?.length ?? 0) > 1
-                ? chip(`${f.especieSugerida} o su línea`, 'ojo')
-                : f.especieSugerida,
+                ? el('span.chip.ojo.con-sprite', {}, [
+                    sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
+                    el('span', { texto: `${f.especieSugerida} o su línea` }),
+                  ])
+                : el('span.con-sprite', {}, [
+                    sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
+                    el('span', { texto: f.especieSugerida ?? '' }),
+                  ]),
             (f.movimientos ?? []).length ? chip(f.movimientos.join(', '), 'ojo') : '—',
           ]),
           [0],
@@ -133,7 +141,7 @@ function bloqueManual(datos) {
         (v) => {
           borrador.especie = v ? (res(datos).especie(v).valor ?? v) : '';
           fijar({}); // repinta para actualizar las sugerencias de movimientos
-        }, { placeholder: 'Rattata, Larvitar…' }),
+        }, { placeholder: 'Rattata, Larvitar…', conSprites: true }),
       el('div', { style: 'flex:0 0 130px' }, [
         el('label', { for: 'b-sexo', texto: 'Sexo' }),
         el('select', { id: 'b-sexo', onchange: (e) => { borrador.sexo = e.target.value; } }, [
@@ -205,7 +213,14 @@ function bloqueLista(inventario, seleccion) {
       'aria-label': `Seleccionar ${e.especie}`,
       onchange: (ev) => marcar(e.id, ev.target.checked),
     }),
-    e.especie || '(sin especie)',
+    // La caja del juego se lee por la cara, no por el nombre: con veinte
+    // Magikarp anotados, el sprite y el sexo son lo que distingue una fila.
+    e.especie
+      ? el('span.con-sprite', {}, [
+          sprite(e.especie, { tam: 'mini', sexo: e.sexo }),
+          el('span', { texto: e.especie }),
+        ])
+      : '(sin especie)',
     e.sexo,
     `${cuantosPerfectos(e)}×31`,
     STATS.map((s) => (e.ivs[s] >= IV_MAX ? NOMBRE_STAT[s] : null)).filter(Boolean).join(', ') || '—',

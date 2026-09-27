@@ -1,5 +1,8 @@
 // Ayudas de render. No hay framework: se construyen nodos y se pintan.
 
+import { datosCargados } from '../datos/cargador.js';
+import { urlSprite, altSprite, VIA_3D, VIA_ANIMADO } from '../nucleo/sprites.js';
+
 /* eslint-disable no-use-before-define -- `el` se define aquí abajo. */
 
 /** el('div.tarjeta', {onclick}, [hijos]) */
@@ -33,6 +36,69 @@ export const tarjeta = (titulo, hijos, clase = '') =>
   el(`section.tarjeta${clase ? `.${clase}` : ''}`, {}, [titulo ? el('h2', { texto: titulo }) : null, ...[].concat(hijos)]);
 
 export const chip = (texto, clase = '') => el(`span.chip${clase ? `.${clase}` : ''}`, { texto });
+
+export { VIA_3D, VIA_ANIMADO };
+
+/** Un píxel transparente: lo que se le pone a una imagen que no ha cargado para
+ *  que el navegador no pinte su icono de rota. */
+const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+/**
+ * La imagen de un Pokémon.
+ *
+ * Sale de `datos/sprites.json`, que a su vez sale de `wiki/sprites/`: el
+ * componente no sabe ni de dónde se sirven ni cómo se arma la URL, eso es de
+ * `src/nucleo/sprites.js`. Aquí sólo se decide el tamaño y qué hacer cuando no
+ * hay imagen.
+ *
+ * **Cuando no la hay, se dice.** Ni se pone la de otra especie ni se deja el
+ * icono de imagen rota del navegador: queda un hueco con las dos primeras
+ * letras y un `title` que explica por qué. Es la regla 2 del repositorio.
+ *
+ * @param {string} especie nombre en inglés, como en la pokédex
+ * @param {Object} opciones `sexo` pinta la variante hembra en las 97 especies
+ *   que la tienen; `tam` es 'mini' | 'normal' | 'grande'; `via` es el render 3D
+ *   (por defecto) o el sprite animado de 5ª generación.
+ */
+export function sprite(especie, { sexo = null, tam = 'normal', via = VIA_3D } = {}) {
+  // El hueco NO lleva texto dentro, y no es un descuido: el sprite va pegado al
+  // nombre en tablas, chips y sugerencias, y dos letras más dentro del mismo
+  // elemento ensucian su `textContent` — bastó para que una sugerencia dejara de
+  // decir «Rattata» y empezara a decir «RARattata». Lo que explica el hueco es
+  // el `title`, y quien lee con lector de pantalla tiene el nombre al lado.
+  const hueco = (motivo) => el(`span.sprite.sprite-${tam}.sprite-hueco`, {
+    title: motivo, 'aria-hidden': 'true',
+  });
+  if (!especie) return hueco('sin especie');
+
+  const sprites = datosCargados()?.sprites;
+  const url = urlSprite(especie, sprites, { sexo, via });
+  if (!url) return hueco(`${especie}: la wiki no trae su sprite`);
+
+  return el(`img.sprite.sprite-${tam}`, {
+    src: url,
+    alt: altSprite(especie, sprites, sexo),
+    loading: 'lazy',
+    decoding: 'async',
+    // Las imágenes viven fuera (el volcado de PokeAPI), así que sin red no
+    // llegan. Eso no es un error de la app: la imagen se queda como el mismo
+    // hueco, en el sitio. No se SUSTITUYE el nodo a propósito — así conserva su
+    // `alt` para quien lee con lector de pantalla y su URL en `data-sprite`,
+    // que es lo que comprueba la prueba de navegador aunque no haya red.
+    onerror: (ev) => {
+      const img = ev.target;
+      if (img.dataset.sprite) return;
+      img.dataset.sprite = url;
+      img.title = `${especie}: no he podido cargar su sprite`;
+      img.classList.add('sprite-hueco');
+      img.src = PIXEL;
+    },
+  });
+}
+
+/** Sprite + nombre en una línea, que es como se lee un Pokémon en casi todas las vistas. */
+export const conSprite = (especie, textoOpcional = null, opciones = {}) =>
+  el('span.con-sprite', {}, [sprite(especie, opciones), el('span', { texto: textoOpcional ?? especie })]);
 
 /**
  * Qué plegables ha abierto el usuario, por título.
@@ -114,7 +180,10 @@ export function tabla(cabeceras, filas, alinearNum = []) {
  */
 export function campoConSugerencias(id, etiqueta, valor, opciones, onChange, extra = {}) {
   // Se acepta una cadena como sexto argumento por compatibilidad: era el placeholder.
-  const { placeholder = '', cuantas = 30, exigirDeLaLista = false } =
+  // `conSprites` es para los campos de ESPECIE: cada sugerencia lleva su cara.
+  // No se activa solo porque el campo no sabe qué lista le han dado — la misma
+  // función sirve para movimientos, naturalezas y habilidades.
+  const { placeholder = '', cuantas = 30, exigirDeLaLista = false, conSprites = false } =
     typeof extra === 'string' ? { placeholder: extra } : extra;
 
   const lista = el('ul.sug-lista', { hidden: true, role: 'listbox' });
@@ -186,7 +255,11 @@ export function campoConSugerencias(id, etiqueta, valor, opciones, onChange, ext
         // cerraría la lista antes de que llegara el evento.
         onmousedown: (ev) => { ev.preventDefault(); confirmar(o); },
         ontouchstart: (ev) => { ev.preventDefault(); confirmar(o); },
-      }, [o]),
+        // El nombre va como texto suelto del botón, NO envuelto en un <span>:
+        // el motor de texto de Playwright busca el elemento MÁS PEQUEÑO que
+        // contiene la cadena, y con el envoltorio `.sug-opcion:text-is("…")`
+        // deja de encontrar nada. En flex un nodo de texto se comporta igual.
+      }, conSprites ? [sprite(o, { tam: 'mini' }), o] : [o]),
     ])));
     lista.hidden = false;
     entrada.setAttribute('aria-expanded', 'true');

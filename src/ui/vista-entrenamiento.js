@@ -1,6 +1,6 @@
 // El plan de EVs: cuántos faltan, en qué hordas y cuántas rondas.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, sprite } from './componentes.js';
 import { NOMBRE_STAT, EV_MAX_TOTAL } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar } from './estado.js';
 import { planearEvs } from '../nucleo/entrenamiento.js';
@@ -44,12 +44,17 @@ export function vistaEntrenamiento(datos) {
   const barraCuando = tarjeta('Cuándo estás jugando', [selectorCuando('ent')]);
 
   const resumen = tarjeta(`EVs · ${plan.total} de ${EV_MAX_TOTAL}`, [
-    el('div.etiquetas', {}, [
-      chip(`nivel ${plan.nivel}`),
-      chip(plan.objeto.nombre ? `${plan.objeto.nombre} (×${plan.objeto.factor})` : 'sin objeto', plan.objeto.factor > 1 ? 'si' : ''),
-      chip(`${plan.libres} EVs libres`),
-      cuando.hora ? chip(cuando.hora, 'si') : null,
-      cuando.estacion ? chip(cuando.estacion, 'si') : null,
+    // A quién se está entrenando. Con varias crianzas abiertas es fácil mirar
+    // el reparto de una creyendo que es el de otra.
+    el('div.ficha-especie', {}, [
+      sprite(objetivo.especie, { tam: 'grande', sexo: objetivo.sexo }),
+      el('div.etiquetas', {}, [
+        chip(`nivel ${plan.nivel}`),
+        chip(plan.objeto.nombre ? `${plan.objeto.nombre} (×${plan.objeto.factor})` : 'sin objeto', plan.objeto.factor > 1 ? 'si' : ''),
+        chip(`${plan.libres} EVs libres`),
+        cuando.hora ? chip(cuando.hora, 'si') : null,
+        cuando.estacion ? chip(cuando.estacion, 'si') : null,
+      ]),
     ]),
     el('p.nota', { texto: plan.objeto.nota }),
     plan.problemas.length
@@ -91,7 +96,11 @@ export function vistaEntrenamiento(datos) {
         chip(`+${s.puntosANivel} ${s.puntosANivel === 1 ? 'punto' : 'puntos'} a nivel ${plan.nivel}`, 'bien'),
       ]),
       el('p.nota', {}, [
-        'La mejor: ', el('strong', { texto: `${s.mejor.especie} +${s.mejor.ev}` }),
+        'La mejor: ',
+        el('span.con-sprite', {}, [
+          sprite(s.mejor.especie, { tam: 'mini' }),
+          el('strong', { texto: `${s.mejor.especie} +${s.mejor.ev}` }),
+        ]),
         ` en ${s.mejor.zona} (${s.mejor.region}, ${s.mejor.nivel}), `,
         cuando.hora || cuando.estacion
           ? `${cuandoLegible(s.mejor)}. `
@@ -114,7 +123,9 @@ export function vistaEntrenamiento(datos) {
             tabla(
               ['EV', 'Especie', 'Región', 'Zona', 'Nivel', 'Cuándo'],
               s.hordas.slice(1).map((h) => [
-                `+${h.ev}`, h.especie, chip(h.region, 'si'), h.zona, h.nivel, celdaCuando(h, cuando),
+                `+${h.ev}`,
+                el('span.con-sprite', {}, [sprite(h.especie, { tam: 'mini' }), el('span', { texto: h.especie })]),
+                chip(h.region, 'si'), h.zona, h.nivel, celdaCuando(h, cuando),
               ]),
             ),
           ], { pequeno: true, id: `hordas-${s.stat}` })
@@ -281,14 +292,24 @@ function bloqueGuia(objetivo, datos) {
   const g = guiaDeAprendizaje(objetivo, datos);
   const hab = objetivo.habilidad ? planearHabilidad(objetivo, datos) : null;
 
-  const linea = g.linea.map((f) => f.especie).join(' → ');
   const saltos = g.linea.filter((f) => f.desde).map((f) => `${f.especie}: ${f.condicion}`);
 
   return tarjeta('Movimientos y habilidad, en orden', [
+    // La línea evolutiva con las tres caras: esta tarjeta habla de qué aprender
+    // ANTES de evolucionar, y ver los escalones dibujados es lo que hace que se
+    // entienda de un vistazo dónde está cada corte.
     g.linea.length > 1
-      ? el('p.nota', {}, [
-          el('strong', { texto: 'Línea evolutiva: ' }), linea,
-          saltos.length ? ` · ${saltos.join(' · ')}` : '',
+      ? frag([
+          el('div.linea-evolutiva', {}, g.linea.flatMap((f, i) => [
+            // Los espacios alrededor de la flecha van DENTRO del texto: la fila
+            // es flex y sin ellos el `textContent` sale «Foongus→Amoonguss»,
+            // que es lo que lee quien copia la línea o la busca.
+            i ? el('span.flecha', { texto: ' → ' }) : null,
+            el('span.con-sprite', {}, [
+              sprite(f.especie, { tam: 'normal' }), el('span', { texto: f.especie }),
+            ]),
+          ])),
+          saltos.length ? el('p.nota', { texto: saltos.join(' · ') }) : null,
         ])
       : null,
 
