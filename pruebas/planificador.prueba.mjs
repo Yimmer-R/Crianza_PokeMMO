@@ -1037,3 +1037,109 @@ bloque('el plan no se queda estancado en una forma de criar', () => {
     igual([{ ...dosFaciles, ivsCortos: ['ataque'] }, unaDura].sort(comparaPlanes)[0], unaDura);
   });
 });
+
+bloque('las reglas del usuario sobre los 30 y los 31, fijadas', () => {
+  const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+  const bicho = (id, ivsSuyos, extra = {}) => ({
+    id, especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: null,
+    ivs: { ...cero, ...ivsSuyos }, evs: {}, movimientos: [], ...extra,
+  });
+  const planCon = (pedidos, inventario, naturaleza = null) => planear(
+    { especie: 'Larvitar', ivs: ivs(pedidos), evs: {}, movimientos: [], naturaleza },
+    datos, { inventario, regionesDisponibles: REGIONES },
+  );
+  const usados = (p) => {
+    const out = [];
+    (function r(n) { if (n.tipo === 'inventario') out.push(n.ejemplar.id); n.hijos.forEach(r); })(p.arbol);
+    return out;
+  };
+
+  prueba('con 31 de sobra, los 30 no se tocan', () => {
+    const p = planCon({ ataque: 31, velocidad: 31 }, [
+      bicho('31-a', { ataque: 31 }),
+      bicho('31-v', { velocidad: 31 }, { sexo: SEXOS.MACHO }),
+      bicho('30-a', { ataque: 30 }),
+      bicho('30-v', { velocidad: 30 }, { sexo: SEXOS.MACHO }),
+    ]);
+    igual(usados(p).sort(), ['31-a', '31-v']);
+    igual(p.ivsCortos, [], 'y el plan entrega 31 de verdad');
+  });
+
+  prueba('un IV COMPARTIDO no se cambia por un 30: perdería el 31 garantizado', () => {
+    // Éste es el ejemplo del usuario, y la respuesta es que no hay que elegir:
+    // los dos 31 van donde un Recio los fuerza (31 seguro en las dos ramas) y
+    // el 30 se usa igual, en el hueco donde sólo hace falta la especie. Cambiar
+    // uno de los 31 por el 30 bajaría ese IV del 100 % al 25 %.
+    const p = planCon({ ps: 31, ataque: 31, velocidad: 31 }, [
+      bicho('ps-31a', { ps: 31 }),
+      bicho('ps-31b', { ps: 31 }, { sexo: SEXOS.MACHO }),
+      bicho('ps-30', { ps: 30 }),
+    ]);
+    igual(p.arbol.compartidos, ['ps']);
+    igual(p.ivsCortos, [], 'PS tiene que salir a 31, no a 30');
+    igual(p.suerte, [], 'y garantizado, sin dejarlo a suerte');
+    cierto(usados(p).includes('ps-30'), 'el 30 tampoco se desperdicia');
+  });
+
+  prueba('el que combina dos requisitos va antes que el que sólo trae uno', () => {
+    const p = planCon({ ataque: 31, velocidad: 31 }, [
+      bicho('solo-a', { ataque: 31 }),
+      bicho('combina', { ataque: 31, velocidad: 31 }, { sexo: SEXOS.MACHO }),
+    ]);
+    cierto(usados(p).includes('combina'));
+    igual(p.pasos.conseguir.length, 0, 'con el que combina, no hace falta capturar nada');
+  });
+
+  prueba('un 30 acompañado de un 31 de otro IV se aprovecha igual', () => {
+    const p = planCon({ ataque: 31, velocidad: 31 }, [
+      bicho('30a', { ataque: 30 }),
+      bicho('30a-31v', { ataque: 30, velocidad: 31 }, { sexo: SEXOS.MACHO }),
+    ]);
+    igual(usados(p).sort(), ['30a', '30a-31v']);
+    // Sin ningún 31 en Ataque en todo el inventario, Ataque sale a 30 — y se dice.
+    igual(p.ivsCortos, ['ataque']);
+  });
+});
+
+bloque('el mismo objetivo con un padre distinto: tres formas de llegar', () => {
+  // Las tres variantes que planteó el usuario para su Garchomp 2×31 + Alegre.
+  // Las tres salen en 3 cruces y 0 capturas, cada una con la Piedraeterna en
+  // un sitio distinto, y eso lo elige la búsqueda sola.
+  const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+  const base = [
+    { id: 'gible', especie: 'Gible', sexo: SEXOS.HEMBRA, naturaleza: 'Osada',
+      ivs: { ...cero, defensa: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-a', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Huraña',
+      ivs: { ...cero, ataque: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-v', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Plácida',
+      ivs: { ...cero, velocidad: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-n', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Alegre',
+      ivs: { ...cero }, evs: {}, movimientos: [] },
+  ];
+  const objetivoGarchomp = {
+    especie: 'Garchomp', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {},
+    movimientos: [], naturaleza: 'Alegre',
+  };
+  const conHorsea = (naturaleza, ivsSuyos) => planear(objetivoGarchomp, datos, {
+    inventario: [...base, {
+      id: 'horsea', especie: 'Horsea', sexo: SEXOS.MACHO, naturaleza,
+      ivs: { ...cero, ...ivsSuyos }, evs: {}, movimientos: [],
+    }],
+    regionesDisponibles: REGIONES,
+  });
+
+  for (const [nombre, naturaleza, ivsSuyos] of [
+    ['2×31 sin la naturaleza', 'Afable', { ataque: 31, velocidad: 31 }],
+    ['1×31 en Ataque + Alegre', 'Alegre', { ataque: 31 }],
+    ['1×31 en Velocidad + Alegre', 'Alegre', { velocidad: 31 }],
+  ]) {
+    prueba(`un Horsea ♂ ${nombre} sale en 3 cruces y sin capturas`, () => {
+      const p = conHorsea(naturaleza, ivsSuyos);
+      igual(contar(p.arbol).cruces, 3);
+      igual(p.pasos.conseguir.length, 0);
+      igual(p.ivsCortos, []);
+      falso(p.sobrantes.some((e) => e.id === 'horsea'), 'el Horsea tiene que entrar en el plan');
+      arbolSolido(p.arbol);
+    });
+  }
+});

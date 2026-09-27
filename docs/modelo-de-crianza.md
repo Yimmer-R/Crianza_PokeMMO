@@ -152,6 +152,49 @@ así que lo que conviene compartir es el que más abunda en el inventario, que e
 justo lo que deja al final una ordenación de escaso a abundante. La heurística
 no es una aproximación a la respuesta: es la respuesta.
 
+## ¿Y no conviene arriesgar un 31 para guardar el otro?
+
+La pregunta, planteada por el usuario: teniendo dos 31 y un 30 en el mismo IV,
+en vez de cruzar 31 × 31 —que lo garantiza— ¿no es mejor cruzar 31 × 30, tener
+un 25 % de sacar el 31 y guardarse el otro 31 para otro intento?
+
+La respuesta es que **no hay que elegir**, porque el árbol ya usa las tres cosas
+sin arriesgar nada. Con un objetivo de 3×31 y ese inventario sale esto:
+
+```
+cruce PS,Ataque,Velocidad · fuerza Ataque y Velocidad · PS COMPARTIDO
+├── cruce PS,Ataque · fuerza Ataque y PS
+│   ├── cruce Ataque · el padre lo fuerza con su Brazal Recio
+│   │   ├── tu 30 en PS          ← aquí sólo hace falta la especie
+│   │   └── capturar 1×31 Ataque ♂
+│   └── tu 31 en PS  + Pesa Recia   ← 31 garantizado
+└── cruce PS,Velocidad · fuerza Velocidad y PS
+    ├── capturar 1×31 Velocidad ♂
+    └── tu 31 en PS  + Pesa Recia   ← 31 garantizado
+```
+
+Los dos 31 van donde una **Pesa Recia** los fuerza, así que las dos ramas
+entregan PS a 31 **garantizado** — y el IV compartido necesita justamente eso,
+31 en los dos padres. Y el 30 no se queda en la caja: cae en el hueco donde sólo
+importan la especie y el sexo, que es exactamente para lo que sirve un 30
+cuando hay 31 de sobra.
+
+Cambiar uno de esos 31 por el 30 bajaría ese IV del **100 % al 25 %**, que es lo
+contrario de «priorizar el 31 y asegurar la mayor probabilidad de conseguirlo».
+Por eso el plan no lo hace, y por eso `comparaPlanes()` ordena primero por los
+IVs que se quedan cortos: un plan que entrega un 30 donde se pidió un 31 pierde
+contra cualquiera que entregue el 31, aunque ahorre material.
+
+Dónde sí gana el 30, y el plan lo aprovecha solo:
+
+- **en el hueco que no pide ese IV** (especie, sexo, naturaleza) — como arriba;
+- **contra un 31 con el Recio puesto**: el Recio fuerza el IV de quien lo lleva,
+  así que 31 + Recio × 30 da 31 **garantizado** y gasta un 31 en vez de dos. Eso
+  lo coloca `ivsDelArbol()` cambiando los Recios de mano cuando ayuda;
+- **cuando no hay ningún 31 de ese IV en todo el inventario**: ahí el 30 es lo
+  mejor que hay, sale a 30 y el plan lo dice (`plan.ivsCortos`) en vez de
+  prometer un 31 que no va a existir.
+
 ## Cuando lo único que falla es el sexo
 
 El sexo de un Pokémon no se cambia. El de una **cría** sí: se paga en la

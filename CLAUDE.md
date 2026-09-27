@@ -264,7 +264,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 250 pruebas unitarias
+node pruebas/ejecutar.mjs             # 257 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```
