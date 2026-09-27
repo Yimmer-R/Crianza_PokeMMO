@@ -17,8 +17,8 @@ const DESTINO = join(RAIZ, 'iconos');
 mkdirSync(DESTINO, { recursive: true });
 
 // Los mismos colores que --fondo y --acento de src/css/estilos.css.
-const FONDO = [19, 25, 30];
-const ACENTO = [255, 144, 11];
+const FONDO = [5, 5, 5];
+const ACENTO = [217, 4, 41];
 const BLANCO = [255, 255, 255];
 
 // ------------------------------------------------------------- codificar PNG

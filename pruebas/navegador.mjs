@@ -244,6 +244,94 @@ await paso('una línea sin hembras: macho y Ditto, no una captura imposible', as
   await pagina.waitForTimeout(150);
 });
 
+/**
+ * Ningún texto por debajo del contraste mínimo, en las cinco vistas.
+ *
+ * La paleta es de fantasía oscura y el objetivo declarado del usuario es que no
+ * se pierda ninguna letra. A ojo eso no se comprueba: hay que medirlo. Se
+ * recorre el DOM de verdad, se busca el fondo efectivo de cada nodo con texto
+ * —subiendo por los padres hasta encontrar uno opaco— y se exige 4,5:1, o 3:1
+ * si el texto es grande, que es lo que pide la WCAG en cada caso.
+ *
+ * Dos valores de la paleta salieron de aquí: el carmesí aclarado para letra
+ * (#ff3b57) y el borde de campo (#6b6b6b).
+ */
+await paso('ningún texto por debajo del contraste mínimo', async () => {
+  const audita = () => pagina.evaluate(() => {
+    const lum = (c) => {
+      const [r, g, b] = c.map((v) => v / 255)
+        .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const num = (t) => t.match(/[\d.]+/g)?.map(Number) ?? null;
+    const mezcla = (a, b, alfa) => a.map((v, i) => v * alfa + b[i] * (1 - alfa));
+    const fondoDe = (n) => {
+      for (let e = n; e; e = e.parentElement) {
+        const c = num(getComputedStyle(e).backgroundColor);
+        if (c && (c[3] === undefined || c[3] > 0.95)) return c.slice(0, 3);
+      }
+      return [255, 255, 255];
+    };
+    const malos = [];
+    for (const n of document.querySelectorAll('body *')) {
+      if (![...n.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) continue;
+      const e = getComputedStyle(n);
+      if (e.visibility === 'hidden' || e.display === 'none' || Number(e.opacity) < 0.5) continue;
+      if (!n.getClientRects().length) continue;
+      const col = num(e.color);
+      if (!col) continue;
+      const fondo = fondoDe(n);
+      const frente = col[3] !== undefined && col[3] < 1 ? mezcla(col.slice(0, 3), fondo, col[3]) : col.slice(0, 3);
+      const a = lum(frente); const z = lum(fondo);
+      const r = (Math.max(a, z) + 0.05) / (Math.min(a, z) + 0.05);
+      const px = parseFloat(e.fontSize);
+      const minimo = (px >= 24 || (px >= 18.66 && Number(e.fontWeight) >= 700)) ? 3 : 4.5;
+      if (r < minimo)
+        malos.push(`${r.toFixed(2)}:1 (mín ${minimo}) ${px}px <${n.tagName.toLowerCase()} class="${n.className}"> "${n.textContent.trim().slice(0, 40)}"`);
+    }
+    return malos;
+  });
+
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Magikarp');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ps');
+  await pagina.check('#iv-ataque');
+  await pagina.fill('#ev-ataque', '250');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.waitForTimeout(400);
+
+  const malos = [];
+  let medidos = 0;
+  for (const vista of ['objetivo', 'plan', 'inventario', 'capturas', 'entrenamiento']) {
+    await pagina.click(`button[data-vista="${vista}"]`);
+    await pagina.waitForTimeout(350);
+    // Con los plegables abiertos: lo escondido también se lee cuando se abre.
+    // Sólo los cerrados — un clic a ciegas CERRABA los que ya estaban abiertos,
+    // y como el estado se recuerda entre repintados, las pruebas de después se
+    // encontraban la vista distinta y fallaban.
+    for (const sum of await pagina.locator('summary').all()) {
+      try {
+        if (!(await sum.evaluate((n) => n.parentElement.open))) await sum.click({ timeout: 700 });
+      } catch { /* alguno desaparece al repintar */ }
+    }
+    await pagina.waitForTimeout(300);
+    const m = await audita();
+    medidos += await pagina.evaluate(() => document.querySelectorAll('#vista *').length);
+    malos.push(...m.map((x) => `${vista}: ${x}`));
+  }
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+
+  if (malos.length) throw new Error(`${malos.length} por debajo del mínimo:\n       ` + malos.slice(0, 6).join('\n       '));
+  console.log(`       ~${medidos} elementos medidos en 5 vistas, todos por encima del mínimo`);
+});
+
+
 await paso('Entrenamiento guía los movimientos contando con la evolución', async () => {
   await pagina.click('text=+ Nueva');
   await pagina.click('button[data-vista="objetivo"]');

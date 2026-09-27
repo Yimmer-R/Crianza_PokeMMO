@@ -13,34 +13,73 @@
  *   - las tarjetas numeradas con su pestañita «.01» encima del borde;
  *   - el pie como un bloque macizo de color.
  *
- * Los colores NO son los de la plantilla (violeta): son los de PokeMMO, que
- * salen de su propia web (pokemmo.com, 27-09-2026):
+ * Los colores son la paleta de fantasía oscura que dio el usuario
+ * (27-09-2026): fondos abisales, carmesí para la interacción y grises y
+ * blancos para que ningún texto se pierda. Están todos en :root, con el
+ * nombre que les puso él.
  *
- *   #ff900b  naranja de los botones  (--bs-btn-bg, con #f3890b al pasar)
- *   #73ace2  azul de fondo del sitio (<meta name="theme-color">)
- *   #2d5971  azul oscuro de las sombras de texto
+ * Dos valores los he tenido que derivar, y los dos por contraste; el resto de
+ * la paleta va tal cual y todos sus pares cumplen AA:
  *
- * El naranja hace de acento, el azul claro de segundo color (pie y enlaces) y
- * el lienzo es el azul oscuro llevado casi a negro.
+ *   --acento-texto  #ff3b57  el carmesí #d90429 como LETRA pequeña sobre el
+ *                            fondo se queda en 3,9:1, y hace falta 4,5:1
+ *   --borde-campo   #6b6b6b  el borde #3d3d3d sobre una tarjeta se queda en
+ *                            1,7:1 y el campo no se veía (hace falta 3:1)
  */
 
 :root {
-  --fondo: #13191e;
-  --fondo-alt: #1a2228;          /* sólo para campos y hover: el lienzo es plano */
-  --fondo-alt2: #202a31;
-  --borde: #2c3841;              /* la línea de 1px que lo separa todo */
-  --borde-fuerte: #4a5c68;
-  --texto: #e7edf2;
-  --texto-tenue: #8fa2b0;
-  --acento: #ff900b;             /* naranja PokeMMO */
-  --acento-vivo: #ffa338;
-  --acento-suave: #3a2a12;
-  --sobre-acento: #12181d;       /* texto encima del naranja: negro, no blanco */
-  --cielo: #73ace2;              /* azul PokeMMO: pie, enlaces, chips de sí */
-  --cielo-suave: #16293a;
-  --bien: #57c98a;
-  --mal: #ff6b6b;
-  --ojo: #ffc94a;
+  /* Tema oscuro y nada más: la paleta es de fantasía oscura y no tiene versión
+     clara. Declararlo hace que los <select>, las casillas y las barras de
+     scroll del navegador salgan oscuras aunque el sistema esté en claro. */
+  color-scheme: dark;
+
+  /* --- superficies: la base y la profundidad --------------------------- */
+  --fondo: #050505;              /* negro abisal */
+  --tarjeta: #121212;            /* tarjetas y paneles */
+  --elevada: #1f1f1f;            /* tercer nivel, para lo anidado */
+
+  /* --- texto: jerarquía ------------------------------------------------ */
+  --texto: #f2f2f2;              /* sobre el fondo; blanco suave, no puro */
+  --texto-tarjeta: #e6e6e6;      /* cuerpos de texto dentro de una tarjeta */
+  --texto-tenue: #8c8c8c;        /* descripciones, pistas, subtítulos */
+
+  /* --- acciones: el foco visual ---------------------------------------- */
+  --acento: #d90429;             /* carmesí: rellenos, botones, activos */
+  --sobre-acento: #ffffff;
+  --acento-suave: #4a0008;       /* contenedor: filas elegidas, pie */
+  --sobre-acento-suave: #ffd1d6;
+  /* El carmesí RELLENO cumple de sobra (blanco encima, 5,3:1), pero como
+     TEXTO pequeño sobre el fondo se queda en 3,9:1 y sobre una tarjeta en
+     3,6:1 — por debajo del 4,5:1 que pide un texto normal. Así que el mismo
+     carmesí, aclarado, para todo lo que sea letra o borde de estado: 5,4:1
+     sobre tarjeta. Es el único color de la paleta que he tenido que derivar. */
+  --acento-texto: #ff3b57;
+
+  /* --- acentos secundarios: botones tonales ---------------------------- */
+  --secundario: #2b2b2b;
+  --sobre-secundario: #ffffff;
+  --secundario-suave: #1a1a1a;
+  --sobre-secundario-suave: #cccccc;
+
+  /* --- terciario: la insignia blanca, para romper el rojo y el negro --- */
+  --terciario: #ffffff;
+  --sobre-terciario: #000000;
+  --terciario-suave: #333333;
+  --sobre-terciario-suave: #ffffff;
+
+  /* --- bordes ---------------------------------------------------------- */
+  --borde: #3d3d3d;              /* divisores y cabeceras de tabla */
+  --borde-sutil: #242424;        /* separa tarjetas casi sin verse */
+  /* Un borde que delimita un campo tiene que distinguirse del fondo (regla
+     1.4.11: 3:1). #3d3d3d sobre #121212 se queda en 1,7:1 y el campo
+     desaparecía, así que los campos y los botones de contorno llevan éste. */
+  --borde-campo: #6b6b6b;
+
+  /* --- estado: distinto del carmesí a propósito ------------------------ */
+  --mal: #ff3300;                /* error Y advertencia: más cálido, eléctrico */
+  --mal-suave: #330a00;
+  --sobre-mal-suave: #ffb8a3;
+
   --radio: 0px;
   --fuente: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -48,28 +87,6 @@
   --rotulo: 700 0.68rem/1.4 var(--fuente);
   --espaciado-rotulo: 0.14em;
   --ancho: 1180px;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-tema="oscuro"]) {
-    --fondo: #ffffff;
-    --fondo-alt: #f4f6f8;
-    --fondo-alt2: #eceff2;
-    --borde: #d9dee3;
-    --borde-fuerte: #8b98a3;
-    --texto: #12181d;
-    --texto-tenue: #5d6b77;
-    --acento: #b35f00;           /* el naranja de PokeMMO, oscurecido hasta que
-                                    el blanco encima llega a 4,6:1 (AA) */
-    --acento-vivo: #8f4c00;
-    --acento-suave: #fdf0dd;
-    --sobre-acento: #ffffff;
-    --cielo: #2f6fa8;
-    --cielo-suave: #e3eef8;
-    --bien: #15784a;
-    --mal: #bb2222;
-    --ojo: #8a5a00;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -120,7 +137,7 @@ body > * { width: 100%; }
   flex: 1 1 260px;
 }
 .edicion {
-  border: 1px solid var(--borde-fuerte); padding: 6px 12px;
+  border: 1px solid var(--borde); padding: 6px 12px;
   font: var(--rotulo); letter-spacing: var(--espaciado-rotulo);
   text-transform: uppercase; color: var(--texto-tenue);
   white-space: nowrap; margin-left: auto;
@@ -160,8 +177,11 @@ body > * { width: 100%; }
   font: inherit; cursor: pointer; border-radius: 0;
   padding: 6px 14px; white-space: nowrap; text-align: left; line-height: 1.25;
 }
-.crianza:hover { color: var(--texto); border-color: var(--borde-fuerte); }
-.crianza.activa { color: var(--texto); border-color: var(--acento); }
+.crianza:hover { color: var(--texto); border-color: var(--borde-campo); }
+.crianza.activa {
+  color: var(--sobre-acento-suave); border-color: var(--acento);
+  background: var(--acento-suave);
+}
 .crianza-nombre {
   display: block; font-weight: 700; font-size: 0.82rem;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -170,9 +190,15 @@ body > * { width: 100%; }
   display: block; font: var(--rotulo); font-size: 0.64rem;
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-tenue);
 }
-.crianza-estado.bien { color: var(--bien); }
-.crianza-estado.ojo { color: var(--ojo); }
+.crianza-estado.bien { color: var(--terciario); }
+.crianza-estado.ojo { color: var(--mal); }
 .crianza-estado.mal { color: var(--mal); }
+/* Dentro de la crianza activa el fondo ya es el contenedor primario, y el rojo
+   de estado encima se queda en 4,4:1. Se usa el tono claro de la misma familia
+   —el mismo que la paleta da para el texto sobre el contenedor de error— que
+   ahí sube a 9,8:1 y no pierde el matiz cálido. */
+.crianza.activa .crianza-estado.ojo,
+.crianza.activa .crianza-estado.mal { color: var(--sobre-mal-suave); }
 .crianzas-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-left: auto; }
 .crianzas-renombrar { display: flex; gap: 6px; flex: 1 1 100%; }
 .crianzas-renombrar input { flex: 1; }
@@ -188,17 +214,17 @@ body > * { width: 100%; }
 /* El pie de la plantilla es un bloque macizo del color de la marca. Aquí es el
    azul de PokeMMO, con el texto en oscuro encima. */
 .pie {
-  background: var(--cielo); color: #10171d;
+  background: var(--acento-suave); color: var(--sobre-acento-suave);
   margin-top: 8px; padding: 26px 16px 30px;
   font-size: 0.85rem;
 }
 .pie > * { max-width: var(--ancho); margin-left: auto; margin-right: auto; }
 .pie p { margin: 6px auto; }
-.pie a { color: #10171d; text-decoration: underline; text-underline-offset: 3px; }
-.pie .tenue { color: #1d3348; }
-.pie code { background: rgb(255 255 255 / 0.35); padding: 1px 5px; }
+.pie a { color: var(--sobre-acento-suave); text-decoration: underline; text-underline-offset: 3px; }
+.pie .tenue { color: #eda9b1; }
+.pie code { background: rgb(255 209 214 / 0.14); padding: 1px 5px; }
 
-a { color: var(--cielo); text-underline-offset: 3px; }
+a { color: var(--acento-texto); text-underline-offset: 3px; }
 
 /* ---------------------------------------------------------------- bloques */
 /* Una tarjeta de la plantilla no tiene fondo propio: es un rectángulo con una
@@ -206,7 +232,7 @@ a { color: var(--cielo); text-underline-offset: 3px; }
    del color de acento. */
 
 .tarjeta {
-  background: none; border: 1px solid var(--borde);
+  background: var(--tarjeta); color: var(--texto-tarjeta); border: 1px solid var(--borde-sutil);
   border-radius: 0; padding: 18px 18px 20px; margin-bottom: 14px;
 }
 .tarjeta > h2, .tarjeta > h3 { margin-top: 0; }
@@ -234,7 +260,7 @@ h3 {
   text-transform: uppercase; letter-spacing: 0.06em;
   list-style-position: outside;
 }
-.plegable > summary::marker { color: var(--acento); }
+.plegable > summary::marker { color: var(--acento-texto); }
 .plegable[open] > summary { margin-bottom: 14px; }
 .plegable .sumario-extra {
   font-weight: 400; color: var(--texto-tenue); font-size: 0.78rem;
@@ -253,11 +279,11 @@ label {
 /* Los campos de la plantilla: sin relleno de color, línea de 1px, y al entrar
    se enciende del color de acento. */
 input, select, textarea, button {
-  font: inherit; color: var(--texto); background: var(--fondo-alt);
-  border: 1px solid var(--borde); border-radius: 0; padding: 9px 11px; width: 100%;
+  font: inherit; color: var(--texto); background: var(--elevada);
+  border: 1px solid var(--borde-campo); border-radius: 0; padding: 9px 11px; width: 100%;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: none; border-color: var(--acento);
+  outline: none; border-color: var(--acento-texto);
 }
 input[type="checkbox"] { width: auto; accent-color: var(--acento); }
 textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
@@ -272,8 +298,12 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
   line-height: 1.4; text-decoration: none; cursor: pointer;
 }
 .boton:hover { background: var(--acento-vivo); border-color: var(--acento-vivo); }
-.boton.secundario { background: none; color: var(--texto); border-color: var(--borde-fuerte); }
-.boton.secundario:hover { border-color: var(--texto); background: none; }
+/* El botón tonal de la paleta: presente pero sin distraer. */
+.boton.secundario {
+  background: var(--secundario-suave); color: var(--sobre-secundario-suave);
+  border-color: var(--borde-campo);
+}
+.boton.secundario:hover { background: var(--secundario); color: var(--sobre-secundario); }
 .boton.peligro { background: none; color: var(--mal); border-color: var(--mal); }
 .boton.peligro:hover { background: none; color: var(--mal); border-color: var(--mal); filter: brightness(1.2); }
 .boton.mini { padding: 5px 10px; font-size: 0.62rem; }
@@ -289,21 +319,37 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
   font: var(--rotulo); font-size: 0.64rem;
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-tenue);
 }
-.chip.si { border-color: var(--cielo); color: var(--cielo); }
-.chip.bien { color: var(--bien); border-color: var(--bien); }
-.chip.mal { color: var(--mal); border-color: var(--mal); }
-.chip.ojo { color: var(--ojo); border-color: var(--ojo); }
+/* El carmesí se reserva para lo que ES una acción o una alerta. Un chip que
+   sólo informa («grupo huevo: Monstruo», «3 cruces») va en el contenedor
+   terciario: presente, neutro, y deja de haber dos rojos casi iguales al lado
+   que se confundían entre sí. */
+.chip.si {
+  background: var(--terciario-suave); color: var(--sobre-terciario-suave);
+  border-color: var(--borde);
+}
+/* La insignia blanca de la paleta, para «esto ya está»: rompe el rojo y el
+   negro y es donde se va el ojo. */
+.chip.bien {
+  background: var(--terciario); color: var(--sobre-terciario);
+  border-color: var(--terciario);
+}
+/* El error y el aviso comparten color a propósito —lo pide la paleta—, pero no
+   la forma: el aviso es un contorno y el error va relleno. */
+.chip.mal, .chip.ojo { color: var(--mal); border-color: var(--mal); }
 
 /* Un aviso y un error sí son cajas: interrumpen. Una nota no — era una caja
    rellena por cada párrafo explicativo y la pantalla parecía un acordeón.
    Aquí la caja es una línea gruesa a la izquierda, como los bloques de cita
    de la plantilla. */
 .aviso, .error {
-  border: 1px solid var(--borde); border-left: 3px solid var(--ojo);
+  border: 1px solid var(--borde-sutil); border-left: 3px solid var(--mal);
   border-radius: 0; padding: 10px 14px; margin: 12px 0; font-size: 0.88rem;
   background: none;
 }
-.error { border-left-color: var(--mal); color: var(--mal); }
+.error {
+  background: var(--mal-suave); border-left-color: var(--mal);
+  color: var(--sobre-mal-suave);
+}
 .nota { margin: 8px 0 14px; font-size: 0.84rem; color: var(--texto-tenue); }
 .error ul, .aviso ul, .nota ul { margin: 6px 0 0; padding-left: 20px; }
 
@@ -314,10 +360,11 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 .ivs { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .iv {
   display: flex; align-items: center; gap: 8px; cursor: pointer;
-  background: none; border: 1px solid var(--borde);
+  background: none; border: 1px solid var(--borde-campo);
   border-radius: 0; padding: 9px 11px; user-select: none;
 }
 .iv:has(input:checked) { border-color: var(--acento); background: var(--acento-suave); }
+.iv:has(input:checked) span { color: var(--sobre-acento-suave); }
 .iv span {
   font: var(--rotulo); font-size: 0.68rem; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--texto);
@@ -330,11 +377,11 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 /* ------------------------------------------------------------------ tabla */
 
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde-sutil); }
 th {
   color: var(--texto-tenue); font: var(--rotulo); font-size: 0.62rem;
   text-transform: uppercase; letter-spacing: var(--espaciado-rotulo);
-  border-bottom-color: var(--borde-fuerte);
+  border-bottom-color: var(--borde);
 }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .desliza { overflow-x: auto; }
@@ -346,18 +393,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pasos { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: paso; }
 .pasos li {
   position: relative; padding: 16px 14px 12px 14px; margin-bottom: 14px;
-  background: none; border: 1px solid var(--borde); border-radius: 0;
+  background: var(--elevada); border: 1px solid var(--borde-sutil); border-radius: 0;
 }
 .pasos li::before {
   counter-increment: paso; content: "." counter(paso, decimal-leading-zero);
   position: absolute; left: -1px; top: -12px;
-  padding: 1px 8px; background: var(--fondo);
+  /* El fondo de la pestañita es el de la TARJETA que contiene la lista, no el
+     del paso: así tapa el borde y se monta encima, como en la plantilla. */
+  padding: 1px 8px; background: var(--tarjeta);
   border: 1px solid var(--borde);
   color: var(--texto-tenue); font: var(--rotulo); font-size: 0.62rem;
   letter-spacing: 0.1em;
 }
-.pasos li.usar::before { color: var(--bien); border-color: var(--bien); }
-.pasos li.conseguir::before { color: var(--acento); border-color: var(--acento); }
+.pasos li.usar::before {
+  background: var(--terciario); color: var(--sobre-terciario); border-color: var(--terciario);
+}
+.pasos li.conseguir::before { color: var(--acento-texto); border-color: var(--acento-texto); }
 .pasos .porque { display: block; color: var(--texto-tenue); font-size: 0.8rem; margin-top: 6px; }
 
 /* Checklist: un paso hecho se apaga, y el que ya se puede hacer se enciende. */
@@ -376,7 +427,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .listos li {
   display: flex; gap: 10px; align-items: center; justify-content: space-between;
   flex-wrap: wrap; padding: 10px 12px; margin-bottom: 8px; font-size: 0.88rem;
-  background: none; border: 1px solid var(--acento); border-radius: 0;
+  background: var(--elevada); border: 1px solid var(--acento); border-radius: 0;
 }
 .pequeno ol, .pequeno ul { margin: 8px 0; padding-left: 20px; }
 
@@ -426,7 +477,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   max-height: 44vh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--fondo);
+  background: var(--elevada);
   border: 1px solid var(--acento);
   border-radius: 0;
   box-shadow: 0 14px 34px rgb(0 0 0 / 0.45);
@@ -447,4 +498,4 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   cursor: pointer;
   font: inherit;
 }
-.sug-opcion:hover, .sug-opcion.resaltada { background: var(--acento-suave); color: var(--texto); }
+.sug-opcion:hover, .sug-opcion.resaltada { background: var(--acento-suave); color: var(--sobre-acento-suave); }

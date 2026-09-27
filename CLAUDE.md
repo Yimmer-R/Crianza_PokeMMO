@@ -107,29 +107,46 @@ Ocho cosas que no son evidentes leyendo un archivo suelto:
 
 ## El aspecto
 
-El diseño sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
-Design / Web Template»), con los colores cambiados por los de PokeMMO. Si vas a
-añadir una vista, estas son las reglas del sistema, y están todas en
-`src/css/estilos.css`:
+La **forma** sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
+Design / Web Template»); el **color**, de una paleta de fantasía oscura que dio
+después. Las dos cosas están en `src/css/estilos.css` y en ningún otro sitio.
 
-- **el lienzo es plano**. Una tarjeta no tiene fondo propio: es un rectángulo
-  con una línea de 1px. El relleno de color se reserva para el acento;
+De la plantilla, la geometría y la tipografía:
+
 - **esquinas rectas** en todo (`--radio: 0`). Nada de píldoras ni de sombras;
 - **un solo acento**, con cuentagotas. El resto es blanco y gris;
-- **los rótulos pequeños van en MAYÚSCULAS muy espaciadas** (la variable
-  `--rotulo` y `--espaciado-rotulo`): etiquetas de campo, cabeceras de tabla,
-  botones, chips y `h3`. El texto corrido NO;
-- **los titulares llevan un subrayado corto** del acento, que lo pone `h2::after`;
+- **los rótulos pequeños van en MAYÚSCULAS muy espaciadas** (`--rotulo` y
+  `--espaciado-rotulo`): etiquetas de campo, cabeceras de tabla, botones, chips
+  y `h3`. El texto corrido NO;
+- **los titulares llevan un subrayado corto** del acento, que pone `h2::after`;
 - **las listas numeradas llevan su pestañita** `.01` montada sobre el borde de
   arriba (`.pasos li::before`), como las tarjetas de curso de la plantilla;
-- **el pie es un bloque macizo** del azul de PokeMMO.
+- **el pie es un bloque macizo** de color.
 
-Los colores no son inventados: salen de la web del juego (pokemmo.com,
-27-09-2026) y están citados en la cabecera de la hoja — `#ff900b` el naranja de
-sus botones, `#73ace2` el azul de su fondo, `#2d5971` el azul oscuro. El naranja
-es el acento, el azul el segundo color, y el lienzo es ese azul oscuro llevado
-casi a negro. En el tema claro el naranja se oscurece a `#b35f00` porque el
-blanco encima de `#ff900b` no llega al contraste AA (3,8:1); así queda en 4,6:1.
+De la paleta, los colores y la profundidad. Los tokens están en `:root` con el
+nombre que les puso el usuario: tres superficies (`--fondo` abisal, `--tarjeta`,
+`--elevada` para lo anidado), tres niveles de texto, el carmesí de las acciones
+con su contenedor para lo elegido, el gris tonal, la insignia blanca y el rojo
+anaranjado del estado. Tres reglas que no son evidentes:
+
+1. **El carmesí es de las acciones y el rojo anaranjado de las alertas.** Un
+   chip que sólo informa va en el contenedor terciario gris: con los dos rojos
+   juntos no se distinguía una acción de un aviso, que es justo lo que la paleta
+   quiere evitar. Error y aviso sí comparten color, pero no forma — el aviso es
+   un contorno y el error va relleno sobre `--mal-suave`.
+2. **Hay dos valores derivados, y los dos por contraste.** `--acento-texto`
+   (`#ff3b57`) porque el carmesí `#d90429` como LETRA pequeña se queda en 3,6:1
+   sobre una tarjeta, y `--borde-campo` (`#6b6b6b`) porque el borde `#3d3d3d` se
+   queda en 1,7:1 y el campo no se veía. Todo lo demás va tal cual.
+3. **No hay tema claro.** La paleta es oscura y no tiene versión clara, así que
+   se quitó el bloque de `prefers-color-scheme: light` y `:root` declara
+   `color-scheme: dark` — sin eso, con el sistema en claro el navegador pintaba
+   los `<select>` y las casillas en blanco sobre negro.
+
+Lo de la legibilidad **no se comprueba a ojo**: la prueba de navegador recorre
+el DOM de las cinco vistas, con los plegables abiertos, busca el fondo efectivo
+de cada nodo con texto y exige 4,5:1 (3:1 si el texto es grande). Si tocas
+colores y algo baja de ahí, falla. Son ~760 elementos.
 
 ## Al tocar la interfaz
 

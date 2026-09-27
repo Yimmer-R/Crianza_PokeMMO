@@ -154,11 +154,18 @@ los demás al lado. De ahí salen dos avisos que antes no estaban:
   comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
   imposible», que es lo que hacía.
 
-**El aspecto.** La interfaz sigue una plantilla de diseño oscura: lienzo plano,
-cajas de una línea de 1px, esquinas rectas, rótulos en mayúsculas espaciadas y
-un solo color de acento. Los colores son los de PokeMMO, sacados de su propia
-web: el naranja `#ff900b` de sus botones como acento, el azul `#73ace2` de su
-fondo para el pie y los enlaces. Hay tema claro y oscuro, y sigue al del sistema.
+**El aspecto.** La forma viene de una plantilla de diseño: esquinas rectas,
+cajas de una línea, rótulos en mayúsculas espaciadas, titulares con un
+subrayado corto y los pasos numerados con su pestañita. El color, de una paleta
+de fantasía oscura: fondo abisal, carmesí para lo que se puede pulsar, gris
+tonal para lo secundario, una insignia blanca para «esto ya está» y un rojo
+anaranjado, distinto del carmesí, para los avisos y los errores. Es oscura y no
+tiene versión clara.
+
+Que no se pierda ninguna letra no se deja al ojo: la prueba de navegador mide el
+contraste real de los ~760 elementos con texto de las cinco vistas y exige el
+mínimo de la WCAG. Dos colores de la paleta se aclararon precisamente por eso, y
+está anotado cuáles y por qué.
 
 **Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme, y al
 lado compara con el precio de mercado observado cuando lo hay. Con un caso
