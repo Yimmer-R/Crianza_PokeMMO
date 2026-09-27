@@ -368,6 +368,54 @@ Se hace en tres pasadas:
 Un 3×31 colocado en un hueco de 3×31 borra siete capturas del árbol. Colocado en
 una hoja de 1×31 no ahorra ninguna. La diferencia es todo el valor de la función.
 
+## Los IVs que nadie pidió
+
+Un ejemplar del inventario casi nunca trae **sólo** lo que el hueco pedía. El caso
+que abrió esto: un Gible ♀ que entra en el árbol por ser la hembra que pone la
+especie, y que además tiene **31 en Defensa** — que el objetivo (Ataque +
+Velocidad + Alegre) no pide.
+
+La pregunta natural es «¿y no puede el plan conservarlo?». La respuesta sale de la
+regla del principio, y es que **no hay forma de conservar un IV a medias**:
+
+> un IV sale 31 seguro si los DOS padres lo tienen a 31, o si un padre lleva su
+> Recio y lo tiene a 31.
+
+Los Recios de un plan ya están todos comprometidos con los IVs que sí se pidieron,
+y cuando hay naturaleza uno de los dos huecos se lo lleva la Piedraeterna. No
+sobra ninguno. Así que a un IV de regalo sólo le quedan tres finales:
+
+| final | cuándo | qué hace la app |
+|---|---|---|
+| **gratis** | los dos padres de ese cruce lo tienen a 31 por casualidad | lo recoge el suelo de `ivsDelArbol()` y se dice que ya sale solo |
+| **por suerte** | un padre lo tiene y el otro no | se dice la probabilidad de la rama alta **y en qué cruce se juega** |
+| **pidiéndolo** | el usuario decide que lo quiere garantizado | el objetivo pasa de n×31 a (n+1)×31 y el árbol dobla |
+
+Lo tercero es la única garantía, y por eso la vista Plan lo ofrece como un botón
+con el **precio delante** —cruces, capturas y dinero de más— en vez de hacerlo por
+su cuenta. `objetivo.conservados` recuerda qué IVs se pidieron por esa vía, para
+poder soltarlos sin tener que acordarse.
+
+Dos detalles que no son evidentes:
+
+- **dónde se juega la tirada importa tanto como la probabilidad.** El 31 en
+  Defensa del Gible se juega en el cruce más hondo, al 20 %; aunque salga,
+  todavía tiene que sobrevivir a los dos cruces de encima, donde nadie lo
+  comparte. Por eso la app dice «se juega en un cruce intermedio» y no sólo el
+  porcentaje: un 20 % en el último cruce y un 20 % abajo del todo no valen lo
+  mismo;
+- **no hay un modo «pídemelo a 30».** Se pide a 31 siempre. Si en la caja sólo
+  hay un 30, `cumple()` lo acepta como pseudo 31 y el plan dice a qué valor deja
+  ese IV de verdad; y si capturar un 31 sale a cuenta, lo captura, que es mejor
+  que conservar el 30. El «o 30 en su defecto» es el resultado, no una opción.
+
+Lo único que la app sí hace sola, porque **no cuesta nada**, es un desempate al
+emparejar: entre dos candidatos que ya empataban en todo —lo que tapan del árbol,
+los 30 que usan y los 31 que gastan—, gana el que comparte un IV de regalo con su
+pareja de cruce, porque entonces sale garantizado sin gastar un objeto. Va el
+último de la lista a propósito: conservar un regalo nunca compensa quemar un 3×31
+en un hueco de 1×31.
+
 ## Las tablas de probabilidad
 
 Para los IVs que **no** están garantizados, el reparto depende de cuántos objetos

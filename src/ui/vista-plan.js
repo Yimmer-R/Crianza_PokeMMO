@@ -1,6 +1,7 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
 import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, sprite } from './componentes.js';
+import { conservando, dejandoDeConservar } from '../nucleo/regalos.js';
 import { NOMBRE_STAT, STATS, IV_MAX, INCUBADORAS, ACELERAR_HUEVO } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
 import { contar, criaDe, ROL } from '../nucleo/planificador.js';
@@ -210,13 +211,131 @@ export function vistaPlan(datos) {
     el('div.nota', {}, [pres.sinPrecio.nota]),
   ]);
 
-  return frag([resumen, ahora, pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
+  return frag([resumen, ahora, bloqueRegalos(objetivo), pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
 }
 
 function irAObjetivo(e) {
   e.preventDefault();
   fijarYGuardar({ vista: 'objetivo' });
 }
+
+// ------------------------------------------------------------ IVs de regalo
+
+/**
+ * "3 cruces · 2 capturas · 64.000 PokéYen", o "nada" si sale gratis.
+ *
+ * Se leen las magnitudes, sin signo: la frase de alrededor ya dice si es lo que
+ * cuesta o lo que se ahorra, y un «te ahorrarías +3 cruces» no se entiende.
+ */
+function precioLegible(p) {
+  if (!p) return 'no se puede medir';
+  const cuantos = (n, uno, varios) => (n ? `${Math.abs(n)} ${Math.abs(n) === 1 ? uno : varios}` : null);
+  const partes = [
+    cuantos(p.cruces, 'cruce', 'cruces'),
+    cuantos(p.capturas, 'captura', 'capturas'),
+    p.dinero ? `${numero(Math.abs(p.dinero))} PokéYen` : null,
+  ].filter(Boolean);
+  return partes.length ? partes.join(' · ') : 'nada: sale gratis';
+}
+
+/**
+ * Los IVs que el inventario trae y el objetivo no pide.
+ *
+ * El caso real: un Gible ♀ que está en el árbol por ser la hembra de la especie
+ * y que además lleva 31 en Defensa. Sin esta tarjeta, esa Defensa se pierde en
+ * el primer cruce y el plan no dice nada.
+ *
+ * Lo que NO se hace aquí, y es deliberado: intentar conservarlos por lo bajo.
+ * Un cruce garantiza los 31 que comparten los DOS padres más los que fuerce un
+ * Recio, y los Recios del plan ya están todos comprometidos. Así que un IV que
+ * no se pide sólo llega gratis por casualidad o sale por suerte. Querer el
+ * garantizado es pedirlo, y eso es lo que hace el botón — con su precio delante.
+ * Ver nucleo/regalos.js.
+ */
+function bloqueRegalos(objetivo) {
+  const { regalos } = obtener();
+  const { candidatos = [], conservados = [] } = regalos ?? {};
+  if (!candidatos.length && !conservados.length) return null;
+
+  const cambia = (nuevo) => fijarYGuardar({ objetivo: nuevo });
+
+  const filaCandidato = (r) => {
+    const deQuien = r.quienes.slice(0, 3)
+      .map((q) => `${q.especie}${q.mote ? ` "${q.mote}"` : ''} ${q.sexo ?? ''} (${q.valor})`)
+      .join(', ');
+
+    const queHace = r.estado === 'garantizado'
+      ? chip(`ya sale a ${r.entregado}: gratis`, 'bien')
+      : r.estado === 'a-suerte'
+        ? chip(`a suerte: ${r.tiradas.map((t) => `${Math.round(t.probabilidad * 100)} %`).join(' / ')}`, 'ojo')
+        : chip('se pierde', 'mal');
+
+    return el('div.regalo', {}, [
+      el('div.fila-regalo', {}, [
+        r.quienes[0] ? sprite(r.quienes[0].especie, { tam: 'mini', sexo: r.quienes[0].sexo }) : null,
+        el('strong', { texto: `${r.nombre} a ${r.mejorEnLaCaja}` }),
+        queHace,
+      ]),
+      el('p.nota', { texto: `Lo trae ${deQuien}.` }),
+      r.estado === 'a-suerte'
+        ? el('p.nota', {
+            texto: r.tiradas.every((t) => t.esRaiz)
+              ? 'Se juega en el ÚLTIMO cruce, así que si sale te lo quedas.'
+              : 'Se juega en un cruce intermedio: aunque salga, todavía tiene que sobrevivir a los '
+                + 'de encima. Si te toca, anota la cría y el plan lo recoge.',
+          })
+        : null,
+      r.estado === 'garantizado'
+        ? el('p.nota', { texto: 'Los dos padres de ese cruce lo tienen, así que sale solo. No hay nada que decidir.' })
+        : el('p', {}, [
+            el('button.boton.mini', {
+              onclick: () => cambia(conservando(objetivo, r.stat)),
+            }, [`Conservar ${r.nombre}`]),
+            ' ',
+            el('span.nota', { texto: `cuesta ${precioLegible(r.precio)}` }),
+            // Se pide siempre a 31: no hay forma de pedir «un 30». Si el plan
+            // acaba entregando 30 es porque en la caja sólo hay un 30 y
+            // capturar un 31 salía más caro — que es justo lo que se quería.
+            r.saldriaA != null && r.saldriaA < 31
+              ? el('span.nota', { texto: ` · saldría a ${r.saldriaA}: en la caja no hay un 31 y el plan usa tu ${r.mejorEnLaCaja}` })
+              : null,
+          ]),
+    ]);
+  };
+
+  const filaConservado = (c) => el('div.regalo', {}, [
+    el('div.fila-regalo', {}, [
+      el('strong', { texto: c.nombre }),
+      chip('lo estás conservando', 'si'),
+    ]),
+    el('p', {}, [
+      el('button.boton.mini.secundario', {
+        onclick: () => cambia(dejandoDeConservar(objetivo, c.stat)),
+      }, [`Dejar de conservar ${c.nombre}`]),
+      ' ',
+      el('span.nota', { texto: `te ahorrarías ${precioLegible(c.ahorro)}` }),
+    ]),
+  ]);
+
+  const resumenCorto = [
+    conservados.length ? `${conservados.length} conservado${conservados.length > 1 ? 's' : ''}` : null,
+    candidatos.length ? `${candidatos.length} sin pedir` : null,
+  ].filter(Boolean).join(' · ');
+
+  return plegable('IVs de regalo', [
+    el('p.nota', {}, [
+      'Un cruce garantiza los 31 que comparten los ',
+      el('strong', { texto: 'DOS' }),
+      ' padres, más los que fuerce un Recio — y los Recios de este plan ya están todos ',
+      'comprometidos con lo que pediste. Así que un IV que no se pide no se conserva solo: ',
+      'o coincide y sale gratis, o se juega a una tirada. Para tenerlo garantizado hay que ',
+      'pedirlo, y eso agranda el árbol.',
+    ]),
+    ...conservados.map(filaConservado),
+    ...candidatos.map(filaCandidato),
+  ], { extra: resumenCorto, id: 'regalos' });
+}
+
 
 
 // --------------------------------------------------------------- ahora mismo

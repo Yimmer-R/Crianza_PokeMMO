@@ -1043,6 +1043,35 @@ await paso('un 2×31 del sexo contrario deja de quedarse en la caja', async () =
     throw new Error('no explica dónde va la Piedraeterna');
   console.log('       Garchomp + Horsea ♂ 2×31: entra en el cruce final y el plan sale sin capturas');
 
+});
+
+
+await paso('el 31 en Defensa del Gible se dice, y se puede conservar', async () => {
+  // Sigue el mismo montaje de la prueba de arriba: Garchomp 2×31 Alegre con el
+  // Gible ♀ que además trae 31 en Defensa, que nadie pidió.
+  await abrir('IVs de regalo');
+  const t = await pagina.textContent('#vista');
+  if (!/Defensa a 31/.test(t)) throw new Error('la tarjeta no nombra el regalo');
+  if (!/Lo trae Gible/.test(t)) throw new Error('no dice quién lo trae');
+  if (!/a suerte: \d+ %/.test(t)) throw new Error(`no dice a qué se juega: ${t.slice(0, 200)}`);
+  const precio = (t.match(/cuesta ([^]{0,60}?PokéYen)/) ?? [])[1];
+  if (!precio) throw new Error('no dice lo que costaría conservarlo');
+
+  const antes = await pagina.textContent('.tarjeta h2');
+  await pagina.click('button:text-is("Conservar Defensa")');
+  await pagina.waitForTimeout(700);
+  const despues = await pagina.textContent('.tarjeta h2');
+  if (!/3×31/.test(despues) || !/Defensa/.test(despues))
+    throw new Error(`el objetivo no ha crecido: "${antes}" -> "${despues}"`);
+
+  // Y se puede soltar, volviendo al plan de antes.
+  await abrir('IVs de regalo');
+  await pagina.click('text=Dejar de conservar Defensa');
+  await pagina.waitForTimeout(700);
+  const final = await pagina.textContent('.tarjeta h2');
+  if (final !== antes) throw new Error(`no ha vuelto: "${antes}" -> "${final}"`);
+  console.log(`       Defensa: se pierde, conservarla cuesta ${precio.replace(/\s+/g, ' ')}`);
+
   // Es la última prueba: no hace falta devolver el estado a su sitio, sólo no
   // dejar el inventario sembrado en el navegador de la siguiente tanda.
   await pagina.evaluate(() => localStorage.removeItem('crianza-pokemmo:inventario:v1'));

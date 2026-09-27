@@ -25,6 +25,11 @@ function objetivoVacio() {
   return {
     especie: '',
     ivs: Object.fromEntries(STATS.map((s) => [s, 0])),
+    // IVs que están pedidos porque el usuario decidió CONSERVAR un regalo del
+    // inventario, no porque los quisiera de entrada. Están en `ivs` como
+    // cualquier otro —para el planificador no hay diferencia—; esto sólo sirve
+    // para poder decir cuáles fueron y ofrecer soltarlos. Ver nucleo/regalos.js.
+    conservados: [],
     evs: Object.fromEntries(STATS.map((s) => [s, 0])),
     naturaleza: null,
     habilidad: null,
@@ -72,6 +77,10 @@ const inicial = {
   // ejemplar que dos crianzas se disputan.
   plan: null,
   planes: {},
+  // Los IVs que el inventario trae de regalo en la crianza ACTIVA, con lo que
+  // costaría conservarlos. Se calculan aparte del plan porque cada uno lleva un
+  // `planear()` detrás. Ver nucleo/regalos.js.
+  regalos: { candidatos: [], conservados: [] },
   disputados: [],
   ultimaEvaluacion: null,
   avisoPersistencia: null,

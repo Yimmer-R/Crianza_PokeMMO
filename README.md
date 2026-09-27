@@ -51,6 +51,14 @@ sólo fuerza un IV en vez de dos, y la hoja de sólo naturaleza entra por abajo 
 árbol. El lado bueno: media cadena queda sin naturaleza, y ahí encaja cualquier
 Pokémon que ya tengas aunque la suya no sea la buena.
 
+**Los IVs que no pediste.** Si en tu caja hay un 31 (o un 30) en una
+característica que el objetivo no pide —el Gible que está en el árbol sólo por
+poner la especie y que además trae 31 en Defensa—, el plan lo dice en vez de
+tirarlo en silencio: si sale gratis, si se juega a una tirada y con qué
+probabilidad, o si se pierde. Y hay un botón para conservarlo, con el precio
+delante: lo que va a costar en cruces, capturas y dinero. Conservarlo de verdad
+es pedirlo, porque un cruce sólo garantiza lo que comparten los dos padres.
+
 **Con la cara de cada Pokémon.** Objetivo, plan, árbol, capturas, inventario y la
 línea evolutiva salen con su sprite: el render 3D de Pokémon HOME, y la variante ♀
 en las 97 especies que el juego dibuja distintas. Las imágenes no viven aquí —son
@@ -248,6 +256,7 @@ src/nucleo/             la lógica, sin nada del DOM
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
   habilidades.js          normal, oculta, y qué objeto hace falta
   sprites.js              qué imagen le toca a cada Pokémon, y con qué sexo
+  regalos.js              los IVs que el inventario trae y nadie pidió
 src/ui/                 vistas y estado; nada de reglas del juego
   estado.js               las crianzas, el inventario y el repintado
   barra-crianzas.js       cambiar de crianza sin salir de la pestaña
@@ -262,7 +271,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                272 pruebas unitarias + una de navegador
+pruebas/                288 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 
