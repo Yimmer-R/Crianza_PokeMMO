@@ -172,6 +172,9 @@ async function arrancar() {
     return;
   }
 
+  const fecha = document.getElementById('edicion-fecha');
+  if (fecha) fecha.textContent = datos.meta.generado;
+
   const meta = document.getElementById('pie-meta');
   if (meta)
     meta.textContent =

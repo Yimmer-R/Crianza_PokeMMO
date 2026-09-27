@@ -95,8 +95,7 @@ export function vistaObjetivo(datos) {
   // --------------------------------------------------------- naturaleza
   const nat = objetivo.naturaleza ? datos.naturalezas[objetivo.naturaleza] : null;
   const bloqueNaturaleza = frag([
-    el('h3', { texto: 'Naturaleza' }),
-    el('div.fila', {}, [
+    el('div.fila', { style: 'margin-top:18px' }, [
       campoConSugerencias(
         'naturaleza', 'Naturaleza (opcional)', objetivo.naturaleza ?? '', datos.nombresNaturaleza,
         (v) => cambiaObjetivo({ naturaleza: v ? (res(datos).naturaleza(v).valor ?? v) : null }),
@@ -164,7 +163,6 @@ export function vistaObjetivo(datos) {
   // ------------------------------------------------- habilidad y movimientos
   const habs = p ? habilidadesDe(objetivo.especie, datos.pokedex) : { normales: [], ocultas: [] };
   const bloqueHabilidad = frag([
-    el('h3', { texto: 'Habilidad' }),
     p
       ? el('div.fila', {}, [
           el('div.crece', {}, [

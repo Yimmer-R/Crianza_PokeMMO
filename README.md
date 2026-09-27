@@ -154,6 +154,12 @@ los demás al lado. De ahí salen dos avisos que antes no estaban:
   comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
   imposible», que es lo que hacía.
 
+**El aspecto.** La interfaz sigue una plantilla de diseño oscura: lienzo plano,
+cajas de una línea de 1px, esquinas rectas, rótulos en mayúsculas espaciadas y
+un solo color de acento. Los colores son los de PokeMMO, sacados de su propia
+web: el naranja `#ff900b` de sus botones como acento, el azul `#73ace2` de su
+fondo para el pie y los enlaces. Hay tema claro y oscuro, y sigue al del sistema.
+
 **Tienda o GTL.** El presupuesto usa el precio de tienda, que es firme, y al
 lado compara con el precio de mercado observado cuando lo hay. Con un caso
 aparte: **la Piedraeterna no se vende en ninguna tienda**, por mucho que el

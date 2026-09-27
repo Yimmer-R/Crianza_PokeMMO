@@ -105,6 +105,32 @@ Ocho cosas que no son evidentes leyendo un archivo suelto:
    contrario que en los juegos originales. Y no tiene sexos: ningún hueco del
    árbol puede pedir ♀ ni ♂, o salen capturas de «1 de cada 0».
 
+## El aspecto
+
+El diseño sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
+Design / Web Template»), con los colores cambiados por los de PokeMMO. Si vas a
+añadir una vista, estas son las reglas del sistema, y están todas en
+`src/css/estilos.css`:
+
+- **el lienzo es plano**. Una tarjeta no tiene fondo propio: es un rectángulo
+  con una línea de 1px. El relleno de color se reserva para el acento;
+- **esquinas rectas** en todo (`--radio: 0`). Nada de píldoras ni de sombras;
+- **un solo acento**, con cuentagotas. El resto es blanco y gris;
+- **los rótulos pequeños van en MAYÚSCULAS muy espaciadas** (la variable
+  `--rotulo` y `--espaciado-rotulo`): etiquetas de campo, cabeceras de tabla,
+  botones, chips y `h3`. El texto corrido NO;
+- **los titulares llevan un subrayado corto** del acento, que lo pone `h2::after`;
+- **las listas numeradas llevan su pestañita** `.01` montada sobre el borde de
+  arriba (`.pasos li::before`), como las tarjetas de curso de la plantilla;
+- **el pie es un bloque macizo** del azul de PokeMMO.
+
+Los colores no son inventados: salen de la web del juego (pokemmo.com,
+27-09-2026) y están citados en la cabecera de la hoja — `#ff900b` el naranja de
+sus botones, `#73ace2` el azul de su fondo, `#2d5971` el azul oscuro. El naranja
+es el acento, el azul el segundo color, y el lienzo es ese azul oscuro llevado
+casi a negro. En el tema claro el naranja se oscurece a `#b35f00` porque el
+blanco encima de `#ff900b` no llega al contraste AA (3,8:1); así queda en 4,6:1.
+
 ## Al tocar la interfaz
 
 Tres trampas que ya han costado caro y que no se ven en las pruebas unitarias:

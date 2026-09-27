@@ -1,35 +1,74 @@
-/* Hoja única. Sin framework: la app no tiene paso de compilación. */
+/* Hoja única. Sin framework: la app no tiene paso de compilación.
+ *
+ * El diseño sale de la plantilla «UI Design / Web Template» que pasó el
+ * usuario (PSD de 1440×8000). Lo que se ha copiado de ella:
+ *
+ *   - un lienzo PLANO casi negro, sin tarjetas de otro color encima: lo que
+ *     separa las cosas es una línea de 1px, no un relleno;
+ *   - esquinas RECTAS, sin radio, en todo: cajas, botones, campos y chips;
+ *   - un solo color de acento, usado con cuentagotas, y el resto en blanco y
+ *     gris;
+ *   - los rótulos pequeños en MAYÚSCULAS muy espaciadas, y los titulares en
+ *     negrita con un subrayado corto del color de acento;
+ *   - las tarjetas numeradas con su pestañita «.01» encima del borde;
+ *   - el pie como un bloque macizo de color.
+ *
+ * Los colores NO son los de la plantilla (violeta): son los de PokeMMO, que
+ * salen de su propia web (pokemmo.com, 27-09-2026):
+ *
+ *   #ff900b  naranja de los botones  (--bs-btn-bg, con #f3890b al pasar)
+ *   #73ace2  azul de fondo del sitio (<meta name="theme-color">)
+ *   #2d5971  azul oscuro de las sombras de texto
+ *
+ * El naranja hace de acento, el azul claro de segundo color (pie y enlaces) y
+ * el lienzo es el azul oscuro llevado casi a negro.
+ */
 
 :root {
-  --fondo: #10131a;
-  --fondo-alt: #171b25;
-  --fondo-alt2: #1e2431;
-  --borde: #2b3344;
-  --texto: #e6e9f0;
-  --texto-tenue: #9aa4b8;
-  --acento: #6ea8fe;
-  --acento-suave: #24344f;
-  --bien: #5ecf8f;
-  --mal: #f2777a;
-  --ojo: #f0c674;
-  --radio: 10px;
-  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fondo: #13191e;
+  --fondo-alt: #1a2228;          /* sólo para campos y hover: el lienzo es plano */
+  --fondo-alt2: #202a31;
+  --borde: #2c3841;              /* la línea de 1px que lo separa todo */
+  --borde-fuerte: #4a5c68;
+  --texto: #e7edf2;
+  --texto-tenue: #8fa2b0;
+  --acento: #ff900b;             /* naranja PokeMMO */
+  --acento-vivo: #ffa338;
+  --acento-suave: #3a2a12;
+  --sobre-acento: #12181d;       /* texto encima del naranja: negro, no blanco */
+  --cielo: #73ace2;              /* azul PokeMMO: pie, enlaces, chips de sí */
+  --cielo-suave: #16293a;
+  --bien: #57c98a;
+  --mal: #ff6b6b;
+  --ojo: #ffc94a;
+  --radio: 0px;
+  --fuente: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Los rótulos de la plantilla: mayúsculas, pequeñas y muy separadas. */
+  --rotulo: 700 0.68rem/1.4 var(--fuente);
+  --espaciado-rotulo: 0.14em;
+  --ancho: 1180px;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-tema="oscuro"]) {
-    --fondo: #f6f7fb;
-    --fondo-alt: #ffffff;
-    --fondo-alt2: #eef1f7;
-    --borde: #d6dbe6;
-    --texto: #1b2030;
-    --texto-tenue: #5d6879;
-    --acento: #2563eb;
-    --acento-suave: #dce7ff;
-    --bien: #157f4a;
-    --mal: #b3261e;
-    --ojo: #8a6100;
+    --fondo: #ffffff;
+    --fondo-alt: #f4f6f8;
+    --fondo-alt2: #eceff2;
+    --borde: #d9dee3;
+    --borde-fuerte: #8b98a3;
+    --texto: #12181d;
+    --texto-tenue: #5d6b77;
+    --acento: #b35f00;           /* el naranja de PokeMMO, oscurecido hasta que
+                                    el blanco encima llega a 4,6:1 (AA) */
+    --acento-vivo: #8f4c00;
+    --acento-suave: #fdf0dd;
+    --sobre-acento: #ffffff;
+    --cielo: #2f6fa8;
+    --cielo-suave: #e3eef8;
+    --bien: #15784a;
+    --mal: #bb2222;
+    --ojo: #8a5a00;
   }
 }
 
@@ -42,99 +81,183 @@ body {
   font-family: var(--fuente);
   line-height: 1.55;
   -webkit-text-size-adjust: 100%;
+  /* El pie es un bloque de color macizo, así que tiene que quedar pegado al
+     final de la ventana: si no, en una vista corta se veía flotando en medio
+     con lienzo por debajo. */
+  min-height: 100vh;
+  min-height: 100dvh;   /* en el móvil, sin contar la barra del navegador */
+  display: flex;
+  flex-direction: column;
 }
+.vista { flex: 1 0 auto; }
+/* En un contenedor flex, un `margin: 0 auto` deja de estirar al hijo y lo
+   encoge a su contenido: la cabecera y las pestañas salían centradas y
+   estrechas. Con el ancho al 100 % vuelven a mandar su max-width y su margen. */
+body > * { width: 100%; }
 
-.cabecera { padding: 24px 16px 8px; max-width: 1100px; margin: 0 auto; }
-.cabecera h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.02em; }
-.lema { margin: 4px 0 0; color: var(--texto-tenue); }
-.tenue { color: var(--texto-tenue); font-weight: 400; }
+/* ---------------------------------------------------------------- cabecera */
+/* La barra de la plantilla: la marca a la izquierda, un cuadro con borde a la
+   derecha («EDITION 2022»), y una línea que cruza por debajo. */
+
+.cabecera {
+  max-width: var(--ancho); margin: 0 auto;
+  padding: 18px 16px 14px;
+  display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--borde);
+}
+.cabecera h1 {
+  margin: 0; font-size: 1.05rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  display: flex; align-items: center; gap: 10px;
+}
+/* El cuadradito de la plantilla, delante del logo. */
+.cabecera h1::before {
+  content: ""; width: 10px; height: 10px; background: var(--acento); flex: none;
+}
+.cabecera .tenue { color: var(--texto-tenue); font-weight: 400; letter-spacing: 0.1em; }
+.lema {
+  margin: 4px 0 0; color: var(--texto-tenue); font-size: 0.86rem;
+  flex: 1 1 260px;
+}
+.edicion {
+  border: 1px solid var(--borde-fuerte); padding: 6px 12px;
+  font: var(--rotulo); letter-spacing: var(--espaciado-rotulo);
+  text-transform: uppercase; color: var(--texto-tenue);
+  white-space: nowrap; margin-left: auto;
+}
+.edicion b { display: block; color: var(--texto); font-size: 0.82rem; letter-spacing: 0.06em; }
+
+/* ------------------------------------------------------------------ pestañas */
+/* En la plantilla el menú no son botones: son palabras en mayúsculas y la
+   activa lleva un subrayado corto. */
 
 .pestanas {
-  display: flex; gap: 4px; padding: 12px 16px 0;
-  max-width: 1100px; margin: 0 auto; overflow-x: auto;
+  display: flex; gap: 2px; padding: 0 16px;
+  max-width: var(--ancho); margin: 0 auto; overflow-x: auto;
   border-bottom: 1px solid var(--borde);
 }
 .pestanas button {
-  background: none; border: 1px solid transparent; border-bottom: none;
-  color: var(--texto-tenue); font: inherit; padding: 8px 14px; cursor: pointer;
-  border-radius: var(--radio) var(--radio) 0 0; white-space: nowrap;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--texto-tenue); font: var(--rotulo); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: var(--espaciado-rotulo);
+  padding: 14px 14px 11px; cursor: pointer; white-space: nowrap;
+  border-radius: 0; width: auto;
 }
-.pestanas button:hover { color: var(--texto); background: var(--fondo-alt); }
-.pestanas button.activa {
-  color: var(--texto); background: var(--fondo-alt);
-  border-color: var(--borde); margin-bottom: -1px;
-}
+.pestanas button:hover { color: var(--texto); }
+.pestanas button.activa { color: var(--texto); border-bottom-color: var(--acento); }
 
 /* --------------------------------------------------------- barra de crianzas */
 /* Transversal a las pestañas: cambiar de crianza cambia Objetivo, Plan y
    Entrenamiento a la vez. Por eso va encima de ellas y no dentro de una vista. */
 
 .crianzas {
-  max-width: 1100px; margin: 0 auto; padding: 10px 16px 0;
-  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  max-width: var(--ancho); margin: 0 auto; padding: 12px 16px 0;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
 }
-.crianzas-lista { display: flex; gap: 6px; overflow-x: auto; flex: 1 1 260px; padding-bottom: 2px; }
+.crianzas-lista { display: flex; gap: 6px; overflow-x: auto; flex: 0 1 auto; max-width: 100%; padding-bottom: 2px; }
 .crianza {
-  background: var(--fondo-alt); border: 1px solid var(--borde); color: var(--texto-tenue);
-  font: inherit; cursor: pointer; border-radius: var(--radio);
-  padding: 5px 12px; white-space: nowrap; text-align: left; line-height: 1.25;
+  background: none; border: 1px solid var(--borde); color: var(--texto-tenue);
+  font: inherit; cursor: pointer; border-radius: 0;
+  padding: 6px 14px; white-space: nowrap; text-align: left; line-height: 1.25;
 }
-.crianza:hover { color: var(--texto); }
-.crianza.activa { color: var(--texto); border-color: var(--acento); background: var(--acento-suave); }
-.crianza-nombre { display: block; font-weight: 600; font-size: 0.92rem; }
-.crianza-estado { display: block; font-size: 0.74rem; color: var(--texto-tenue); }
+.crianza:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+.crianza.activa { color: var(--texto); border-color: var(--acento); }
+.crianza-nombre {
+  display: block; font-weight: 700; font-size: 0.82rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.crianza-estado {
+  display: block; font: var(--rotulo); font-size: 0.64rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-tenue);
+}
 .crianza-estado.bien { color: var(--bien); }
 .crianza-estado.ojo { color: var(--ojo); }
 .crianza-estado.mal { color: var(--mal); }
-.crianzas-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.crianzas-acciones { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-left: auto; }
 .crianzas-renombrar { display: flex; gap: 6px; flex: 1 1 100%; }
 .crianzas-renombrar input { flex: 1; }
 .crianzas-conflicto {
-  flex: 1 1 100%; margin: 0; font-size: 0.82rem; color: var(--texto-tenue);
+  flex: 1 1 100%; margin: 0; font-size: 0.8rem; color: var(--texto-tenue);
 }
 
-.vista { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+.vista { max-width: var(--ancho); margin: 0 auto; padding: 22px 16px 56px; }
 .cuando-barra .fila { align-items: flex-end; }
 .sig { display: inline-flex; gap: 4px; }
 .barra-seleccion { align-items: center; margin-bottom: 10px; min-height: 30px; }
-.pie {
-  max-width: 1100px; margin: 0 auto; padding: 16px;
-  border-top: 1px solid var(--borde); color: var(--texto-tenue); font-size: 0.85rem;
-}
-.pie p { margin: 4px 0; }
 
-a { color: var(--acento); }
+/* El pie de la plantilla es un bloque macizo del color de la marca. Aquí es el
+   azul de PokeMMO, con el texto en oscuro encima. */
+.pie {
+  background: var(--cielo); color: #10171d;
+  margin-top: 8px; padding: 26px 16px 30px;
+  font-size: 0.85rem;
+}
+.pie > * { max-width: var(--ancho); margin-left: auto; margin-right: auto; }
+.pie p { margin: 6px auto; }
+.pie a { color: #10171d; text-decoration: underline; text-underline-offset: 3px; }
+.pie .tenue { color: #1d3348; }
+.pie code { background: rgb(255 255 255 / 0.35); padding: 1px 5px; }
+
+a { color: var(--cielo); text-underline-offset: 3px; }
 
 /* ---------------------------------------------------------------- bloques */
+/* Una tarjeta de la plantilla no tiene fondo propio: es un rectángulo con una
+   línea de 1px alrededor, y su título va en mayúsculas con un subrayado corto
+   del color de acento. */
 
 .tarjeta {
-  background: var(--fondo-alt); border: 1px solid var(--borde);
-  border-radius: var(--radio); padding: 16px 18px; margin-bottom: 14px;
+  background: none; border: 1px solid var(--borde);
+  border-radius: 0; padding: 18px 18px 20px; margin-bottom: 14px;
 }
 .tarjeta > h2, .tarjeta > h3 { margin-top: 0; }
-.tarjeta > h3 { margin-top: 18px; }
-h2 { font-size: 1.05rem; letter-spacing: 0.01em; }
-h3 { font-size: 0.92rem; color: var(--texto-tenue); text-transform: none; }
+.tarjeta > h3 { margin-top: 22px; }
+h2 {
+  font-size: 0.95rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.06em; margin: 0 0 14px;
+  padding-bottom: 8px; position: relative;
+}
+h2::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  width: 34px; height: 2px; background: var(--acento);
+}
+h3 {
+  font: var(--rotulo); text-transform: uppercase;
+  letter-spacing: var(--espaciado-rotulo); color: var(--texto-tenue);
+  margin: 20px 0 8px;
+}
 
 /* Un bloque plegable con el mismo aire que una tarjeta. Lo secundario se
    guarda aquí en vez de ocupar pantalla: importar, el árbol, la copia. */
-.plegable { padding-top: 12px; padding-bottom: 12px; }
+.plegable { padding-top: 14px; padding-bottom: 14px; }
 .plegable > summary {
-  cursor: pointer; font-weight: 600; font-size: 1.05rem; list-style-position: outside;
+  cursor: pointer; font-weight: 800; font-size: 0.86rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  list-style-position: outside;
 }
-.plegable > summary::marker { color: var(--texto-tenue); }
-.plegable[open] > summary { margin-bottom: 12px; }
-.plegable .sumario-extra { font-weight: 400; color: var(--texto-tenue); font-size: 0.85rem; }
+.plegable > summary::marker { color: var(--acento); }
+.plegable[open] > summary { margin-bottom: 14px; }
+.plegable .sumario-extra {
+  font-weight: 400; color: var(--texto-tenue); font-size: 0.78rem;
+  text-transform: none; letter-spacing: 0;
+}
 
 .rejilla { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .crece { flex: 1 1 200px; }
 
-label { display: block; font-size: 0.85rem; color: var(--texto-tenue); margin-bottom: 4px; }
+label {
+  display: block; font: var(--rotulo); text-transform: uppercase;
+  letter-spacing: var(--espaciado-rotulo); color: var(--texto-tenue); margin-bottom: 6px;
+}
 
+/* Los campos de la plantilla: sin relleno de color, línea de 1px, y al entrar
+   se enciende del color de acento. */
 input, select, textarea, button {
-  font: inherit; color: var(--texto); background: var(--fondo-alt2);
-  border: 1px solid var(--borde); border-radius: 8px; padding: 7px 10px; width: 100%;
+  font: inherit; color: var(--texto); background: var(--fondo-alt);
+  border: 1px solid var(--borde); border-radius: 0; padding: 9px 11px; width: 100%;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none; border-color: var(--acento);
 }
 input[type="checkbox"] { width: auto; accent-color: var(--acento); }
 textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
@@ -143,42 +266,45 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
    <label> no entran en la regla de arriba y salían sin borde ni relleno. */
 .boton {
   display: inline-block; width: auto;
-  padding: 7px 12px; border: 1px solid var(--acento); border-radius: 8px;
-  background: var(--acento); color: #fff;
-  font: inherit; font-weight: 600; line-height: 1.3; text-decoration: none;
-  cursor: pointer;
+  padding: 9px 16px; border: 1px solid var(--acento); border-radius: 0;
+  background: var(--acento); color: var(--sobre-acento);
+  font: var(--rotulo); text-transform: uppercase; letter-spacing: var(--espaciado-rotulo);
+  line-height: 1.4; text-decoration: none; cursor: pointer;
 }
-.boton:hover { filter: brightness(1.1); }
-.boton.secundario { background: var(--fondo-alt2); color: var(--texto); border-color: var(--borde); }
+.boton:hover { background: var(--acento-vivo); border-color: var(--acento-vivo); }
+.boton.secundario { background: none; color: var(--texto); border-color: var(--borde-fuerte); }
+.boton.secundario:hover { border-color: var(--texto); background: none; }
 .boton.peligro { background: none; color: var(--mal); border-color: var(--mal); }
-.boton.mini { padding: 3px 8px; font-size: 0.8rem; font-weight: 500; }
+.boton.peligro:hover { background: none; color: var(--mal); border-color: var(--mal); filter: brightness(1.2); }
+.boton.mini { padding: 5px 10px; font-size: 0.62rem; }
 
 /* --------------------------------------------------------------- utilería */
 
 .etiquetas { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
-  /* nowrap: al partirse en dos líneas el radio de 999px lo convertía en un
-     globo ilegible, y en el móvil pasaba en cada tabla. */
-  display: inline-block; white-space: nowrap; padding: 2px 9px; border-radius: 999px;
-  background: var(--fondo-alt2); border: 1px solid var(--borde);
-  font-size: 0.78rem; color: var(--texto-tenue);
+  /* nowrap: al partirse en dos líneas quedaba un rótulo ilegible, y en el
+     móvil pasaba en cada tabla. */
+  display: inline-block; white-space: nowrap; padding: 3px 9px; border-radius: 0;
+  background: none; border: 1px solid var(--borde);
+  font: var(--rotulo); font-size: 0.64rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-tenue);
 }
-.chip.si { background: var(--acento-suave); border-color: var(--acento); color: var(--texto); }
+.chip.si { border-color: var(--cielo); color: var(--cielo); }
 .chip.bien { color: var(--bien); border-color: var(--bien); }
 .chip.mal { color: var(--mal); border-color: var(--mal); }
 .chip.ojo { color: var(--ojo); border-color: var(--ojo); }
 
 /* Un aviso y un error sí son cajas: interrumpen. Una nota no — era una caja
-   rellena por cada párrafo explicativo y la pantalla parecía un acordeón. */
+   rellena por cada párrafo explicativo y la pantalla parecía un acordeón.
+   Aquí la caja es una línea gruesa a la izquierda, como los bloques de cita
+   de la plantilla. */
 .aviso, .error {
-  border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 0.9rem;
-  border: 1px solid var(--borde); background: var(--fondo-alt2);
+  border: 1px solid var(--borde); border-left: 3px solid var(--ojo);
+  border-radius: 0; padding: 10px 14px; margin: 12px 0; font-size: 0.88rem;
+  background: none;
 }
-.error { border-color: var(--mal); color: var(--mal); }
-.aviso { border-color: var(--ojo); }
-.nota {
-  margin: 6px 0 12px; font-size: 0.86rem; color: var(--texto-tenue);
-}
+.error { border-left-color: var(--mal); color: var(--mal); }
+.nota { margin: 8px 0 14px; font-size: 0.84rem; color: var(--texto-tenue); }
 .error ul, .aviso ul, .nota ul { margin: 6px 0 0; padding-left: 20px; }
 
 .cargando { color: var(--texto-tenue); }
@@ -188,11 +314,14 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 .ivs { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .iv {
   display: flex; align-items: center; gap: 8px; cursor: pointer;
-  background: var(--fondo-alt2); border: 1px solid var(--borde);
-  border-radius: 8px; padding: 8px 10px; user-select: none;
+  background: none; border: 1px solid var(--borde);
+  border-radius: 0; padding: 9px 11px; user-select: none;
 }
 .iv:has(input:checked) { border-color: var(--acento); background: var(--acento-suave); }
-.iv span { font-size: 0.9rem; color: var(--texto); }
+.iv span {
+  font: var(--rotulo); font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--texto);
+}
 .iv label { margin: 0; }
 
 .regiones { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -200,61 +329,82 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 
 /* ------------------------------------------------------------------ tabla */
 
-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--borde); }
-th { color: var(--texto-tenue); font-weight: 600; font-size: 0.8rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+th {
+  color: var(--texto-tenue); font: var(--rotulo); font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: var(--espaciado-rotulo);
+  border-bottom-color: var(--borde-fuerte);
+}
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .desliza { overflow-x: auto; }
 
 /* ------------------------------------------------------------- pasos/árbol */
+/* Las tarjetas numeradas de la plantilla: el número va en su propio cuadrito,
+   montado sobre el borde de arriba. */
 
-.pasos { list-style: none; padding: 0; margin: 0; counter-reset: paso; }
+.pasos { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: paso; }
 .pasos li {
-  position: relative; padding: 10px 12px 10px 44px; margin-bottom: 8px;
-  background: var(--fondo-alt2); border: 1px solid var(--borde); border-radius: 8px;
+  position: relative; padding: 16px 14px 12px 14px; margin-bottom: 14px;
+  background: none; border: 1px solid var(--borde); border-radius: 0;
 }
 .pasos li::before {
-  counter-increment: paso; content: counter(paso);
-  position: absolute; left: 12px; top: 10px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--acento); color: #fff;
-  font-size: 0.75rem; font-weight: 700;
-  display: grid; place-items: center;
+  counter-increment: paso; content: "." counter(paso, decimal-leading-zero);
+  position: absolute; left: -1px; top: -12px;
+  padding: 1px 8px; background: var(--fondo);
+  border: 1px solid var(--borde);
+  color: var(--texto-tenue); font: var(--rotulo); font-size: 0.62rem;
+  letter-spacing: 0.1em;
 }
-.pasos li.usar::before { background: var(--bien); }
-.pasos li.conseguir::before { background: var(--ojo); color: #000; }
-.pasos .porque { display: block; color: var(--texto-tenue); font-size: 0.82rem; margin-top: 4px; }
+.pasos li.usar::before { color: var(--bien); border-color: var(--bien); }
+.pasos li.conseguir::before { color: var(--acento); border-color: var(--acento); }
+.pasos .porque { display: block; color: var(--texto-tenue); font-size: 0.8rem; margin-top: 6px; }
 
 /* Checklist: un paso hecho se apaga, y el que ya se puede hacer se enciende. */
-.pasos li.hecho { opacity: 0.6; }
+.pasos li.hecho { opacity: 0.55; }
 .pasos li.listo { border-color: var(--acento); }
-.pasos li.cruzar:not(.listo) { opacity: 0.75; }
+.pasos li.cruzar:not(.listo) { opacity: 0.8; }
 .pasos .marca { display: none; }
-.pasos li .boton.mini { margin-top: 8px; }
-.pequeno > summary { cursor: pointer; font-size: 0.85rem; color: var(--texto-tenue); margin: 6px 0; }
-.pequeno { font-size: 0.9rem; }
+.pasos li .boton.mini { margin-top: 10px; }
+.pequeno > summary {
+  cursor: pointer; font: var(--rotulo); font-size: 0.64rem;
+  text-transform: uppercase; letter-spacing: var(--espaciado-rotulo);
+  color: var(--texto-tenue); margin: 10px 0;
+}
+.pequeno { font-size: 0.88rem; }
 .listos { list-style: none; padding: 0; margin: 0 0 4px; }
 .listos li {
   display: flex; gap: 10px; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; padding: 8px 10px; margin-bottom: 6px; font-size: 0.9rem;
-  background: var(--fondo-alt2); border: 1px solid var(--acento); border-radius: 8px;
+  flex-wrap: wrap; padding: 10px 12px; margin-bottom: 8px; font-size: 0.88rem;
+  background: none; border: 1px solid var(--acento); border-radius: 0;
 }
 .pequeno ol, .pequeno ul { margin: 8px 0; padding-left: 20px; }
 
 .arbol { list-style: none; padding-left: 0; margin: 0; }
 .arbol ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--borde); }
-.arbol li { padding: 3px 0 3px 10px; font-size: 0.88rem; }
+.arbol li { padding: 3px 0 3px 10px; font-size: 0.86rem; }
 .arbol .nodo { display: inline-flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.arbol .obj { font-size: 0.78rem; color: var(--texto-tenue); font-family: var(--mono); }
+.arbol .obj { font-size: 0.76rem; color: var(--texto-tenue); font-family: var(--mono); }
 
-.total { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* El número grande de la plantilla: mucho peso y el acento al lado. */
+.total {
+  font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
 
 @media (max-width: 560px) {
-  .cabecera { padding-top: 16px; }
+  .cabecera { padding: 14px 16px 12px; }
+  .cabecera h1 { font-size: 0.95rem; }
+  .lema { font-size: 0.8rem; }
+  /* En el móvil la cabecera se comía media pantalla antes de enseñar nada. La
+     fecha de los datos sigue estando en el pie. */
+  .edicion { display: none; }
   .vista { padding: 16px 16px 40px; }
-  .pestanas button { padding: 8px 10px; font-size: 0.9rem; }
-  .crianzas { padding: 8px 12px 0; }
+  .pestanas button { padding: 12px 10px 9px; font-size: 0.66rem; letter-spacing: 0.1em; }
+  .crianzas { padding: 10px 12px 0; }
   .crianzas-acciones { width: 100%; }
+  .tarjeta { padding: 16px 14px 18px; }
+  .pie { padding: 22px 16px 26px; }
 }
 
 /* --------------------------------------------------- autocompletado propio */
@@ -267,19 +417,19 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .sug-lista {
   position: absolute;
   z-index: 40;
-  top: calc(100% + 4px);
+  top: 100%;
   left: 0;
   right: 0;
   margin: 0;
-  padding: 4px;
+  padding: 0;
   list-style: none;
   max-height: 44vh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--fondo-alt);
+  background: var(--fondo);
   border: 1px solid var(--acento);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  border-radius: 0;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.45);
   -webkit-overflow-scrolling: touch;
 }
 .sug-lista[hidden] { display: none; }
@@ -290,11 +440,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   text-align: left;
   background: none;
   border: none;
-  border-radius: 7px;
+  border-radius: 0;
   /* Alto cómodo para el dedo: en el móvil una lista apretada es inusable. */
-  padding: 10px 12px;
+  padding: 11px 12px;
   color: var(--texto);
   cursor: pointer;
   font: inherit;
 }
-.sug-opcion:hover, .sug-opcion.resaltada { background: var(--acento-suave); }
+.sug-opcion:hover, .sug-opcion.resaltada { background: var(--acento-suave); color: var(--texto); }
