@@ -107,6 +107,48 @@ entera es `ROL.LIBRE`: cualquier especie del grupo huevo, cualquier sexo. La
 espina pasa a bajar por la cadena de sólo IVs, y su hoja de abajo es un 1×31 de
 la especie objetivo en vez de una de sólo naturaleza.
 
+## El pseudo 31: un IV a 30
+
+Un 30 no es un 31, pero **sirve de padre** cuando no hay un 31 a mano, y es el
+caso normal cuando llevas un rato capturando. Lo que hace falta saber es qué
+sale de cada combinación, y eso lo dice la tabla de herencia de la wiki: cada IV
+de la cría sale del valor **alto**, del **promedio redondeado hacia abajo** o del
+**bajo** de los dos padres.
+
+| Padres | Alto | Promedio | Bajo | Qué sale |
+|---|---|---|---|---|
+| 31 y 31 | 31 | 31 | 31 | **31 seguro** |
+| 30 y 30 | 30 | 30 | 30 | **30 seguro** — la cadena no se rompe |
+| 30 y 31 | 31 | 30 | 30 | **31 con la probabilidad de la rama «alto»** |
+
+Y la rama «alto» depende de cuántos objetos de crianza haya en ese cruce: 25 %
+con ninguno, 20 % con uno y 12,5 % con dos. O sea que un 30 no es un callejón
+sin salida: garantiza el 30 y deja abierta la puerta del 31.
+
+Hay un atajo que convierte esa lotería en una certeza. Un **Recio fuerza el IV
+de quien lo lleva**, así que si el Recio de ese IV va en el padre que tiene el
+31, la cría saca 31 **seguro**. Los dos Recios de un cruce son intercambiables
+entre los dos padres y cuestan lo mismo, así que `ivsDelArbol()` los cambia de
+mano cuando eso sube el suelo, y lo explica en el paso. Con una madre 30/31 y un
+padre 31/30 el plan entrega los dos IVs a 31 garantizados en un solo cruce.
+
+Tres reglas de uso, que son del usuario:
+
+1. **primero los 31, y los 30 sólo si no hay otra cosa.** `asignarInventario()`
+   ordena por lo que tapa del árbol y, a igualdad, por cuántos huecos cubre con
+   un 30 en vez de con un 31;
+2. **en la raíz no vale un 30.** La raíz es el Pokémon pedido: darlo por bueno
+   sería mentir. En cualquier hueco de padre, sí;
+3. **lo que el árbol entrega se dice.** `plan.ivsFinales` trae el suelo real,
+   `plan.ivsCortos` los IVs que se quedan en 30 y `plan.suerte` los cruces que
+   van a probabilidad. Eso es lo que alimenta la optimización de EVs, porque a
+   nivel 50 un 30 es par y un 31 impar, y la paridad mueve los escalones.
+
+Simplificación consciente: el suelo se propaga como un número, no como una
+distribución. Si un 30 se convierte en 31 a mitad de la cadena, la mejora no se
+compone hacia arriba en el cálculo — se ve al anotar la cría y recalcular, que
+es como se juega. Arrastrar la distribución entera por nodo no compensa.
+
 ## La especie: sólo la espina materna la tiene atada
 
 > La cría hereda la especie de la madre (o del progenitor que no sea Ditto).

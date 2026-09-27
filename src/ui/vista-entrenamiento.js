@@ -10,13 +10,21 @@ import { guiaDeAprendizaje, RECORDADOR, PAGO_RECORDADOR } from '../nucleo/aprend
 import { planearHabilidad } from '../nucleo/habilidades.js';
 
 export function vistaEntrenamiento(datos) {
-  const { objetivo, regionesDisponibles, cuando } = obtener();
+  const { objetivo, regionesDisponibles, cuando, plan: planCrianza } = obtener();
+
+  // Los IVs que se usan para los escalones de EVs son los que la CRIANZA va a
+  // entregar de verdad, no los que se han pedido: si un hueco se cubre con un
+  // pseudo 31, ese IV sale 30 y a nivel 50 un 30 no da los mismos escalones que
+  // un 31 —cambia la paridad, que es justo lo que los mueve—. Sin esto la
+  // optimización recortaba EVs contando un 31 que no va a existir.
+  const ivsReales = { ...objetivo.ivs, ...(planCrianza?.ok ? planCrianza.ivsFinales : {}) };
+  const pseudo = planCrianza?.ok ? (planCrianza.ivsCortos ?? []) : [];
 
   const plan = planearEvs(objetivo.evs, {}, datos, {
     regionesDisponibles,
     objeto: objetivo.objetoEntrenamiento,
     nivel: objetivo.nivel,
-    ivs: objetivo.ivs,
+    ivs: ivsReales,
     cuando,
   });
 
@@ -123,7 +131,7 @@ export function vistaEntrenamiento(datos) {
   // mismo en cada visita es ruido. Lo que de verdad afecta a un número concreto
   // se dice en su sitio (las vitaminas, los escalones).
 
-  return frag([guia, barraCuando, resumen, bloqueOptimizar(plan.optimizacion), ...bloques]);
+  return frag([guia, barraCuando, resumen, bloqueOptimizar(plan.optimizacion, pseudo), ...bloques]);
 }
 
 
@@ -136,7 +144,16 @@ export function vistaEntrenamiento(datos) {
  * A nivel 50 el corte depende de la PARIDAD del IV, así que si un IV no está
  * fijado a 31 la cuenta puede cambiar: eso se avisa en vez de callarlo.
  */
-function bloqueOptimizar(o) {
+/** La cuenta de EVs está hecha con un 30, y eso cambia los escalones. */
+const avisoDelPseudo = (pseudo) => aviso(
+  `Esta cuenta ya está hecha con un 30, no con un 31, en ${
+    pseudo.map((s) => NOMBRE_STAT[s]).join(', ')
+  }: es lo que el plan de crianza entrega con lo que tienes en el inventario. `
+  + 'A nivel 50 eso mueve los escalones, porque un 30 es par y un 31 impar. Si al final te sale '
+  + 'el 31, vuelve por aquí: los cortes cambian.',
+);
+
+function bloqueOptimizar(o, pseudo = []) {
   if (!o) return null;
 
   if (!o.recuperados)
@@ -146,6 +163,7 @@ function bloqueOptimizar(o) {
         el('strong', { texto: `${o.puntosAntes} puntos` }),
         ` a nivel ${o.nivel}, que es todo lo que pueden dar.`,
       ]),
+      pseudo.length ? avisoDelPseudo(pseudo) : null,
     ]);
 
   const filas = o.porStat
@@ -195,11 +213,13 @@ function bloqueOptimizar(o) {
       ),
     ]),
 
+    pseudo.length ? avisoDelPseudo(pseudo) : null,
+
     o.ivsSinFijar.length
       ? aviso(
           `A nivel 50 el escalón depende de si el IV es par o impar, y ${
             o.ivsSinFijar.map((s) => NOMBRE_STAT[s]).join(', ')
-          } no ${o.ivsSinFijar.length > 1 ? 'están' : 'está'} a 31 en el objetivo. ` +
+          } no ${o.ivsSinFijar.length > 1 ? 'están' : 'está'} a 31 ni a 30. ` +
           'La cuenta usa el IV que has puesto; si al final sale otro, vuelve a mirarlo aquí.',
         )
       : null,

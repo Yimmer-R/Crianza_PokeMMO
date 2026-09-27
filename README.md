@@ -154,6 +154,16 @@ los demás al lado. De ahí salen dos avisos que antes no estaban:
   comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
   imposible», que es lo que hacía.
 
+**El pseudo 31.** Un IV a 30 vale de padre cuando no hay un 31, y el plan lo
+usa — pero por detrás de los 31, nunca por delante, y diciéndolo. Dos 30 dan 30
+seguro; un 30 contra un 31 da 31 sólo a veces (25 % sin objetos, 12,5 % con dos),
+salvo que el Recio de ese IV lo lleve el padre que tiene el 31, y entonces sale
+31 seguro: eso lo coloca la app sola y lo explica en el paso. En la raíz no se
+acepta un 30, porque la raíz es el Pokémon que has pedido. Y si la cadena acaba
+entregando un 30, la optimización de EVs hace la cuenta con el 30: a nivel 50 la
+paridad del IV mueve los escalones, así que 252 deja de ser el corte y pasa a
+ser 248.
+
 **El aspecto.** La forma viene de una plantilla de diseño: esquinas rectas,
 cajas de una línea, rótulos en mayúsculas espaciadas, titulares con un
 subrayado corto y los pasos numerados con su pestañita. El color, de una paleta

@@ -256,6 +256,64 @@ await paso('una línea sin hembras: macho y Ditto, no una captura imposible', as
  * Dos valores de la paleta salieron de aquí: el carmesí aclarado para letra
  * (#ff3b57) y el borde de campo (#6b6b6b).
  */
+/**
+ * El pseudo 31 de punta a punta: un 30 entra en el plan, el plan dice que ese
+ * IV sale a 30, y la optimización de EVs hace la cuenta con el 30 (que a nivel
+ * 50 da otros escalones, porque cambia la paridad).
+ */
+await paso('un 30 del inventario entra en el plan y llega hasta los EVs', async () => {
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Poliwag');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.check('#iv-velocidad');
+  await pagina.fill('#ev-ataque', '252');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.waitForTimeout(300);
+
+  // Un Poliwag hembra con 30 en Ataque: no es un 31, pero sirve de madre.
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.fill('#b-especie', 'Poliwag');
+  await confirmarCampo('#b-especie');
+  await pagina.selectOption('#b-sexo', '♀');
+  await pagina.fill('#b-iv-ataque', '30');
+  await pagina.dispatchEvent('#b-iv-ataque', 'change');
+  await pagina.waitForTimeout(200);
+  await pagina.click('text=Sólo comprobar si me sirve');
+  await pagina.waitForTimeout(300);
+  const veredicto = await pagina.textContent('#vista');
+  if (!/pseudo 31/i.test(veredicto)) throw new Error('el inventario no avisa de que entra como pseudo 31');
+  await pagina.click('text=Añadir al inventario');
+  await pagina.waitForSelector('.tarjeta:has-text("Tu inventario · 1")', { timeout: 5000});
+
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(400);
+  const plan = await pagina.textContent('#vista');
+  if (!/Ataque a 30/.test(plan)) throw new Error('el plan no dice que Ataque sale a 30');
+  if (!/pseudo 31/.test(plan)) throw new Error('el plan no explica de dónde sale el 30');
+
+  await pagina.click('button[data-vista="entrenamiento"]');
+  await pagina.waitForTimeout(500);
+  const ent = await pagina.textContent('#vista');
+  if (!/hecha con un 30/.test(ent)) throw new Error('la optimización de EVs no cuenta con el 30');
+  // Con un IV par, 252 sobra: el escalón está en 248.
+  if (!/248/.test(ent)) throw new Error('con el IV a 30 el corte debería caer en 248');
+  console.log('       30 en Ataque: entra como pseudo 31, el plan lo dice y los EVs cortan en 248');
+
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.click('text=Vaciar el inventario');
+  await pagina.waitForTimeout(200);
+  const conf = pagina.locator('button', { hasText: 'Sí, vaciar' }).first();
+  if (await conf.count()) await conf.click();
+  await pagina.waitForTimeout(200);
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(150);
+});
+
 await paso('ningún texto por debajo del contraste mínimo', async () => {
   const audita = () => pagina.evaluate(() => {
     const lum = (c) => {

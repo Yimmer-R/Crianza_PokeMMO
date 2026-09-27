@@ -61,6 +61,11 @@ export function vistaPlan(datos) {
       chip(`${cuentas.conseguir} padres por conseguir`, cuentas.conseguir ? 'ojo' : 'bien'),
       cuentas.inventario ? chip(`${cuentas.inventario} del inventario`, 'bien') : null,
       chip(`${pres.objetosUsados.reduce((a, o) => a + o.cuantos, 0)} objetos de crianza`),
+      // Lo que la cadena entrega de verdad: con un pseudo 31 de por medio, ese
+      // IV sale a 30 y hay que verlo sin abrir nada.
+      ...(plan.ivsCortos ?? []).map((st) => chip(`${NOMBRE_STAT[st]} a 30`, 'ojo')),
+      ...(plan.suerte ?? []).map((x) =>
+        chip(`${NOMBRE_STAT[x.stat]}: ${Math.round(x.probabilidad * 100)} % de 31`, 'ojo')),
     ]),
     plan.avisos?.length
       ? el('div.aviso', {}, [el('ul', {}, plan.avisos.map((x) => el('li', { texto: x })))])

@@ -5,10 +5,11 @@
 // agrupadas por el EV que dan).
 
 import {
-  STATS, NOMBRE_STAT, EV_MAX_POR_STAT, EV_MAX_TOTAL,
+  STATS, NOMBRE_STAT, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX,
   EV_POR_VITAMINA, EV_POR_BAYA, EVS_POR_PUNTO,
 } from './constantes.js';
 import { disponibleAhora, porQueNoAhora, ordenarPorCuando, CUANDO_CUALQUIERA } from './cuando.js';
+import { IV_PSEUDO } from './herencia.js';
 
 /** Vitamina y baya de cada característica. */
 export const VITAMINA_DE = {
@@ -148,11 +149,13 @@ export function optimizarEvs(evsObjetivo, ivs = {}, nivel = 50) {
   const puntosDe = (mapa) => STATS.reduce((a, s) => a + puntosPorEvs(mapa[s], nivel, ivDe(s)), 0);
   const totalDe = (mapa) => STATS.reduce((a, s) => a + mapa[s], 0);
 
-  // Un IV que no está fijado a 31 puede salir par o impar, y a nivel 50 eso
-  // mueve los escalones. Conviene decirlo en vez de dar por buena una paridad.
+  // Un IV que no se sabe puede salir par o impar, y a nivel 50 eso mueve los
+  // escalones. Conviene decirlo en vez de dar por buena una paridad. Un 30 SÍ
+  // se sabe —es lo que entrega la cadena cuando se usa un pseudo 31—, así que
+  // no entra aquí: la cuenta con un 30 es firme.
   const ivsSinFijar = nivel === 100
     ? []
-    : porStat.filter((x) => x.iv !== 31).map((x) => x.stat);
+    : porStat.filter((x) => x.iv !== IV_MAX && x.iv !== IV_PSEUDO).map((x) => x.stat);
 
   return {
     nivel,

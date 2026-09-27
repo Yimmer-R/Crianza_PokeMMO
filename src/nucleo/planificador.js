@@ -19,6 +19,7 @@
 import { STATS, NOMBRE_STAT, IV_MAX, PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, SEXOS } from './constantes.js';
 import {
   RECIO_DE, PIEDRAETERNA, perfectos, ivsGarantizados, naturalezaGarantizada, ivsVacios,
+  IV_PSEUDO, pseudos, probabilidadDe, distribucionDe,
 } from './herencia.js';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
@@ -337,10 +338,20 @@ export function cumple(ejemplar, nodo, datos, objetivo) {
   if (nodo.especieFija && ejemplar.especie !== nodo.especieFija)
     return { ok: false, motivo: `este hueco tiene que ser ${nodo.especieFija}`, especieIncompatible: true };
 
+  // Un 30 vale para un hueco de PADRE, pero no es lo mismo que un 31 y hay que
+  // decirlo: la cría saldrá 30 salvo que el otro padre traiga el 31 y la suerte
+  // acompañe. Se aceptan por detrás de los 31, nunca por delante.
+  //
+  // En la RAÍZ no: la raíz es el Pokémon que el usuario ha pedido, y dar por
+  // cumplido un 6×31 con un ejemplar que tiene un 30 es decirle que ya está
+  // cuando no está. Si la cadena acaba entregando un 30 ahí, se dice aparte
+  // (plan.ivsCortos), que no es lo mismo.
   const suyos = perfectos(ejemplar.ivs ?? {});
-  const faltan = nodo.stats.filter((s) => !suyos.has(s));
+  const casi = nodo.rol === ROL.RAIZ ? new Set() : pseudos(ejemplar.ivs ?? {});
+  const faltan = nodo.stats.filter((s) => !suyos.has(s) && !casi.has(s));
   if (faltan.length)
     return { ok: false, motivo: `le falta 31 en ${faltan.join(', ')}`, faltanIvs: faltan };
+  const conPseudo = nodo.stats.filter((s) => casi.has(s));
 
   // Un hueco puede exigir movimientos: es el padre del cruce final cuando el
   // objetivo lleva un movimiento que sólo se pasa de huevo.
@@ -374,23 +385,30 @@ export function cumple(ejemplar, nodo, datos, objetivo) {
       sexoIncorrecto: true,
     };
 
+  // Un 30 en un hueco no lo invalida, pero sí cambia lo que promete el cruce
+  // de encima: se anota para que el plan y el aviso lo digan.
+  const conSuerte = conPseudo.length
+    ? { pseudo: conPseudo, aviso: `aporta 30 en ${conPseudo.map((x) => NOMBRE_STAT[x]).join(', ')}, no 31` }
+    : {};
+
   // Espina materna: la especie la pone la madre, así que aquí no hay flexibilidad.
   if (nodo.rol === ROL.ESPINA || nodo.rol === ROL.RAIZ) {
     const r = sirveComoLineaMaterna(ejemplar, objetivo.especie, pokedex);
     if (!r.sirve) return { ok: false, motivo: r.motivo, especieIncompatible: true };
-    if (r.necesitaDitto) return { ok: true, necesitaDitto: true, aviso: r.motivo };
-    return { ok: true };
+    if (r.necesitaDitto)
+      return { ok: true, ...conSuerte, necesitaDitto: true, aviso: [r.motivo, conSuerte.aviso].filter(Boolean).join('; ') };
+    return { ok: true, ...conSuerte };
   }
 
   // Hueco libre: cualquier especie que comparta grupo huevo, de cualquiera de los
   // dos sexos. El sexo se reparte después, al emparejar: lo único que pide el
   // juego es un ♀ y un ♂ por cruce.
-  if (esDitto(ejemplar.especie)) return { ok: true, via: 'ditto' };
+  if (esDitto(ejemplar.especie)) return { ok: true, ...conSuerte, via: 'ditto' };
   if (sinGenero(p)) return { ok: false, motivo: `${ejemplar.especie} no tiene género: sólo vale como Ditto` };
   const comunes = gruposEnComun(pokedex[objetivo.especie], p);
   if (!comunes.length)
     return { ok: false, motivo: `no comparte grupo huevo con ${objetivo.especie}`, especieIncompatible: true };
-  return { ok: true, gruposEnComun: comunes };
+  return { ok: true, ...conSuerte, gruposEnComun: comunes };
 }
 
 // ------------------------------------------------------------- el árbol
@@ -678,14 +696,24 @@ export function asignarInventario(arbol, ctx) {
         const r = cumple(e, nodo, datos, objetivo);
         if (!r.ok) continue;
         if (!sexoCompatibleConHermano(nodo, padre, e, datos.pokedex)) continue;
-        candidatos.push({ nodo, i, e, r, ahorro: hojasBajo(nodo), perfectos: perfectos(e.ivs ?? {}).size });
+        candidatos.push({
+          nodo, i, e, r,
+          ahorro: hojasBajo(nodo),
+          perfectos: perfectos(e.ivs ?? {}).size,
+          // Cuántos de los IVs que pide el hueco los cubre con un 30 en vez de
+          // con un 31. Cuantos menos, mejor.
+          pseudo: (r.pseudo ?? []).length,
+        });
       }
       for (const h of nodo.hijos) recorre(h, nodo);
     })(arbol, null);
 
     if (!candidatos.length) break;
 
-    candidatos.sort((a, b) => b.ahorro - a.ahorro || a.perfectos - b.perfectos);
+    // Primero el que tapa más árbol; después, a igualdad, el que lo hace con
+    // 31 de verdad —los 30 sólo cuando no hay otra cosa, que es la regla— y ya
+    // por último el que menos 31 desperdicia en un hueco pequeño.
+    candidatos.sort((a, b) => b.ahorro - a.ahorro || a.pseudo - b.pseudo || a.perfectos - b.perfectos);
     const mejor = candidatos[0];
 
     mejor.nodo.tipo = 'inventario';
@@ -856,6 +884,23 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
   const pasos = aPasos(arbol, objetivo, datos, relleno, ctx.espina);
 
+  // Lo que el árbol entrega de verdad. Con todo a 31 es lo pedido; con algún 30
+  // del inventario, el suelo baja y aparecen los cruces a suerte.
+  const entrega = ivsDelArbol(arbol, objetivo, { colocarObjetos: true });
+  const avisos = [...(validacion.avisos ?? [])];
+  if (entrega.cortos.length)
+    avisos.push(
+      `con lo que hay en el inventario, ${entrega.cortos.map((x) => NOMBRE_STAT[x]).join(', ')} `
+      + `sale${entrega.cortos.length > 1 ? 'n' : ''} a 30, no a 31: se está usando un pseudo 31 `
+      + 'porque no hay un 31 de verdad para ese hueco. La optimización de EVs ya cuenta con ese 30.',
+    );
+  for (const s2 of entrega.suerte)
+    avisos.push(
+      `${NOMBRE_STAT[s2.stat]}: en un cruce se junta un 30 con un 31, así que sale 31 el `
+      + `${(s2.probabilidad * 100).toFixed(s2.probabilidad * 100 % 1 ? 1 : 0)} % de las veces y 30 el resto. `
+      + 'Si te toca, anota la cría y el plan mejora solo.',
+    );
+
   return {
     ok: true,
     objetivo,
@@ -866,7 +911,14 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
     medida: medirArbol(arbol),
     espina: ctx.espina,
     movimientosDeHuevo: movsHuevo,
+    // Los IVs que el árbol garantiza de verdad (30 donde se usa un pseudo 31),
+    // qué cruces van a suerte y cuáles se quedan cortos.
+    ivsFinales: entrega.ivs,
+    suerte: entrega.suerte,
+    ivsCortos: entrega.cortos,
+    objetosRecolocados: entrega.objetosRecolocados,
     ...validacion,
+    avisos,
   };
 }
 
@@ -999,9 +1051,24 @@ export function criaDe(nodo, objetivo, datos) {
   const especie = esDitto(eMadre.especie) ? ePadre.especie : eMadre.especie;
   const base = datos.pokedex[especie]?.base ?? especie;
 
-  const g = ivsGarantizados(eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre);
+  // Lo que la cría trae SEGURO. Con los dos padres a 31 es un 31; con un 30
+  // enfrente es un 30, y el 31 queda a suerte — así que se anota el 30 y se
+  // avisa de que hay que mirarlo en el juego. Anotar un 31 que a lo mejor no
+  // salió descuadra el resto del plan sin que se note, que es el error caro.
   const ivs = ivsVacios();
-  for (const st of g.garantizados) ivs[st] = IV_MAX;
+  const aSuerte = [];
+  // Se miran TODOS los IVs, no sólo los que el cruce prometía: si los dos
+  // padres comparten un 31 de más, la cría lo trae igual y hay que anotarlo.
+  // Lo que queda por debajo de 30 se deja sin anotar: el suelo real sería
+  // correcto, pero escribir un 7 que el usuario no ha medido es ruido.
+  for (const st of STATS) {
+    const d = distribucionDe(st, eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre);
+    const suelo = Math.min(...d.map((x) => x.valor));
+    if (suelo < IV_PSEUDO) continue;
+    ivs[st] = suelo;
+    const p = d.filter((x) => x.valor >= IV_MAX).reduce((a, x) => a + x.probabilidad, 0);
+    if (p > 0 && p < 1) aSuerte.push({ stat: st, probabilidad: p });
+  }
 
   const nat = naturalezaGarantizada(eMadre, ePadre, nodo.objetos.madre, nodo.objetos.padre);
 
@@ -1018,8 +1085,98 @@ export function criaDe(nodo, objetivo, datos) {
     ivs,
     evs: ivsVacios(),
     movimientos,
-    nota: `cría de ${eMadre.especie} ♀ × ${ePadre.especie} ♂`,
+    nota: `cría de ${eMadre.especie} ♀ × ${ePadre.especie} ♂`
+      + (aSuerte.length
+        ? ` · comprueba en el juego: ${aSuerte.map((x) => `${NOMBRE_STAT[x.stat]} pudo salir 31 (${Math.round(x.probabilidad * 100)} %)`).join(', ')}`
+        : ''),
+    aSuerte,
     padres: [eMadre.id, ePadre.id],
+  };
+}
+
+/**
+ * Qué IVs entrega de verdad el árbol, contando los 30.
+ *
+ * Con todo a 31 esto es trivial: cada cruce garantiza lo que promete. En cuanto
+ * entra un 30 deja de serlo, porque 30 × 31 NO garantiza 31 — sale 31 con la
+ * probabilidad de la rama «alto» de la tabla (25 % sin objetos) y 30 el resto
+ * de las veces. Así que el árbol se recorre de abajo arriba con dos cuentas a
+ * la vez:
+ *
+ *   - el **suelo**: el peor valor posible de cada IV. Es lo que el plan puede
+ *     prometer, y es lo que luego usa la optimización de EVs, porque a nivel 50
+ *     un 30 y un 31 no dan los mismos escalones;
+ *   - la **suerte**: en qué cruces hay un 30 enfrentado a un 31 y con qué
+ *     probabilidad sale el 31. Si toca, el plan mejora solo al recalcularse.
+ *
+ * Simplificación consciente: el suelo se propaga hacia arriba como un número,
+ * no como una distribución. O sea que si un 30 se convierte en 31 a mitad de la
+ * cadena, la mejora no se compone hacia arriba en el cálculo — se ve al
+ * recalcular el plan con la cría ya anotada, que es como se juega de verdad.
+ * Para componerlo habría que arrastrar la distribución entera por cada nodo y
+ * no compensa.
+ */
+export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false } = {}) {
+  const suerte = [];
+  const cambios = [];
+
+  const deNodo = (nodo) => {
+    if (nodo.tipo === 'inventario') return { ...ivsVacios(), ...(nodo.ejemplar?.ivs ?? {}) };
+    if (nodo.tipo !== 'cruce') {
+      // Un hueco por conseguir se captura o se compra buscando el 31: es lo que
+      // el plan pide, así que es lo que se cuenta.
+      const ivs = ivsVacios();
+      for (const st of nodo.stats) ivs[st] = IV_MAX;
+      return ivs;
+    }
+
+    const [a, b] = nodo.hijos.map(deNodo);
+
+    // Los dos Recios de un cruce son intercambiables entre los padres, y con un
+    // 30 de por medio deja de dar igual quién lleva cuál: un Recio fuerza el IV
+    // de QUIEN LO LLEVA, así que puesto en el padre que tiene 30 garantiza un 30
+    // teniendo el 31 delante. Si cambiarlos de mano sube el suelo, se cambian:
+    // sale gratis, son los mismos dos objetos. La Piedraeterna no se toca — va
+    // en el padre a propósito (ver construir()).
+    if (colocarObjetos && nodo.objetos
+        && nodo.objetos.madre !== PIEDRAETERNA && nodo.objetos.padre !== PIEDRAETERNA) {
+      const suelo = (om, op) => nodo.stats
+        .reduce((acc, st) => acc + Math.min(...distribucionDe(st, a, b, om, op).map((x) => x.valor)), 0);
+      const { madre, padre } = nodo.objetos;
+      if (madre && padre && madre !== padre && suelo(padre, madre) > suelo(madre, padre)) {
+        nodo.objetos = { madre: padre, padre: madre };
+        cambios.push({ nodo: nodo.id, madre: padre, padre: madre });
+        nodo.explicacion += ` Los dos Recios van cambiados de mano a propósito: cada uno está en `
+          + `el padre que tiene el 31 de ese IV, porque un Recio fuerza el IV de quien lo lleva `
+          + `y puesto en el que tiene 30 garantizaría el 30.`;
+      }
+    }
+
+    const ivs = ivsVacios();
+    for (const st of nodo.stats) {
+      const d = distribucionDe(st, a, b, nodo.objetos?.madre, nodo.objetos?.padre);
+      ivs[st] = Math.min(...d.map((x) => x.valor));
+      const p = d.filter((x) => x.valor >= IV_MAX).reduce((acc, x) => acc + x.probabilidad, 0);
+      if (p > 0 && p < 1) {
+        suerte.push({ nodo: nodo.id, stat: st, probabilidad: p, suelo: ivs[st] });
+        if (colocarObjetos)
+          nodo.explicacion += ` En ${NOMBRE_STAT[st]} un padre trae 30 y el otro 31: aquí no hay `
+            + `garantía, sale 31 el ${Math.round(p * 100)} % de las veces y ${ivs[st]} el resto.`;
+      }
+    }
+    return ivs;
+  };
+
+  const ivs = deNodo(arbol);
+  const pedidos = statsPedidos(objetivo);
+  return {
+    ivs,
+    suerte,
+    // Cruces donde se han intercambiado los dos Recios para no forzar un 30
+    // teniendo un 31 en el otro padre.
+    objetosRecolocados: cambios,
+    // Los que el plan NO puede prometer a 31 pase lo que pase.
+    cortos: pedidos.filter((st) => ivs[st] < IV_MAX),
   };
 }
 

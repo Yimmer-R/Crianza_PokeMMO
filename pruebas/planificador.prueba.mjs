@@ -6,9 +6,9 @@ import { bloque, prueba, igual, cierto, falso } from './marco.mjs';
 import { datos, ivs } from './datos-de-prueba.mjs';
 import {
   planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
-  movimientosSoloDeHuevo, medirArbol, criaDe, ROL, lineaMaterna,
+  movimientosSoloDeHuevo, medirArbol, criaDe, ROL, lineaMaterna, ivsDelArbol,
 } from '../src/nucleo/planificador.js';
-import { ivsGarantizados, naturalezaGarantizada, perfectos } from '../src/nucleo/herencia.js';
+import { ivsGarantizados, naturalezaGarantizada, perfectos, IV_PSEUDO } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
 import { planDeCapturas } from '../src/nucleo/capturas.js';
 import { presupuestar } from '../src/nucleo/coste.js';
@@ -768,5 +768,97 @@ bloque('la espina acepta la línea entera, y lo dice cuando no hay hembras', () 
     cierto(pichu.noCria && pichu.evolucionar?.especie === 'Pikachu');
     falso(espina.recomendada.noCria, 'con todo igual se recomienda el que ya cría');
     cierto(plan.avisos.some((a) => /Pichu.*evolucionarlo/.test(a)), plan.avisos.join(' | '));
+  });
+});
+
+bloque('el pseudo 31: un 30 sirve de padre, pero no miente', () => {
+  const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+  const bicho = (id, ivs, extra = {}) => ({
+    id, especie: 'Larvitar', sexo: SEXOS.HEMBRA, naturaleza: null,
+    ivs: { ...cero, ...ivs }, evs: {}, movimientos: [], ...extra,
+  });
+  const obj = (ivsPedidos) => ({
+    especie: 'Larvitar', ivs: { ...cero, ...ivsPedidos }, evs: {}, movimientos: [],
+  });
+  const conInventario = (inventario, pedidos = { ps: 31, ataque: 31, velocidad: 31 }) =>
+    planear(obj(pedidos), datos, { inventario, regionesDisponibles: REGIONES });
+  const usados = (plan) => {
+    const out = [];
+    (function r(n) { if (n.tipo === 'inventario') out.push(n.ejemplar.id); n.hijos.forEach(r); })(plan.arbol);
+    return out;
+  };
+
+  prueba('un 30 tapa un hueco que pide 31, y se dice que es un 30', () => {
+    const plan = conInventario([bicho('treinta', { ataque: IV_PSEUDO })]);
+    igual(usados(plan), ['treinta']);
+    igual(plan.ivsFinales.ataque, 30, 'el plan entrega 30, no 31');
+    igual(plan.ivsCortos, ['ataque']);
+    cierto(plan.avisos.some((a) => /pseudo 31/.test(a)), plan.avisos.join(' | '));
+  });
+
+  prueba('entre un 30 y un 31 para el mismo hueco, se coge el 31', () => {
+    const plan = conInventario([
+      bicho('treinta', { ataque: IV_PSEUDO }),
+      bicho('treintayuno', { ataque: 31 }, { especie: 'Slowpoke', sexo: SEXOS.MACHO }),
+    ], { ps: 31, ataque: 31 });
+    const huecoDe = (id) => {
+      let r = null;
+      (function rec(n) { if (n.tipo === 'inventario' && n.ejemplar.id === id) r = n; n.hijos.forEach(rec); })(plan.arbol);
+      return r;
+    };
+    const conHueco = huecoDe('treintayuno');
+    cierto(conHueco, 'el 31 tiene que estar colocado');
+    cierto(conHueco.stats.includes('ataque'), 'y en el hueco que pide el ataque');
+  });
+
+  prueba('la RAÍZ no se da por cumplida con un 30: no es lo que se ha pedido', () => {
+    const plan = conInventario([bicho('casi', { ps: 31, ataque: IV_PSEUDO })], { ps: 31, ataque: 31 });
+    falso(plan.arbol.tipo === 'inventario', 'un 30 no puede ser el objetivo');
+  });
+
+  prueba('30 × 31 no garantiza nada: sale 31 con la probabilidad de la tabla', () => {
+    const plan = conInventario([
+      bicho('m', { ps: IV_PSEUDO, ataque: 31 }),
+      bicho('p', { ps: 31, ataque: IV_PSEUDO }, { especie: 'Slowpoke', sexo: SEXOS.MACHO }),
+    ], { ps: 31, ataque: 31 });
+    // Aquí los dos Recios se cambian de mano y los dos IVs salen a 31 seguros,
+    // que es mejor que la lotería: cada Recio acaba en el padre que tiene el 31.
+    igual(plan.ivsFinales.ps, 31);
+    igual(plan.ivsFinales.ataque, 31);
+    igual(plan.suerte, []);
+    igual(plan.objetosRecolocados.length, 1);
+  });
+
+  prueba('sin poder recolocar, el 30 contra el 31 queda a suerte y se dice', () => {
+    // Un solo IV pedido: el cruce tiene un Recio para él, así que da igual la
+    // mano. Se fuerza el caso a mano sobre el árbol.
+    const plan = conInventario([], { ps: 31, ataque: 31, velocidad: 31 });
+    const [a, b] = plan.arbol.hijos;
+    // Se simula que las dos ramas entregan 30 y 31 en el IV compartido.
+    const compartido = plan.arbol.stats.find((st) => !plan.arbol.forzados.includes(st));
+    for (const n of [a, b]) { n.tipo = 'conseguir'; n.hijos = []; }
+    a.stats = [compartido]; b.stats = [compartido];
+    a.tipo = 'inventario'; a.ejemplar = bicho('x', { [compartido]: IV_PSEUDO });
+    const r = ivsDelArbol(plan.arbol, obj({ ps: 31, ataque: 31, velocidad: 31 }));
+    igual(r.ivs[compartido], 30, 'el suelo del compartido es el 30');
+    igual(r.suerte.length, 1);
+    cierto(r.suerte[0].probabilidad > 0 && r.suerte[0].probabilidad < 1);
+  });
+
+  prueba('la cría de un 30 con un 31 se anota como 30 y avisa de que se mire', () => {
+    const plan = conInventario([
+      bicho('m', { ataque: IV_PSEUDO, ps: 31 }),
+      bicho('p', { ataque: 31, ps: 31 }, { especie: 'Slowpoke', sexo: SEXOS.MACHO }),
+    ], { ps: 31, ataque: 31 });
+    let cruce = null;
+    (function r(n) {
+      if (n.tipo === 'cruce' && n.hijos.every((h) => h.tipo === 'inventario')) cruce = n;
+      n.hijos.forEach(r);
+    })(plan.arbol);
+    cierto(cruce, 'tiene que haber un cruce con los dos padres puestos');
+    const cria = criaDe(cruce, plan.objetivo, datos);
+    cierto(cria.ivs.ataque >= IV_PSEUDO, `ataque anotado: ${cria.ivs.ataque}`);
+    if (cria.ivs.ataque === IV_PSEUDO)
+      cierto(/comprueba en el juego/.test(cria.nota), cria.nota);
   });
 });

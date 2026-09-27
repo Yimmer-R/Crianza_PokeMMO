@@ -314,6 +314,12 @@ bloque('entrenamiento: los escalones de EVs', () => {
     igual(o.puntosDespues, o.puntosAntes, 'no se gana nada, pero tampoco se pierde');
   });
 
+  prueba('un 30 es un IV sabido: no se avisa de que la paridad esté en el aire', () => {
+    const o = optimizarEvs({ ataque: 252 }, { ataque: 30 }, 50);
+    igual(o.ivsSinFijar, [], 'un 30 se sabe; lo que no se sabe es un IV sin anotar');
+    igual(optimizarEvs({ ataque: 252 }, { ataque: 0 }, 50).ivsSinFijar, ['ataque']);
+  });
+
   prueba('con IVs pares el mismo reparto tira 14 EVs y uno de ellos vale un punto', () => {
     const o = optimizarEvs(
       { ataque: 252, velocidad: 252, ps: 6 },

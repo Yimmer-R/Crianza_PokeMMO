@@ -156,6 +156,12 @@ export function evaluar(ejemplar, plan, datos) {
         (mejor.hueco.sexoNecesario ? ` ${mejor.hueco.sexoNecesario}` : '') +
         `: ahorra ${mejor.ahorro} captura${mejor.ahorro === 1 ? '' : 's'}. ` +
         `Encaja en ${encaja.length} hueco${encaja.length === 1 ? '' : 's'} en total. ` +
+        // Que entre por un 30 y no por un 31 cambia lo que sale al final, así
+        // que no se calla: sirve, pero como sustituto.
+        ((mejor.pseudo ?? []).length
+          ? `Ojo: entra como pseudo 31 — aporta 30 en ${mejor.pseudo.join(', ')}, así que ese IV `
+            + 'saldrá 30 salvo que el otro padre traiga el 31 y toque la suerte. '
+          : '') +
         'Añádelo al inventario y el plan se recalcula.',
     };
   }

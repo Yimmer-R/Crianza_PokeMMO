@@ -16,6 +16,12 @@ archivos son a ciegas.
 El resumen de una línea: **un cruce garantiza los 31 que comparten los dos padres,
 más uno forzado por cada objeto Recio**. Todo lo demás sale de ahí.
 
+Y el **pseudo 31**, que es un IV a 30: vale de padre cuando no hay un 31, pero no
+es un 31. Dos 30 dan 30 seguro; un 30 contra un 31 da 31 sólo con la
+probabilidad de la rama «alto» de la tabla (25 % sin objetos, 20 % con uno,
+12,5 % con dos) — salvo que el Recio de ese IV lo lleve el padre que tiene el
+31, y entonces sí sale 31 seguro. La app coloca los Recios así sola.
+
 La naturaleza va por otro camino: **sólo la pasa la Piedraeterna, y la pasa
 siempre**. Que los dos padres la compartan **no** la transmite — la cría la
 sortea igual entre las 25 (`wiki/mecanicas/Crianza.md`). La app tuvo esto al
@@ -62,7 +68,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Ocho cosas que no son evidentes leyendo un archivo suelto:
+Nueve cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -104,6 +110,17 @@ Ocho cosas que no son evidentes leyendo un archivo suelto:
    propia línea evolutiva** o con un Ditto (`wiki/mecanicas/Crianza.md`), al
    contrario que en los juegos originales. Y no tiene sexos: ningún hueco del
    árbol puede pedir ♀ ni ♂, o salen capturas de «1 de cada 0».
+9. **Un 30 entra como pseudo 31, pero nunca en la raíz.** `cumple()` acepta un
+   30 en cualquier hueco de PADRE y lo marca (`r.pseudo`), y
+   `asignarInventario()` ordena los candidatos poniendo los 31 de verdad
+   delante. En la RAÍZ no se acepta: la raíz es el Pokémon que el usuario ha
+   pedido, y darle por cumplido un 6×31 con un 30 es decirle que ya está cuando
+   no está. Lo que el árbol entrega de verdad lo calcula `ivsDelArbol()`, que
+   propaga el **suelo** (el peor valor posible) de abajo arriba y va apuntando
+   en qué cruces hay un 30 contra un 31 y con qué probabilidad sale el 31. De
+   ahí salen `plan.ivsFinales`, `plan.ivsCortos` y `plan.suerte`, y esos son los
+   IVs que usa la optimización de EVs — con un 30 los escalones de nivel 50
+   caen en otro sitio, porque cambia la paridad.
 
 ## El aspecto
 
@@ -201,7 +218,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 229 pruebas unitarias
+node pruebas/ejecutar.mjs             # 236 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

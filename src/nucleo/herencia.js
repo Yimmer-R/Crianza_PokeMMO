@@ -44,6 +44,32 @@ export const ivsVacios = () => Object.fromEntries(STATS.map((s) => [s, 0]));
 export const perfectos = (ivs) => new Set(STATS.filter((s) => (ivs?.[s] ?? 0) >= IV_MAX));
 
 /**
+ * El «pseudo 31»: un IV a 30.
+ *
+ * No es un 31 y no se puede fingir que lo sea —a nivel 50 un 30 da medio punto
+ * menos que un 31, y encima cambia la paridad, que es lo que mueve los
+ * escalones de EVs—, pero un 30 SÍ sirve de padre cuando no hay un 31 a mano:
+ *
+ *   - cruzado con otro 30, la cría saca 30 seguro (alto, bajo y promedio valen
+ *     30 los tres), así que la cadena no se rompe;
+ *   - cruzado con un 31, la cría puede salir 31. El alto es 31 y el promedio y
+ *     el bajo son 30, así que sale 31 con la probabilidad de la rama «alto» de
+ *     la tabla de herencia: 25 % sin objetos, 20 % con uno y 12,5 % con dos.
+ *     De ahí que un 30 no sea un callejón sin salida: es un billete de lotería
+ *     que además garantiza el 30 si no toca.
+ *
+ * La regla de uso, que es del usuario: **primero los 31, y los 30 sólo cuando
+ * no hay otra cosa**.
+ */
+export const IV_PSEUDO = 30;
+
+/** Los IVs que están exactamente a 30, como Set. */
+export const pseudos = (ivs) => new Set(STATS.filter((s) => (ivs?.[s] ?? 0) === IV_PSEUDO));
+
+/** Los que valen para un hueco que pide 31: los 31 y, a falta de nada mejor, los 30. */
+export const sirvenComo31 = (ivs) => new Set(STATS.filter((s) => (ivs?.[s] ?? 0) >= IV_PSEUDO));
+
+/**
  * Qué IVs quedan garantizados a 31 en la cría.
  *
  * @param {Ivs} ivsA IVs del primer padre
