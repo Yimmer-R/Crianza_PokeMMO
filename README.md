@@ -51,6 +51,12 @@ sólo fuerza un IV en vez de dos, y la hoja de sólo naturaleza entra por abajo 
 árbol. El lado bueno: media cadena queda sin naturaleza, y ahí encaja cualquier
 Pokémon que ya tengas aunque la suya no sea la buena.
 
+**Con la cara de cada Pokémon.** Objetivo, plan, árbol, capturas, inventario y la
+línea evolutiva salen con su sprite: el render 3D de Pokémon HOME, y la variante ♀
+en las 97 especies que el juego dibuja distintas. Las imágenes no viven aquí —son
+unos 150 MB—: se enlazan al volcado que enlaza la wiki, y si una no carga se queda
+su hueco marcado en vez de la de otro Pokémon.
+
 **Tu inventario.** Cada vez que anotas un Pokémon, el plan se recalcula entero y
 se recorta por donde puede. El emparejado busca el hueco que **más capturas
 ahorra**, no el primero que encaja: un 3×31 metido en un hueco de 3×31 borra siete
@@ -241,6 +247,7 @@ src/nucleo/             la lógica, sin nada del DOM
   entrenamiento.js        el plan de EVs
   movimientos.js          cómo llega cada movimiento, y cuál obliga a criar
   habilidades.js          normal, oculta, y qué objeto hace falta
+  sprites.js              qué imagen le toca a cada Pokémon, y con qué sexo
 src/ui/                 vistas y estado; nada de reglas del juego
   estado.js               las crianzas, el inventario y el repintado
   barra-crianzas.js       cambiar de crianza sin salir de la pestaña
@@ -255,7 +262,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                217 pruebas unitarias + una de navegador
+pruebas/                272 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 
@@ -271,7 +278,8 @@ node herramientas/extraer-wiki.mjs [ruta-al-repo-de-la-wiki]
 Busca `../wiki-pokemmo` por defecto, y `../PokeMMO` como respaldo. Saca 667 Pokémon con sus grupos huevo, ratios de
 género, learnsets completos y encuentros por región; las 25 naturalezas; los 177
 movimientos huevo cruzados al revés con sus grupos; las hordas de EVs por
-característica; y los precios de los objetos de crianza y entrenamiento.
+característica; los precios de los objetos de crianza y entrenamiento; y el
+sprite de cada uno.
 
 ## Pruebas
 

@@ -3,7 +3,9 @@
 // El filtro de regiones se aplica antes de cualquier cosa: una sugerencia en una
 // región que el usuario no tiene desbloqueada no es una sugerencia, es ruido.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunidad } from './componentes.js';
+import {
+  el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunidad, sprite,
+} from './componentes.js';
 import { NOMBRE_STAT } from '../nucleo/constantes.js';
 import { obtener } from './estado.js';
 import { planDeCapturas, regionesQueHacenFalta } from '../nucleo/capturas.js';
@@ -84,28 +86,33 @@ export function vistaCapturas(datos) {
     const hayEspina = grupo.some((c) => !c.requisito.especieLibre);
 
     return tarjeta(`${especie} · ${cuantos} ${cuantos === 1 ? 'captura' : 'capturas'}`, [
-      el('div.etiquetas', {}, [
-        hayLibres
-          ? chip(
-              sinGeneroObjetivo ? 'hueco libre: su línea o un Ditto' : 'hueco libre: la especie no está atada',
-              'si',
-            )
-          : null,
-        hayEspina
-          ? chip(
-              rec.noSeCria ? 'sin hembras en la línea: la pareja tiene que ser un Ditto'
-                : `espina materna: ${especie} o cualquiera de su línea`,
-              'ojo',
-            )
-          : null,
-        rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
-        chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
-        (cuando.hora || cuando.estacion)
-          ? chip(
-              rec.zonasAhora ? `${rec.zonasAhora} ahora mismo` : 'ninguna ahora mismo',
-              rec.zonasAhora ? 'bien' : 'mal',
-            )
-          : null,
+      // A quién hay que buscar, en grande. En una lista de cinco tarjetas de
+      // captura es lo primero que se mira antes de leer en qué ruta sale.
+      el('div.ficha-especie', {}, [
+        sprite(especie, { tam: 'grande', sexo: base.requisito.sexo }),
+        el('div.etiquetas', {}, [
+          hayLibres
+            ? chip(
+                sinGeneroObjetivo ? 'hueco libre: su línea o un Ditto' : 'hueco libre: la especie no está atada',
+                'si',
+              )
+            : null,
+          hayEspina
+            ? chip(
+                rec.noSeCria ? 'sin hembras en la línea: la pareja tiene que ser un Ditto'
+                  : `espina materna: ${especie} o cualquiera de su línea`,
+                'ojo',
+              )
+            : null,
+          rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
+          chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
+          (cuando.hora || cuando.estacion)
+            ? chip(
+                rec.zonasAhora ? `${rec.zonasAhora} ahora mismo` : 'ninguna ahora mismo',
+                rec.zonasAhora ? 'bien' : 'mal',
+              )
+            : null,
+        ]),
       ]),
       // Lo que hay que hacer cuando la especie más fácil de pillar todavía no
       // puede criar, que es el caso de los 18 bebés.
@@ -176,7 +183,13 @@ export function vistaCapturas(datos) {
             tabla(
               ['Especie', 'Grupo en común', 'Sexo pedido', 'Intentos', 'Zonas al alcance'],
               base.viables.slice(1, 6).map((o) => [
-                o.noCria && o.evolucionar ? `${o.especie} (evoluciónalo a ${o.evolucionar.especie})` : o.especie,
+                el('span.con-sprite', {}, [
+                  sprite(o.especie, { tam: 'mini' }),
+                  el('span', {
+                    texto: o.noCria && o.evolucionar
+                      ? `${o.especie} (evoluciónalo a ${o.evolucionar.especie})` : o.especie,
+                  }),
+                ]),
                 o.gruposEnComun.join(' / '), `${o.ratioSexo} %`,
                 comoOportunidad(o.intentos), numero(o.zonas.length),
               ]),
@@ -203,7 +216,8 @@ export function vistaCapturas(datos) {
             tabla(
               ['Especie', 'Región', 'Zona', 'Método', 'Rareza'],
               c.opciones.flatMap((o) => o.zonasFueraDeAlcance.map((z) => [
-                o.especie, chip(z.region, 'mal'), z.zona, z.metodo, z.rareza,
+                el('span.con-sprite', {}, [sprite(o.especie, { tam: 'mini' }), el('span', { texto: o.especie })]),
+                chip(z.region, 'mal'), z.zona, z.metodo, z.rareza,
               ])),
             ),
           ])

@@ -71,7 +71,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Trece cosas que no son evidentes leyendo un archivo suelto:
+Catorce cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -166,6 +166,24 @@ Trece cosas que no son evidentes leyendo un archivo suelto:
    750 BP en la Torre Batalla de Kanto. La Piedraeterna **no** tiene precio en
    PB y elegir el sexo de la cría tampoco —es un servicio, no un objeto—, y eso
    se dice en su línea en vez de dejarla en blanco (`pres.pbNoCubre`).
+
+14. **Los sprites se enlazan, no se guardan.** Cada Pokémon sale con su imagen, y
+   la imagen NO está en este repositorio ni en la wiki: son unos 150 MB y las dos
+   cosas son texto. La wiki (`wiki/sprites/`) las enlaza al volcado de PokeAPI, y
+   `datos/sprites.json` guarda el prefijo común **una vez** en `base` más, de cada
+   Pokémon, sólo lo que cambia. Dos vías: el render 3D de Pokémon HOME —lo que
+   pidió el usuario, y lo más nuevo que hay publicado suelto— y el sprite animado
+   de 5ª generación, que es el del propio juego. De Escarlata/Púrpura y de
+   Leyendas Z-A **no hay volcado**, y en 3D **no existe el dorso**: las dos cosas
+   están comprobadas pidiendo el archivo, no supuestas. Tres consecuencias:
+   **la especie manda sobre la forma final** también aquí — cada página de la
+   wiki tiene su hoja, así que «Rotom Calor» no cae en el sprite de Rotom;
+   **el sexo importa en 97 de las 667**, que son las que el juego dibuja distintas,
+   y en el resto pedir la hembra devuelve la de siempre, que no es un hueco;
+   y **una imagen que no carga deja su hueco dicho**, nunca la de otra especie
+   ni el icono de rota del navegador. El hueco NO lleva texto dentro: el sprite va
+   pegado al nombre en tablas y sugerencias, y dos letras de más bastaron para que
+   una opción dejara de decir «Rattata» y dijera «RARattata».
 
 ## El aspecto
 
@@ -264,7 +282,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 257 pruebas unitarias
+node pruebas/ejecutar.mjs             # 272 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

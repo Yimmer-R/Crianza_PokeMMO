@@ -15,6 +15,7 @@ export const datos = {
   naturalezas: leer('naturalezas.json'),
   movimientos: leer('movimientos.json'),
   objetos: leer('objetos.json'),
+  sprites: leer('sprites.json'),
   movimientosHuevo: leer('movimientos-huevo.json'),
   habilidades: leer('habilidades.json'),
   dondeEntrenar: leer('donde-entrenar.json'),

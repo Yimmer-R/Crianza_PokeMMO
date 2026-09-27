@@ -6,7 +6,7 @@
 node pruebas/ejecutar.mjs
 ```
 
-217 pruebas, contra los JSON reales de `datos/` y no contra dobles inventados: si
+272 pruebas, contra los JSON reales de `datos/` y no contra dobles inventados: si
 la extracción de la wiki rompe algo, las pruebas lo ven.
 
 Las dos que más valen:
@@ -44,12 +44,23 @@ Recorre el flujo entero: cargar, elegir objetivo, ver el plan y la comparativa d
 estrategias de naturaleza, filtrar regiones, anotar una captura que no sirve,
 anotar una que sí y comprobar que el plan se recorta, escribir un movimiento con
 el nombre del juego, importar por texto con su pantalla de revisión, calcular
-hordas, recargar y comprobar que el inventario sigue ahí, y que a 390 px no hay
-scroll horizontal.
+hordas, que cada Pokémon sale con su sprite, recargar y comprobar que el
+inventario sigue ahí, y que a 390 px no hay scroll horizontal.
 
 **Falla ante cualquier error de consola.** Los fallos más caros de este proyecto
 sólo se veían aquí, y el peor de todos no daba error: la app entraba en un bucle
 de repintado y se quedaba colgada, que desde fuera parece «no carga».
+
+### Los sprites se comprueban sin bajarlos
+
+Las imágenes de los Pokémon las sirve un host externo (el volcado de PokeAPI que
+enlaza la wiki), así que en una máquina sin salida directa —CI, o un proxy con su
+propia autoridad— no cargan, y Chromium lo apunta como error de consola. Eso **no**
+se cuenta como fallo: se cuenta aparte y la batería lo dice al final. Lo que sí se
+comprueba siempre, haya red o no, es que cada `<img class="sprite">` apunte a la
+URL que dice `datos/sprites.json` para esa especie y ese sexo — que es lo que puede
+romper un cambio de código. La imagen que no carga guarda su URL buena en
+`data-sprite`, justo para eso.
 
 ### Los campos con autocompletado se confirman saliendo del campo
 

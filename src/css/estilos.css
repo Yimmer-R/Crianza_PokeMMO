@@ -176,7 +176,11 @@ body > * { width: 100%; }
   background: none; border: 1px solid var(--borde); color: var(--texto-tenue);
   font: inherit; cursor: pointer; border-radius: 0;
   padding: 6px 14px; white-space: nowrap; text-align: left; line-height: 1.25;
+  /* El sprite a la izquierda y el nombre con su estado apilados a la derecha;
+     sin el envoltorio `.crianza-texto` el flex los pondría los tres en fila. */
+  display: flex; align-items: center; gap: 8px;
 }
+.crianza-texto { display: flex; flex-direction: column; }
 .crianza:hover { color: var(--texto); border-color: var(--borde-campo); }
 .crianza.activa {
   color: var(--sobre-acento-suave); border-color: var(--acento);
@@ -307,6 +311,50 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 .boton.peligro { background: none; color: var(--mal); border-color: var(--mal); }
 .boton.peligro:hover { background: none; color: var(--mal); border-color: var(--mal); filter: brightness(1.2); }
 .boton.mini { padding: 5px 10px; font-size: 0.62rem; }
+
+/* ---------------------------------------------------------------- sprites */
+
+/* La imagen de cada Pokémon la sirve el volcado de PokeAPI, que es lo que
+   enlaza la wiki: ni este repositorio ni la wiki guardan un byte de imagen.
+   Por eso cada sprite reserva su hueco con medidas fijas — sin ellas, una
+   lista de treinta capturas pega un salto cuando van llegando las imágenes. */
+.sprite {
+  flex: none; display: inline-block; vertical-align: middle;
+  object-fit: contain; background: var(--elevada);
+  border: 1px solid var(--borde-sutil);
+}
+.sprite-mini   { width: 26px; height: 26px; }
+.sprite-normal { width: 46px; height: 46px; }
+.sprite-grande { width: 96px; height: 96px; }
+
+/* Cuando no hay imagen no se pone la de otra especie: se deja el hueco dicho,
+   con el porqué en el `title`. Es la regla 2 del repositorio, la misma que rige
+   los datos. El interrogante va en un `::after` y no como texto del nodo: así
+   no entra en el `textContent` del nombre que tiene al lado. */
+.sprite-hueco {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-style: dashed; border-color: var(--borde); background: var(--secundario-suave);
+}
+.sprite-hueco::after {
+  content: '?';
+  font: var(--rotulo); letter-spacing: var(--espaciado-rotulo); color: var(--texto-tenue);
+}
+.sprite-grande.sprite-hueco::after { font-size: 1.05rem; }
+
+/* Sprite y nombre leídos como una sola cosa. */
+.con-sprite { display: inline-flex; align-items: center; gap: 8px; }
+
+/* La cabecera de Objetivo: el Pokémon a la izquierda y sus etiquetas al lado. */
+.ficha-especie { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
+.ficha-especie .etiquetas { flex: 1; }
+/* `.chip` va más abajo y fija `display: inline-block`; aquí hace falta el flex
+   para que el sprite y el texto se alineen, y por eso la regla es más
+   específica en vez de ir arriba con las demás. */
+.chip.con-sprite { display: inline-flex; padding: 2px 9px 2px 2px; gap: 6px; }
+
+/* La línea evolutiva de Entrenamiento: las caras en fila con su flecha. */
+.linea-evolutiva { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 10px; }
+.linea-evolutiva .flecha { color: var(--texto-tenue); }
 
 /* --------------------------------------------------------------- utilería */
 
@@ -485,8 +533,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .sug-lista[hidden] { display: none; }
 
+/* Con `conSprites` la opción lleva la cara del Pokémon delante del nombre, así
+   que es flex; sin él sigue siendo una línea de texto y el flex no estorba. */
 .sug-opcion {
-  display: block;
+  display: flex; align-items: center; gap: 8px;
   width: 100%;
   text-align: left;
   background: none;

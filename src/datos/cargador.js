@@ -11,6 +11,7 @@ const ARCHIVOS = {
   habilidades: 'habilidades.json',
   movimientosHuevo: 'movimientos-huevo.json',
   objetos: 'objetos.json',
+  sprites: 'sprites.json',
   dondeEntrenar: 'donde-entrenar.json',
   meta: 'meta.json',
 };

@@ -4,7 +4,7 @@
 // Objetivo, el Plan y el Entrenamiento a la vez. El Inventario no, que es el
 // mismo para todas.
 
-import { el, chip } from './componentes.js';
+import { el, chip, sprite } from './componentes.js';
 import {
   obtener, nombreDeCrianza, anadirCrianza, duplicarCrianza,
   cambiarDeCrianza, renombrarCrianza, borrarCrianza,
@@ -40,8 +40,13 @@ export function barraCrianzas() {
       'aria-selected': c.id === crianzaActiva ? 'true' : 'false',
       onclick: () => { renombrando = null; cambiarDeCrianza(c.id); },
     }, [
-      el('span.crianza-nombre', { texto: nombreDeCrianza(c) }),
-      el(`span.crianza-estado${r.clase ? `.${r.clase}` : ''}`, { texto: r.texto }),
+      // Con tres o cuatro crianzas abiertas, la cara distingue la pestaña antes
+      // que el nombre, que casi siempre es el de la especie repetido.
+      c.objetivo.especie ? sprite(c.objetivo.especie, { tam: 'mini', sexo: c.objetivo.sexo }) : null,
+      el('span.crianza-texto', {}, [
+        el('span.crianza-nombre', { texto: nombreDeCrianza(c) }),
+        el(`span.crianza-estado${r.clase ? `.${r.clase}` : ''}`, { texto: r.texto }),
+      ]),
     ]);
   }));
 

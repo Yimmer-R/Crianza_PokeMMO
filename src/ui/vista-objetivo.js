@@ -1,6 +1,8 @@
 // El formulario del Pokémon objetivo: lo que el usuario quiere conseguir.
 
-import { el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor } from './componentes.js';
+import {
+  el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor, sprite,
+} from './componentes.js';
 import {
   STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS,
 } from '../nucleo/constantes.js';
@@ -46,7 +48,7 @@ export function vistaObjetivo(datos) {
             sexo: sexosPosibles(nueva).includes(o.sexo) ? o.sexo : null,
           }));
         },
-        { placeholder: 'Larvitar, Chimchar…' },
+        { placeholder: 'Larvitar, Chimchar…', conSprites: true },
       ),
       // El selector sólo sale cuando de verdad hay algo que elegir. Sin género
       // no hay sexos; y en una línea de un solo sexo (Starmie, Nidoking,
@@ -66,11 +68,23 @@ export function vistaObjetivo(datos) {
             ]),
           ]),
     ]),
-    p ? el('div.etiquetas', { style: 'margin-top:10px' }, [
-      chip(`Grupo huevo: ${p.gruposHuevo.join(' / ')}`, 'si'),
-      chip(`Género: ${p.genero.sinGenero ? 'sin género' : `${p.genero.macho}% ♂ / ${p.genero.hembra}% ♀`}`),
-      p.base !== objetivo.especie ? chip(`Del huevo sale ${p.base}`, 'ojo') : null,
-      chip(`Tipos: ${p.tipos.join(' / ')}`),
+    // El sprite al lado de las etiquetas: es lo que confirma de un vistazo que
+    // la especie escrita es la que se quería. El sexo cuenta porque 97 especies
+    // se dibujan distintas según sea ♂ o ♀.
+    p ? el('div.ficha-especie', {}, [
+      sprite(objetivo.especie, { tam: 'grande', sexo: objetivo.sexo }),
+      el('div.etiquetas', {}, [
+        chip(`Grupo huevo: ${p.gruposHuevo.join(' / ')}`, 'si'),
+        chip(`Género: ${p.genero.sinGenero ? 'sin género' : `${p.genero.macho}% ♂ / ${p.genero.hembra}% ♀`}`),
+        // De la línea sale la base, así que se enseña también a quién se cría
+        // de verdad: el huevo no eclosiona en la forma final.
+        p.base !== objetivo.especie
+          ? el('span.chip.ojo.con-sprite', {}, [
+              sprite(p.base, { tam: 'mini' }), el('span', { texto: `Del huevo sale ${p.base}` }),
+            ])
+          : null,
+        chip(`Tipos: ${p.tipos.join(' / ')}`),
+      ]),
     ]) : el('p.vacio', { texto: 'Escribe una especie para empezar.' }),
   ]);
 

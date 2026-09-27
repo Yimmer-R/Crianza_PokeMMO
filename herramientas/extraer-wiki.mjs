@@ -396,6 +396,100 @@ if (!Object.keys(pokemon).length) {
   process.exit(1);
 }
 
+// ------------------------------------------------------------------- sprites
+//
+// Cada ficha de Pokémon tiene su hoja en `wiki/sprites/`, con una fila por
+// variante. La PRIMERA fila es la de la propia página —en «Sprites de Rotom
+// Calor» se llama «Rotom Calor», no «Base»—, así que es la que vale. Las demás
+// son formas sin página propia (las cuatro estaciones de Deerling, las 28
+// letras de Unown, los 17 tipos de Arceus) y la app no las conoce: su pokédex
+// tiene una entrada por página, no por forma.
+//
+// De las tres columnas de imagen se guardan dos. El DORSO se deja fuera a
+// propósito: es el sprite de combate y aquí no se enseña a nadie de espaldas.
+// La wiki lo tiene, así que si algún día hace falta está a una columna.
+//
+// Las URL comparten un prefijo larguísimo (el volcado de PokeAPI). Se guarda
+// una vez en `base` y cada entrada lleva sólo lo que cambia: son 667 × 2 URL y
+// repetirlo entero multiplica por tres el archivo. El prefijo se CALCULA de las
+// propias URL, no se escribe a mano, para que un cambio de host en la wiki lo
+// arrastre solo.
+const dirSprites = join(WIKI, 'wiki', 'sprites');
+
+// La cabecera dice qué es cada columna, y no todas las hojas tienen las mismas:
+// sólo 97 especies tienen sprite de hembra. Por eso se mapea por nombre de
+// columna y no por posición.
+const COLUMNAS_SPRITE = {
+  '3D frontal': 'tresD',
+  'Frontal': 'frontal',
+  '3D frontal ♀': 'tresDHembra',
+  'Frontal ♀': 'frontalHembra',
+};
+
+/** Tabla Markdown CON su cabecera: `filas()` la tira, y aquí es el dato. */
+function tablaConCabecera(bloque) {
+  const celdas = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '')
+    .split(/(?<!\\)\|/).map((c) => c.trim());
+  const lineas = bloque.split('\n')
+    .filter((l) => l.trim().startsWith('|') && !/^\|[\s|:-]+\|$/.test(l.trim()));
+  if (!lineas.length) return { cabecera: [], filas: [] };
+  return { cabecera: celdas(lineas[0]), filas: lineas.slice(1).map(celdas) };
+}
+
+/** URL de un `![alt](url)`. Un «—» quiere decir que el volcado no la tiene. */
+const imagenDe = (celda) => celda?.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)?.[1] ?? null;
+
+const spritesCrudos = {};
+let sinHoja = 0;
+if (existsSync(dirSprites)) {
+  for (const nombre of Object.keys(pokemon)) {
+    const ruta = join(dirSprites, `Sprites de ${nombre}.md`);
+    if (!existsSync(ruta)) { sinHoja++; continue; }
+    const { cabecera, filas: variantes } = tablaConCabecera(
+      seccion(readFileSync(ruta, 'utf8'), '## Sprites'),
+    );
+    const suya = variantes[0];
+    if (!suya) { sinHoja++; continue; }
+    const uno = {};
+    cabecera.forEach((col, i) => {
+      const clave = COLUMNAS_SPRITE[col];
+      const url = clave ? imagenDe(suya[i]) : null;
+      if (clave && url) uno[clave] = url;
+    });
+    if (Object.keys(uno).length) spritesCrudos[nombre] = uno; else sinHoja++;
+  }
+  if (sinHoja) avisa(`${sinHoja} Pokémon sin sprite en wiki/sprites/: saldrán con su silueta`);
+} else {
+  avisa('no hay wiki/sprites/: la app no puede enseñar ningún sprite');
+}
+
+/** Prefijo común de todas las URL, cortado en la última `/` que comparten. */
+function prefijoComun(urls) {
+  if (!urls.length) return '';
+  let p = urls[0];
+  for (const u of urls) {
+    let i = 0;
+    while (i < p.length && i < u.length && p[i] === u[i]) i++;
+    p = p.slice(0, i);
+  }
+  return p.slice(0, p.lastIndexOf('/') + 1);
+}
+
+const todasLasUrls = Object.values(spritesCrudos).flatMap((s) => Object.values(s));
+const baseSprites = prefijoComun(todasLasUrls);
+const sprites = {
+  base: baseSprites,
+  // Qué es cada imagen, dicho por la wiki y no por el nombre de la clave.
+  vias: {
+    tresD: 'render 3D del modelo de Pokémon HOME',
+    frontal: 'sprite animado de 5ª generación (Blanco/Negro), la que usa PokeMMO',
+  },
+  de: Object.fromEntries(Object.entries(spritesCrudos).map(([nombre, s]) => [
+    nombre,
+    Object.fromEntries(Object.entries(s).map(([k, u]) => [k, u.slice(baseSprites.length)])),
+  ])),
+};
+
 // -------------------------------------------------------------- naturalezas
 
 const dirNat = join(WIKI, 'wiki', 'naturalezas');
@@ -645,6 +739,7 @@ const meta = {
     movimientos: Object.keys(movimientos).length,
     habilidades: Object.keys(habilidades).length,
     movimientosHuevo: Object.keys(movimientosHuevo).length,
+    conSprite: Object.keys(sprites.de).length,
   },
   regiones,
   gruposHuevo: [...new Set(Object.values(pokemon).flatMap((p) => p.gruposHuevo))].sort(),
@@ -666,6 +761,7 @@ escribe('movimientos.json', movimientos);
 escribe('habilidades.json', habilidades);
 escribe('movimientos-huevo.json', { deHuevo: movimientosHuevo, otrosModos: loAprendeDeOtroModo });
 escribe('objetos.json', objetos);
+escribe('sprites.json', sprites);
 escribe('donde-entrenar.json', dondeEntrenar);
 escribe('meta.json', meta);
 

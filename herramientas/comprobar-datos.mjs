@@ -19,7 +19,7 @@ const mal = (m) => problemas.push(m);
 const ARCHIVOS = [
   'pokemon.json', 'encuentros.json', 'naturalezas.json', 'movimientos.json',
   'habilidades.json', 'movimientos-huevo.json', 'objetos.json',
-  'donde-entrenar.json', 'meta.json',
+  'sprites.json', 'donde-entrenar.json', 'meta.json',
 ];
 for (const a of ARCHIVOS) if (!existsSync(join(RAIZ, 'datos', a))) mal(`falta datos/${a}`);
 if (problemas.length) { console.error(problemas.join('\n')); process.exit(1); }
@@ -103,6 +103,22 @@ for (const o of ['Pesa Recia', 'Brazal Recio', 'Cinto Recio', 'Lente Recia', 'Ba
 
 // El alias del cliente que el importador necesita para traducir "Desenrollar".
 if (!movimientos.Rodar) mal('movimientos: falta Rodar, al que el juego llama Desenrollar');
+
+// Los sprites. No se comprueba que la imagen cargue —eso es red y esto corre en
+// CI sin ella—, sino que la clave esté y que la ruta sea relativa: si la
+// extracción dejara de recortar el prefijo, cada entrada pesaría el triple y
+// `urlSprite()` devolvería la URL duplicada.
+const sprites = leer('sprites.json');
+if (!/^https:\/\/\S+\/$/.test(sprites.base ?? ''))
+  mal(`sprites: la base no es una URL acabada en barra ("${sprites.base}")`);
+const sinSprite = Object.keys(pokedex).filter((n) => !sprites.de?.[n]);
+if (sinSprite.length)
+  mal(`sprites: ${sinSprite.length} Pokémon sin imagen (${sinSprite.slice(0, 5).join(', ')})`);
+for (const [nombre, s] of Object.entries(sprites.de ?? {})) {
+  if (!s.tresD) mal(`sprites: ${nombre} sin render 3D`);
+  for (const [via, ruta] of Object.entries(s))
+    if (String(ruta).includes('://')) mal(`sprites: ${nombre}.${via} repite el prefijo entero`);
+}
 
 console.log(`datos/ generados el ${meta.generado}`);
 console.log(JSON.stringify(reales));
