@@ -66,6 +66,11 @@ export function vistaPlan(datos) {
       ...(plan.ivsCortos ?? []).map((st) => chip(`${NOMBRE_STAT[st]} a 30`, 'ojo')),
       ...(plan.suerte ?? []).map((x) =>
         chip(`${NOMBRE_STAT[x.stat]}: ${Math.round(x.probabilidad * 100)} % de 31`, 'ojo')),
+      // Que se vea que el plan no es la primera forma que salió: se prueban
+      // varias y se queda la que menos pide contra TU inventario.
+      plan.candidatosProbados > 1
+        ? chip(`el mejor de ${plan.candidatosProbados} formas de criarlo`, 'si')
+        : null,
     ]),
     plan.avisos?.length
       ? el('div.aviso', {}, [el('ul', {}, plan.avisos.map((x) => el('li', { texto: x })))])

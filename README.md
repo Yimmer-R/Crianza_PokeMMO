@@ -160,8 +160,10 @@ el que tiene que traer todos los IVs. Partiendo de cero conviene en el padre
 (así la cadena de naturaleza acepta cualquier especie); en cuanto tienes un
 macho cargado de 31, conviene en la madre, porque entonces ese macho entra tal
 cual en el cruce final. Así que el plan se monta de las tres formas y se queda
-con la que menos capturas pida **contra tu inventario**. En un caso real eso
-pasó de 5 cruces y 1 captura a 3 cruces y 0 capturas.
+con la que menos **esfuerzo de captura** pida contra tu inventario —dos capturas
+sin pedir IVs son más fáciles que una de 2×31, así que se comparan encuentros
+esperados y no número de capturas—. En un caso real eso pasó de 5 cruces y 1
+captura a 3 cruces y 0 capturas, y el plan dice de cuántas formas eligió.
 
 **Si lo único que falla es el sexo.** El sexo de un Pokémon no se cambia, pero
 el de una cría sí: se paga en la guardería. Así que un «1×31 en Velocidad ♀»

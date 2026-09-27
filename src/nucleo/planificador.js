@@ -427,6 +427,27 @@ function ordenarPorEscasez(stats, inventario) {
 }
 
 /**
+ * Y por qué el ORDEN de los IVs no se busca probando, aunque sea el otro eje
+ * del árbol.
+ *
+ * Qué IV se fuerza con un Recio y cuál queda COMPARTIDO decide la forma de
+ * media rama, así que parece un candidato obvio a probar como se prueba el
+ * reparto de la Piedraeterna. Se implementó, se midió y se quitó: en 26.000
+ * inventarios al azar —de 2 a 9 ejemplares, con 31 y con 30, ocho especies,
+ * cuatro naturalezas, objetivos de 2 a 6 IVs con y sin naturaleza— forzar un IV
+ * distinto al que dice `ordenarPorEscasez()` no mejoró el plan **ni una vez**,
+ * y multiplicaba por dos o por tres el coste de cada recálculo.
+ *
+ * Y tiene sentido: el IV compartido tiene que estar a 31 en los DOS padres, así
+ * que lo que conviene compartir es el que más abunda en el inventario — que es
+ * exactamente lo que deja al final `ordenarPorEscasez()` al ordenar de escaso a
+ * abundante. La heurística no es una aproximación: es la respuesta.
+ *
+ * Si alguien vuelve a plantearlo, la prueba que fija esto se llama «comparte el
+ * IV que más abunda en el inventario».
+ */
+
+/**
  * Las tres formas de repartir la Piedraeterna que se prueban.
  *
  * `padre` es la de siempre (la cadena de naturaleza va libre). `raiz` la pone
@@ -997,13 +1018,22 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   // caso que describió el usuario y sale a 3 cruces y 0 capturas donde la forma
   // fija pedía 5 cruces y 1 captura.
   //
-  // Sin naturaleza no hay nada que repartir, así que no se monta tres veces.
+  // Dos ejes, y los dos cambian la forma del árbol:
+  //
+  //   - quién lleva la Piedraeterna (sin naturaleza no hay nada que repartir);
+  //   - qué IV se fuerza en el cruce final y cuál queda compartido.
+  //
+  // Un árbol por cada forma de repartir la Piedraeterna, y gana el mejor contra
+  // el inventario; sin naturaleza no hay nada que repartir y es uno solo. El
+  // otro eje imaginable —qué IV se fuerza y cuál se comparte— no se prueba, y
+  // eso está medido, no supuesto: ver la nota larga de ordenarPorEscasez().
   const modos = objetivo.naturaleza ? MODOS_PIEDRA : ['padre'];
   const candidatos = modos.map((modo) => montarPlan(objetivo, datos, {
     inventario, regionesDisponibles, cuando, modo, validacion,
   }));
 
-  return candidatos.sort(comparaPlanes)[0];
+  const mejor = candidatos.sort(comparaPlanes)[0];
+  return { ...mejor, candidatosProbados: candidatos.length };
 }
 
 /**
@@ -1016,12 +1046,15 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
  * dinero, que se consigue mucho más rápido que un 31.
  */
 export function comparaPlanes(a, b) {
-  const capturas = (p) => p.pasos.conseguir.length;
-  const cruces = (p) => contar(p.arbol).cruces;
   // Un plan que entrega 30 donde se pidió 31 es peor que uno que entrega el 31.
   const cortos = (p) => (p.ivsCortos ?? []).length;
+  // El ESFUERZO, no el número de capturas: capturar dos Pokémon sin pedirles
+  // IVs (1 de cada 1 cada uno) es muchísimo más fácil que capturar uno de 3×31
+  // (1 de cada 32.768). medirArbol() ya lo suma como encuentros esperados.
+  const esfuerzo = (p) => medirArbol(p.arbol).esfuerzo;
+  const cruces = (p) => contar(p.arbol).cruces;
   return cortos(a) - cortos(b)
-    || capturas(a) - capturas(b)
+    || esfuerzo(a) - esfuerzo(b)
     || cruces(a) - cruces(b)
     || (a.sobrantes?.length ?? 0) - (b.sobrantes?.length ?? 0);
 }

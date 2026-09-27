@@ -147,10 +147,19 @@ Trece cosas que no son evidentes leyendo un archivo suelto:
    es lo mejor en cuanto tienes un macho del inventario cargado de 31: entra tal
    cual en el cruce final y te ahorra su rama entera. Así que `planear()` monta
    el árbol tres veces (`padre`, `raiz`, `madre`), lo puntúa con
-   `comparaPlanes()` —primero los IVs que se quedan cortos, luego las capturas,
-   luego los cruces— y devuelve el mejor. Con el inventario del usuario (un
-   Horsea ♂ 2×31) eso pasó de 5 cruces y 1 captura a **3 cruces y 0 capturas**.
-   Si vuelves a fijar el reparto, el plan se queda estancado otra vez.
+   `comparaPlanes()` —primero los IVs que se quedan cortos, luego el ESFUERZO de
+   captura (encuentros esperados, no número de capturas: dos «cualquiera» son
+   más fáciles que un 2×31), luego los cruces— y devuelve el mejor. Con el
+   inventario del usuario (un Horsea ♂ 2×31) eso pasó de 5 cruces y 1 captura a
+   **3 cruces y 0 capturas**. Si vuelves a fijar el reparto, el plan se queda
+   estancado otra vez.
+   **El otro eje —qué IV se fuerza y cuál se comparte— NO se prueba, y está
+   medido**: se implementó y en 26.000 inventarios al azar no mejoró el plan ni
+   una vez, mientras doblaba el coste del recálculo. El motivo es estructural y
+   está en la nota de `ordenarPorEscasez()`: el IV compartido tiene que estar a
+   31 en los DOS padres, así que compartir el que más abunda —lo que ya hace la
+   heurística— es la respuesta, no una aproximación. No lo vuelvas a añadir sin
+   volver a medirlo.
 13. **El presupuesto trae la vía sin dinero.** Cada objeto lleva para qué es
    (`paraQueEs()`: «Franja Recia (Velocidad)», «Piedraeterna (Naturaleza)») y su
    precio en Puntos de Batalla (`precioEnPb()`), que para los seis Recios son
@@ -254,7 +263,8 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 249 pruebas unitarias
+node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
+node pruebas/ejecutar.mjs             # 250 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

@@ -127,12 +127,30 @@ las tres formas —`padre`, `raiz` (sólo en el cruce final) y `madre`— y
 `comparaPlanes()` elige:
 
 1. menos IVs que se queden en 30 pudiendo ser 31;
-2. menos capturas, que es lo que de verdad cuesta: farmeo a ciegas;
+2. menos **esfuerzo** de captura, que no es lo mismo que menos capturas: dos
+   capturas sin pedir IVs son 1 de cada 1 cada una, y una sola de 2×31 es 1 de
+   cada 1.024. `medirArbol()` ya lo suma como encuentros esperados;
 3. menos cruces, que son eclosiones y padres gastados;
 4. y a igualdad, el que deja menos inventario sin usar.
 
 El dinero no entra en la comparación a propósito: se consigue mucho más rápido
 que un 31.
+
+### El otro eje sí se probó, y se quitó
+
+Qué IV se fuerza con un Recio y cuál queda compartido es el otro parámetro que
+cambia la forma del árbol, así que parecía el siguiente candidato a buscar
+probando. Se implementó y se midió contra **26.000 inventarios al azar** (de 2 a
+9 ejemplares, con 31 y con 30, ocho especies, cuatro naturalezas, objetivos de 2
+a 6 IVs con y sin naturaleza): forzar un IV distinto al que elige
+`ordenarPorEscasez()` **no mejoró el plan ni una vez**, y multiplicaba por dos o
+tres el coste de cada recálculo — que se hace en cada tecla y para cada crianza
+abierta.
+
+Y tiene su razón: el IV compartido tiene que estar a 31 en los **dos** padres,
+así que lo que conviene compartir es el que más abunda en el inventario, que es
+justo lo que deja al final una ordenación de escaso a abundante. La heurística
+no es una aproximación a la respuesta: es la respuesta.
 
 ## Cuando lo único que falla es el sexo
 

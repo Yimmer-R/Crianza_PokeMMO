@@ -997,20 +997,43 @@ bloque('el plan no se queda estancado en una forma de criar', () => {
     arbolSolido(conEl.arbol);
   });
 
+  prueba('comparte el IV que más abunda en el inventario', () => {
+    // El IV COMPARTIDO tiene que estar a 31 en los DOS padres, así que lo que
+    // conviene compartir es el que más abunda. Esto es lo que hace innecesario
+    // probar órdenes distintos: está medido que ninguno gana a esta heurística
+    // (ver la nota de ordenarPorEscasez()). Si alguien la cambia, esto falla.
+    const conDosPs = [1, 2].map((n) => ({
+      id: 'ps' + n, especie: 'Larvitar', sexo: n === 1 ? SEXOS.HEMBRA : SEXOS.MACHO,
+      naturaleza: null, ivs: { ...cero, ps: 31 }, evs: {}, movimientos: [],
+    }));
+    const plan = planear(
+      { especie: 'Larvitar', ivs: ivs({ ps: 31, ataque: 31, velocidad: 31 }), evs: {}, movimientos: [] },
+      datos, { inventario: conDosPs, regionesDisponibles: REGIONES },
+    );
+    igual(plan.arbol.compartidos, ['ps'], 'PS es el que abunda: se comparte');
+    igual(plan.arbol.forzados.sort(), ['ataque', 'velocidad']);
+  });
+
   prueba('sin naturaleza no hay nada que repartir y no se prueba tres veces', () => {
     const plan = planear(
       { especie: 'Larvitar', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {}, movimientos: [] },
       datos, { regionesDisponibles: REGIONES },
     );
     igual(plan.modoPiedra, 'padre');
+    igual(plan.candidatosProbados, 1);
   });
 
-  prueba('gana el que menos capturas pide, y a igualdad el de menos cruces', () => {
-    const peor = { pasos: { conseguir: [1, 2] }, arbol: { tipo: 'conseguir', hijos: [] }, ivsCortos: [], sobrantes: [] };
-    const mejor = { pasos: { conseguir: [1] }, arbol: { tipo: 'conseguir', hijos: [] }, ivsCortos: [], sobrantes: [] };
-    igual([peor, mejor].sort(comparaPlanes)[0], mejor);
-    // Un plan que entrega un 30 donde se pidió un 31 pierde aunque ahorre capturas.
-    const conTreinta = { ...mejor, ivsCortos: ['ataque'] };
-    igual([conTreinta, peor].sort(comparaPlanes)[0], peor);
+  prueba('gana el que menos ESFUERZO de captura pide, no el de menos capturas', () => {
+    // Dos capturas sin pedir IVs (1 de cada 1 cada una) son mucho más fáciles
+    // que una sola de 2×31 (1 de cada 1.024): contar capturas a secas lo tenía
+    // al revés.
+    const hoja = (stats) => ({ tipo: 'conseguir', stats, naturaleza: false, hijos: [] });
+    const unaDura = { pasos: { conseguir: [1] }, ivsCortos: [], sobrantes: [],
+      arbol: { tipo: 'cruce', objetos: {}, hijos: [hoja(['ataque', 'velocidad'])] } };
+    const dosFaciles = { pasos: { conseguir: [1, 2] }, ivsCortos: [], sobrantes: [],
+      arbol: { tipo: 'cruce', objetos: {}, hijos: [hoja([]), hoja([])] } };
+    igual([unaDura, dosFaciles].sort(comparaPlanes)[0], dosFaciles);
+    // Y un plan que entrega un 30 donde se pidió un 31 pierde de todas formas.
+    igual([{ ...dosFaciles, ivsCortos: ['ataque'] }, unaDura].sort(comparaPlanes)[0], unaDura);
   });
 });
