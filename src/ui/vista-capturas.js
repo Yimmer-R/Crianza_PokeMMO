@@ -66,6 +66,9 @@ export function vistaCapturas(datos) {
 
   const queBuscar = (c) => {
     const req = c.requisito;
+    // Hay huecos que no piden nada: sólo el sexo. Dejar la celda vacía parecía
+    // un error, y es justo la captura más fácil de todas.
+    if (!req.stats.length && !req.naturaleza) return 'cualquiera: no le pido IVs ni naturaleza';
     return (req.stats.length ? `31 en ${req.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '') +
       (req.naturaleza ? `${req.stats.length ? ' + ' : ''}naturaleza ${req.naturaleza}` : '');
   };
@@ -188,8 +191,10 @@ export function vistaCapturas(datos) {
     const req = c.requisito;
     const titulo =
       `×${c.cuantos} · ` +
-      (req.stats.length ? `31 en ${req.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '') +
-      (req.naturaleza ? `${req.stats.length ? ' + ' : ''}naturaleza ${req.naturaleza}` : '') +
+      (req.stats.length || req.naturaleza
+        ? (req.stats.length ? `31 en ${req.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '')
+          + (req.naturaleza ? `${req.stats.length ? ' + ' : ''}naturaleza ${req.naturaleza}` : '')
+        : 'cualquiera') +
       (req.sexo ? ` · ${req.sexo}` : '');
     return tarjeta(titulo, [
       el('div.aviso', {}, [c.nota]),

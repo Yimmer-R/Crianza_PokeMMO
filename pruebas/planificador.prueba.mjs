@@ -7,6 +7,7 @@ import { datos, ivs } from './datos-de-prueba.mjs';
 import {
   planear, validarObjetivo, contar, statsPedidos, elegirRelleno, cumple,
   movimientosSoloDeHuevo, medirArbol, criaDe, ROL, lineaMaterna, ivsDelArbol,
+  extenderPorSexo,
 } from '../src/nucleo/planificador.js';
 import { ivsGarantizados, naturalezaGarantizada, perfectos, IV_PSEUDO } from '../src/nucleo/herencia.js';
 import { SEXOS, REGIONES } from '../src/nucleo/constantes.js';
@@ -860,5 +861,89 @@ bloque('el pseudo 31: un 30 sirve de padre, pero no miente', () => {
     cierto(cria.ivs.ataque >= IV_PSEUDO, `ataque anotado: ${cria.ivs.ataque}`);
     if (cria.ivs.ataque === IV_PSEUDO)
       cierto(/comprueba en el juego/.test(cria.nota), cria.nota);
+  });
+});
+
+bloque('cuando lo único que falla es el sexo, se cruza en vez de capturar', () => {
+  // El caso que reportó el usuario: criando un Garchomp 2×31 + Alegre, con un
+  // Horsea ♂ 2×31 en el inventario que el plan no usaba, mientras seguía
+  // pidiendo capturar una ♀ con 31 en Velocidad.
+  const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+  const inventarioDelUsuario = [
+    { id: 'gible', especie: 'Gible', sexo: SEXOS.HEMBRA, naturaleza: 'Osada',
+      ivs: { ...cero, defensa: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-a', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Huraña',
+      ivs: { ...cero, ataque: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-v', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Plácida',
+      ivs: { ...cero, velocidad: 31 }, evs: {}, movimientos: [] },
+    { id: 'karp-n', especie: 'Magikarp', sexo: SEXOS.MACHO, naturaleza: 'Alegre',
+      ivs: { ...cero }, evs: {}, movimientos: [] },
+    { id: 'horsea', especie: 'Horsea', sexo: SEXOS.MACHO, naturaleza: 'Afable',
+      ivs: { ...cero, ataque: 31, velocidad: 31 }, evs: {}, movimientos: [] },
+  ];
+  const objetivoGarchomp = {
+    especie: 'Garchomp', ivs: ivs({ ataque: 31, velocidad: 31 }), evs: {},
+    movimientos: [], naturaleza: 'Alegre', sexo: null,
+  };
+  const plan = planear(objetivoGarchomp, datos, {
+    inventario: inventarioDelUsuario, regionesDisponibles: REGIONES,
+  });
+  const usados = [];
+  (function r(n) { if (n.tipo === 'inventario') usados.push(n.ejemplar.id); n.hijos.forEach(r); })(plan.arbol);
+
+  prueba('el 2×31 del sexo contrario entra en el plan', () => {
+    cierto(usados.includes('horsea'), `usados: ${usados.join(', ')}`);
+    igual(plan.sobrantes.map((e) => e.id), [], 'no debería sobrar nadie');
+  });
+
+  prueba('y la captura que quedaba deja de pedir IVs', () => {
+    igual(plan.pasos.conseguir.length, 1);
+    const [req] = plan.pasos.conseguir;
+    igual(req.stats, [], 'una captura sin IVs es 1 de cada 2, no 1 de cada 64');
+    igual(req.naturaleza, null);
+    cierto(req.especieLibre);
+  });
+
+  prueba('el árbol sigue siendo sólido y el cruce nuevo paga el sexo', () => {
+    arbolSolido(plan.arbol);
+    let nuevo = null;
+    (function r(n) { if (n.alargadaPorSexo) nuevo = n; n.hijos.forEach(r); })(plan.arbol);
+    cierto(nuevo, 'tiene que haber un cruce marcado como alargado por sexo');
+    igual(nuevo.sexoNecesario, SEXOS.HEMBRA, 'la cría tiene que salir del sexo que pedía el hueco');
+    // El Recio va en el que trae el 31, que es el único que puede forzarlo.
+    const [madre, padre] = nuevo.hijos;
+    igual(madre.objeto ?? null, null);
+    igual(padre.objeto, 'Franja Recia');
+    igual(padre.sexoNecesario, SEXOS.MACHO);
+    const pres = presupuestar(plan, datos);
+    cierto(pres.pagosSexo.length >= 1);
+  });
+
+  prueba('no se monta el truco si no sobra nadie', () => {
+    const solo = planear(objetivoGarchomp, datos, { inventario: [], regionesDisponibles: REGIONES });
+    let hay = false;
+    (function r(n) { if (n.alargadaPorSexo) hay = true; n.hijos.forEach(r); })(solo.arbol);
+    falso(hay, 'sin inventario no hay nada que rescatar');
+  });
+
+  prueba('un mismo ejemplar no monta dos cruces a la vez', () => {
+    // Dos huecos podrían querer el mismo sobrante; sólo uno puede gastarlo.
+    const ctx = {
+      datos,
+      objetivo: objetivoGarchomp,
+      inventarioLibre: [inventarioDelUsuario[4]],
+    };
+    const falso1 = {
+      id: 'x1', tipo: 'conseguir', stats: ['velocidad'], naturaleza: false,
+      rol: ROL.LIBRE, profundidad: 1, sexoNecesario: SEXOS.HEMBRA, hijos: [],
+    };
+    const falso2 = { ...falso1, id: 'x2', hijos: [] };
+    const raiz = {
+      id: 'r', tipo: 'cruce', stats: ['velocidad'], naturaleza: false, rol: ROL.LIBRE,
+      profundidad: 0, objetos: {}, hijos: [falso1, falso2],
+    };
+    extenderPorSexo(raiz, ctx);
+    const montados = raiz.hijos.filter((h) => h.alargadaPorSexo).length;
+    igual(montados, 1, 'con un solo sobrante sólo puede montarse un cruce');
   });
 });

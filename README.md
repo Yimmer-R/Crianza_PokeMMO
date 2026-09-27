@@ -154,6 +154,15 @@ los demás al lado. De ahí salen dos avisos que antes no estaban:
   comprarlo ya con los IVs. El plan lo dice en vez de quedarse en «captura
   imposible», que es lo que hacía.
 
+**Si lo único que falla es el sexo.** El sexo de un Pokémon no se cambia, pero
+el de una cría sí: se paga en la guardería. Así que un «1×31 en Velocidad ♀»
+que no puedes cubrir se convierte en un cruce entre el ♂ que sí tiene ese 31
+—con su objeto Recio, que lo fuerza— y una captura que no pide nada de nada.
+Cambia buscar 1 de cada 64 encuentros por 1 de cada 2, a cambio de un Recio y
+del pago del sexo, y lo explica en el paso. Y lo que el plan no usa del
+inventario sale en su propio plegable con el motivo: un 2×31 en la caja
+mientras el plan pide capturas parece un fallo aunque haya una razón.
+
 **El pseudo 31.** Un IV a 30 vale de padre cuando no hay un 31, y el plan lo
 usa — pero por detrás de los 31, nunca por delante, y diciéndolo. Dos 30 dan 30
 seguro; un 30 contra un 31 da 31 sólo a veces (25 % sin objetos, 12,5 % con dos),

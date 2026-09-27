@@ -107,6 +107,41 @@ entera es `ROL.LIBRE`: cualquier especie del grupo huevo, cualquier sexo. La
 espina pasa a bajar por la cadena de sólo IVs, y su hoja de abajo es un 1×31 de
 la especie objetivo en vez de una de sólo naturaleza.
 
+## Cuando lo único que falla es el sexo
+
+El sexo de un Pokémon no se cambia. El de una **cría** sí: se paga en la
+guardería, desde 5.000 PokéYen (`wiki/mecanicas/Crianza.md`). De ahí sale un
+cambio que no es evidente y que ahorra mucho farmeo:
+
+```
+        [hueco: 1×31 (Velocidad) ♀]
+                      ↓ se convierte en
+                    cruce · se paga que la cría salga ♀
+           ┌──────────┴──────────┐
+     cualquiera ♀           tu ♂ con el 31
+   (sin pedir IVs)          + Franja Recia
+```
+
+El Recio fuerza el IV de quien lo lleva, así que el 31 lo pone tu macho y el
+otro padre no tiene que aportar **nada**: vale cualquier captura del grupo
+huevo. Se cambia una captura de 1 de cada 64 encuentros (el IV × el sexo) por
+una de 1 de cada 2, y se paga un Recio más y el sexo de la cría.
+
+`extenderPorSexo()` lo hace, con cuatro condiciones:
+
+1. sólo en huecos **libres** — en la espina la especie ata a la madre, y de eso
+   se encarga `extenderEspinaPorEspecie()`;
+2. sólo con lo que ha **sobrado** del inventario. Si el ejemplar tiene un hueco
+   mejor, que se vaya a él;
+3. sólo cuando al hueco le falta **un** requisito (un 31 o la naturaleza), que
+   por construcción es siempre el caso de una hoja. Si el hueco no pide nada y
+   sólo quiere un sexo, montar un cruce es tirar el dinero: capturar uno de ese
+   sexo es 1 de cada 2;
+4. y **después de `asignarSexos()`**, no antes. Hasta ahí los huecos libres no
+   tienen sexo, y un hueco sin sexo se lo habría quedado ya el inventario en la
+   primera pasada: lo que llega hasta aquí con un sexo pedido es porque su
+   pareja ya está atada y no hay forma de darle la vuelta gratis.
+
 ## El pseudo 31: un IV a 30
 
 Un 30 no es un 31, pero **sirve de padre** cuando no hay un 31 a mano, y es el

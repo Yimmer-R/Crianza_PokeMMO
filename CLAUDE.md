@@ -68,7 +68,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Nueve cosas que no son evidentes leyendo un archivo suelto:
+Once cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -121,6 +121,22 @@ Nueve cosas que no son evidentes leyendo un archivo suelto:
    ahí salen `plan.ivsFinales`, `plan.ivsCortos` y `plan.suerte`, y esos son los
    IVs que usa la optimización de EVs — con un 30 los escalones de nivel 50
    caen en otro sitio, porque cambia la paridad.
+
+10. **Si lo único que falla es el sexo, se cruza en vez de capturar.** El sexo
+   de un Pokémon no se cambia, pero el de una cría sí: se paga en la guardería.
+   Así que un hueco «1×31 ♀» que nadie puede cubrir se convierte en un cruce
+   entre el ♂ que SÍ tiene ese 31 —con su Recio, que lo fuerza— y una captura
+   que no pide nada (`extenderPorSexo()`). Cambia 1 de cada 64 encuentros por 1
+   de cada 2, más un Recio y el pago del sexo. Tiene que correr **después de
+   `asignarSexos()`**: hasta ahí los huecos libres no tienen sexo, y uno sin
+   sexo ya se lo habría quedado el inventario en la primera pasada — o sea que
+   lo que llega con un sexo pedido es porque su pareja ya está atada y de verdad
+   no le queda otro. Y sólo con lo que ha SOBRADO, un ejemplar por cruce.
+11. **Lo que el plan NO usa se explica.** `plan.sobrantes` va en un plegable de
+   la vista Plan con el motivo de cada uno (`evaluar()`, el mismo de la pestaña
+   Inventario). Un 2×31 en la caja mientras el plan pide capturas parece un
+   fallo del plan aunque el motivo sea bueno; callárselo fue exactamente el
+   reporte del usuario.
 
 ## El aspecto
 
@@ -218,7 +234,7 @@ node herramientas/servir.mjs          # arranca la app en localhost:8000
 node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
-node pruebas/ejecutar.mjs             # 236 pruebas unitarias
+node pruebas/ejecutar.mjs             # 241 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

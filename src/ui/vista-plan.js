@@ -4,7 +4,7 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero } from './compo
 import { NOMBRE_STAT, STATS, IV_MAX, INCUBADORAS, ACELERAR_HUEVO } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
 import { contar, criaDe, ROL } from '../nucleo/planificador.js';
-import { normalizar, ejemplarNuevo, loQueFalta } from '../nucleo/inventario.js';
+import { normalizar, ejemplarNuevo, loQueFalta, evaluar } from '../nucleo/inventario.js';
 import { presupuestar, formatearYen } from '../nucleo/coste.js';
 import { planearMovimientos } from '../nucleo/movimientos.js';
 import { planearHabilidad } from '../nucleo/habilidades.js';
@@ -73,6 +73,7 @@ export function vistaPlan(datos) {
     cuentas.inventario === 0 && obtener().inventario.length > 0
       ? aviso('Nada de tu inventario encaja en esta cadena. Mira la pestaña Inventario para ver por qué.')
       : null,
+    bloqueSobrantes(plan, datos),
   ]);
 
   // ---------------------------------------------------------------- pasos
@@ -228,8 +229,10 @@ function bloqueAhora(plan, objetivo, datos) {
             ['Cuántos', 'Qué', 'Sexo', 'Especie', ''],
             faltan.map((f) => [
               `×${f.cuantos}`,
-              (f.stats.length ? `31 en ${f.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '') +
-                (f.naturaleza ? `${f.stats.length ? ' + ' : ''}naturaleza ${f.naturaleza}` : '') +
+              (f.stats.length || f.naturaleza
+                ? (f.stats.length ? `31 en ${f.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '')
+                  + (f.naturaleza ? `${f.stats.length ? ' + ' : ''}naturaleza ${f.naturaleza}` : '')
+                : 'cualquiera: no le pido IVs ni naturaleza') +
                 ((f.movimientos ?? []).length ? ` · con ${f.movimientos.join(', ')}` : ''),
               f.sexo ?? 'cualquiera',
               f.especieLibre ? chip(`libre — p. ej. ${f.especieSugerida}`, 'si')
@@ -342,6 +345,42 @@ function bloquePasos(plan, objetivo, datos) {
         ], { pequeno: true, id: 'registro-hechos' })
       : null,
   ], { extra: `${plan.pasos.pasos.length} pasos` });
+}
+
+/**
+ * Lo que el plan NO usa del inventario, y por qué.
+ *
+ * Es la pregunta que se hace cualquiera al ver un 2×31 en la caja mientras el
+ * plan sigue pidiendo capturas: «¿por qué no lo coge?». Casi siempre la razón
+ * es el sexo o la naturaleza, y callársela parece un fallo del plan. El motivo
+ * lo calcula evaluar(), el mismo que usa la pestaña Inventario.
+ */
+function bloqueSobrantes(plan, datos) {
+  const sobrantes = plan.sobrantes ?? [];
+  if (!sobrantes.length) return null;
+
+  const filas = sobrantes.map((e) => {
+    const v = evaluar(e, plan, datos);
+    const perfectos = STATS.filter((s) => (e.ivs?.[s] ?? 0) >= IV_MAX);
+    return [
+      `${e.especie}${e.mote ? ` "${e.mote}"` : ''} ${e.sexo ?? ''}`,
+      perfectos.length ? `${perfectos.length}×31 (${perfectos.map((s) => NOMBRE_STAT[s]).join(', ')})` : '—',
+      e.naturaleza ?? '—',
+      // Si encaja en algún hueco es que el plan ya lo tiene cubierto con algo
+      // que aprovecha menos: eso no es un problema, es una reserva.
+      v.sirve
+        ? chip('cabe, pero ese hueco ya está cubierto', 'si')
+        : (v.motivo ?? v.mensaje ?? 'no encaja en ningún hueco'),
+    ];
+  });
+
+  return plegable(`Del inventario no uso ${sobrantes.length}`, [
+    el('p.nota', {}, [
+      'Ni se pierden ni estorban: siguen en el inventario para la siguiente crianza. ',
+      'Esto es sólo para que no parezca que el plan no se ha enterado.',
+    ]),
+    tabla(['Cuál', 'IVs a 31', 'Naturaleza', 'Por qué no entra'], filas),
+  ], { pequeno: true, id: 'sobrantes' });
 }
 
 /**

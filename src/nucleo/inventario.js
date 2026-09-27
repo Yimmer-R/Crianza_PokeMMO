@@ -200,8 +200,16 @@ export function evaluar(ejemplar, plan, datos) {
     mensaje = `No sirve: los huecos libres tienen que pasar ${faltanMovs.join(', ')} y este no lo sabe. ` +
       'Anótale los movimientos si de verdad los tiene.';
   } else if (soloSexo) {
-    mensaje = 'Los IVs valen, pero todos los huecos libres piden el otro sexo. ' +
-      'Sirve si lo cruzas pagando por el sexo de la cría, o guárdalo para un hueco futuro.';
+    // El truco de pagar el sexo de la cría sólo merece la pena si el hueco pide
+    // algo (un 31, la naturaleza). Si no pide nada, la captura ya es de 1 de
+    // cada 2 y montar un cruce para eso es tirar el dinero: el plan tampoco lo
+    // hace (ver extenderPorSexo()).
+    const piden = rechazos.some((r) => r.hueco.stats.length || r.hueco.naturaleza);
+    mensaje = piden
+      ? 'Los IVs valen, pero todos los huecos libres piden el otro sexo. El plan ya lo aprovecha '
+        + 'donde puede: cruzándolo con cualquiera y pagando por el sexo de la cría.'
+      : 'Los IVs valen, pero los huecos que quedan piden el otro sexo y no piden IVs: sale más '
+        + 'barato capturar uno de ese sexo que montar un cruce. Guárdalo para la siguiente crianza.';
   } else if (soloEspecie) {
     mensaje = `No comparte grupo huevo con ${plan.objetivo.especie}, así que no entra en esta cadena.`;
   } else if (ivsQueSalvarian.length) {

@@ -932,6 +932,59 @@ if (process.env.OCR === '1') {
   console.log('  --  OCR completo omitido: necesita el CDN. Ponle OCR=1 donde haya salida a Internet.');
 }
 
+/**
+ * El caso que reportó el usuario: criando un Garchomp con un Horsea ♂ 2×31 en
+ * el inventario, el plan seguía pidiendo capturar una ♀ con 31 en Velocidad y
+ * dejaba el Horsea sin usar. Ahora lo usa: cruza y paga el sexo de la cría.
+ */
+await paso('un 2×31 del sexo contrario deja de quedarse en la caja', async () => {
+  await pagina.evaluate(() => {
+    const cero = { ps: 0, ataque: 0, defensa: 0, ataqueEsp: 0, defensaEsp: 0, velocidad: 0 };
+    localStorage.setItem('crianza-pokemmo:inventario:v1', JSON.stringify([
+      { id: 'g1', especie: 'Gible', sexo: '♀', naturaleza: 'Osada',
+        ivs: { ...cero, defensa: 31 }, evs: { ...cero }, movimientos: [] },
+      { id: 'k1', especie: 'Magikarp', sexo: '♂', naturaleza: 'Huraña',
+        ivs: { ...cero, ataque: 31 }, evs: { ...cero }, movimientos: [] },
+      { id: 'k2', especie: 'Magikarp', sexo: '♂', naturaleza: 'Plácida',
+        ivs: { ...cero, velocidad: 31 }, evs: { ...cero }, movimientos: [] },
+      { id: 'k3', especie: 'Magikarp', sexo: '♂', naturaleza: 'Alegre',
+        ivs: { ...cero }, evs: { ...cero }, movimientos: [] },
+      { id: 'h1', especie: 'Horsea', sexo: '♂', naturaleza: 'Afable',
+        ivs: { ...cero, ataque: 31, velocidad: 31 }, evs: { ...cero }, movimientos: [] },
+    ]));
+  });
+  // Tras recargar, la app vuelve a la vista que estuviera guardada, que no
+  // tiene por qué ser Objetivo: hay que pedirla.
+  await pagina.reload({ waitUntil: 'networkidle' });
+  await pagina.waitForSelector('#pestanas button', { timeout: 15000 });
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie', { timeout: 10000 });
+  await pagina.fill('#especie', 'Garchomp');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.check('#iv-velocidad');
+  await pagina.fill('#naturaleza', 'Alegre');
+  await confirmarCampo('#naturaleza');
+  await pagina.waitForTimeout(500);
+
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(500);
+  const t = await pagina.textContent('#vista');
+  if (!/5 del inventario/i.test(t)) throw new Error(`no usa los 4 del inventario: ${(t.match(/\d+ del inventario/i) ?? ['—'])[0]}`);
+  await abrir('Todos los pasos');
+  const pasos = await pagina.textContent('#vista');
+  if (!/Horsea/.test(pasos)) throw new Error('el Horsea sigue sin aparecer en los pasos');
+  if (!/el sexo no se cambia/.test(pasos)) throw new Error('no explica por qué monta el cruce');
+  // La captura que queda ya no pide IVs: es 1 de cada 2, no 1 de cada 64.
+  if (!/no le pido IVs ni naturaleza/.test(pasos)) throw new Error('la captura que queda sigue pidiendo IVs');
+  console.log('       Garchomp + Horsea ♂ 2×31: lo usa pagando el sexo, y la captura que queda no pide IVs');
+
+  // Es la última prueba: no hace falta devolver el estado a su sitio, sólo no
+  // dejar el inventario sembrado en el navegador de la siguiente tanda.
+  await pagina.evaluate(() => localStorage.removeItem('crianza-pokemmo:inventario:v1'));
+});
+
 async function contarInventario() {
   const t = await pagina.textContent('.inventario-lista');
   return Number((t.match(/Tu inventario · (\d+)/) ?? [0, 0])[1]);

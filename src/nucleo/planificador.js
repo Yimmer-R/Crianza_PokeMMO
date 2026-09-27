@@ -648,6 +648,119 @@ export function extenderEspinaPorEspecie(arbol, ctx) {
   return { arbol, alargada: true };
 }
 
+/**
+ * Cambia una captura difícil por un cruce cuando **el sexo es lo único que falla**.
+ *
+ * El caso, que es el del usuario: el plan pide «1×31 en Velocidad ♀» y en el
+ * inventario hay un Horsea ♂ con 31 en Velocidad. Los IVs valen, la especie da
+ * igual porque el hueco es libre… y el ejemplar se queda en la caja mirando,
+ * porque el sexo no se puede cambiar. Antes eso salía como «este plan no lo
+ * usa» sin más, y desde fuera parecía que el plan no se enteraba.
+ *
+ * Pero el sexo de una CRÍA sí se elige, pagando en la guardería (desde 5.000
+ * PokéYen). Así que el hueco se convierte en un cruce:
+ *
+ *   [1×31 (Velocidad) ♀]  →        cruce · se paga la cría ♀
+ *                            ┌──────────┴──────────┐
+ *                    cualquiera ♀            tu ♂ con el 31
+ *                     (captura fácil)        + Franja Recia
+ *
+ * El Recio del ejemplar fuerza su propio 31, así que la cría lo saca garantizado
+ * y el otro padre no tiene que aportar nada: vale cualquier captura del grupo
+ * huevo, que es 1 de cada 2 encuentros en vez de 1 de cada 64.
+ *
+ * Sólo se hace en huecos LIBRES (en la espina la especie ata a la madre y de eso
+ * se encarga extenderEspinaPorEspecie), sólo con lo que ha SOBRADO del
+ * inventario —si el ejemplar tiene un hueco mejor, que se vaya a él— y sólo
+ * cuando al hueco le falta un único requisito, que por construcción es siempre
+ * el caso de una hoja: un 31, o la naturaleza.
+ */
+export function extenderPorSexo(arbol, ctx) {
+  const { datos, objetivo, inventarioLibre } = ctx;
+  if (!inventarioLibre.length) return { arbol, alargada: false };
+
+  const opuesto = (s) => (s === SEXOS.HEMBRA ? SEXOS.MACHO : SEXOS.HEMBRA);
+  let alargada = false;
+  // Un ejemplar no puede montar dos cruces a la vez: lo que se gasta aquí se
+  // aparta, porque si no dos huecos se apuntaban el mismo y uno se quedaba con
+  // un cruce vacío.
+  const apartados = new Set();
+
+  (function recorre(nodo) {
+    for (const h of [...nodo.hijos]) recorre(h);
+    if (nodo.tipo !== 'conseguir' || nodo.rol !== ROL.LIBRE) return;
+    if (!SEXO_CONCRETO(nodo.sexoNecesario)) return;
+    // Un objeto, un requisito: es lo que cabe en el cruce.
+    if (nodo.stats.length + (nodo.naturaleza ? 1 : 0) !== 1) return;
+
+    // ¿Sobra alguno al que sólo le falle el sexo? Se prueba el mismo hueco con
+    // su sexo, que es la única diferencia que se le perdona.
+    const valen = inventarioLibre
+      .map((e, i) => ({ e, i }))
+      .filter(({ e, i }) =>
+        !apartados.has(i)
+        && SEXO_CONCRETO(e.sexo)
+        && e.sexo !== nodo.sexoNecesario
+        && cumple(e, { ...nodo, sexoNecesario: e.sexo }, datos, objetivo).ok)
+      // El que menos 31 desperdicia, igual que en asignarInventario(): así el
+      // que se gasta aquí es el mismo que luego elige el reparto.
+      .sort((a, b) => perfectos(a.e.ivs ?? {}).size - perfectos(b.e.ivs ?? {}).size);
+    if (!valen.length) return;
+
+    const { e: suyo, i } = valen[0];
+    apartados.add(i);
+    const forzador = nodo.naturaleza ? PIEDRAETERNA : RECIO_DE[nodo.stats[0]];
+    const loQueTrae = nodo.naturaleza
+      ? `la naturaleza ${objetivo.naturaleza}`
+      : `el 31 en ${NOMBRE_STAT[nodo.stats[0]]}`;
+
+    const conElIv = {
+      id: nuevoId(),
+      tipo: 'conseguir',
+      stats: [...nodo.stats],
+      naturaleza: nodo.naturaleza,
+      rol: ROL.LIBRE,
+      profundidad: nodo.profundidad + 1,
+      objeto: forzador,
+      sexoNecesario: suyo.sexo,
+      movimientosNecesarios: nodo.movimientosNecesarios ?? [],
+      hijos: [],
+    };
+    const pareja = {
+      id: nuevoId(),
+      tipo: 'conseguir',
+      stats: [],
+      naturaleza: false,
+      rol: ROL.LIBRE,
+      profundidad: nodo.profundidad + 1,
+      objeto: null,
+      sexoNecesario: opuesto(suyo.sexo),
+      soloSexo: true,
+      hijos: [],
+    };
+
+    // hijos[0] es la madre y hijos[1] el padre: lo da por hecho criaDe().
+    const madreEsElSuyo = suyo.sexo === SEXOS.HEMBRA;
+    nodo.tipo = 'cruce';
+    nodo.hijos = madreEsElSuyo ? [conElIv, pareja] : [pareja, conElIv];
+    nodo.objetos = madreEsElSuyo ? { madre: forzador, padre: null } : { madre: null, padre: forzador };
+    nodo.forzados = nodo.naturaleza ? [] : [nodo.stats[0]];
+    nodo.compartidos = [];
+    nodo.alargadaPorSexo = true;
+    nodo.explicacion =
+      `Tu ${suyo.especie} ${suyo.sexo} trae ${loQueTrae}, pero este hueco pide `
+      + `${nodo.sexoNecesario} y el sexo no se cambia. El de una cría sí: se cruza con `
+      + `cualquiera del grupo huevo y se paga por que salga ${nodo.sexoNecesario}. `
+      + `${forzador} en tu ${suyo.especie} fuerza ${loQueTrae}, así que el otro padre no `
+      + 'tiene que aportar nada — y una captura sin pedir IVs es muchísimo más fácil que '
+      + 'una que los pida.';
+    delete nodo.movimientosNecesarios;
+    alargada = true;
+  })(arbol);
+
+  return { arbol, alargada };
+}
+
 /** Cuántas capturas cuelgan de un nodo: es lo que se ahorra si el inventario lo cubre. */
 export function hojasBajo(nodo) {
   if (nodo.tipo === 'conseguir') return 1;
@@ -880,6 +993,14 @@ export function planear(objetivo, datos, { inventario = [], regionesDisponibles 
   if (extenderEspinaPorEspecie(crudo, ctx).alargada) asignarInventario(crudo, ctx);
 
   const arbol = asignarSexos(crudo, objetivo, ctx.espina);
+
+  // Y lo último, DESPUÉS de repartir los sexos: si sobra alguien al que sólo le
+  // falla el sexo, se cambia esa captura difícil por un cruce pagando el sexo
+  // de la cría. Tiene que ir aquí y no antes: hasta asignarSexos() los huecos
+  // libres no tienen sexo, y un hueco sin sexo se lo habría quedado ya el
+  // inventario en la primera pasada. O sea que lo que llega hasta aquí con un
+  // sexo pedido es porque de verdad no le queda otro: su pareja ya está atada.
+  if (extenderPorSexo(arbol, ctx).alargada) asignarInventario(arbol, ctx);
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
   const pasos = aPasos(arbol, objetivo, datos, relleno, ctx.espina);
