@@ -37,6 +37,34 @@ export const tarjeta = (titulo, hijos, clase = '') =>
 
 export const chip = (texto, clase = '') => el(`span.chip${clase ? `.${clase}` : ''}`, { texto });
 
+/**
+ * La marca de una variante: variocolor o Alpha.
+ *
+ * Es un dibujo, no texto, y eso no es un capricho: la marca va pegada al nombre
+ * en tablas y sugerencias, y un carácter de más dentro del mismo elemento
+ * ensucia su `textContent` — bastó para que una opción dejara de decir
+ * «Rattata» y empezara a decir «RARattata» (regla 14 del CLAUDE.md). Así que el
+ * símbolo se pinta con una máscara desde el CSS y el nodo va vacío, con el
+ * `title` diciendo qué es.
+ *
+ * Las dos formas salen de lo que el juego enseña: el destello del variocolor y
+ * el **contorno rojo** con el que el juego marca a un Alpha
+ * (`wiki/mecanicas/Pokémon Alpha.md`). El color, en cambio, es de la paleta y
+ * no del juego: las dos van en la insignia blanca porque el carmesí es de las
+ * acciones y el rojo anaranjado de las alertas, y meter un tercer rojo era
+ * justo lo que la paleta quiere evitar. Lo que las distingue es la FORMA.
+ */
+export const marcaVariante = (tipo) => el(`span.marca.marca-${tipo}`, {
+  title: tipo === 'shiny' ? 'Variocolor' : 'Alpha',
+  'aria-hidden': 'true',
+});
+
+/** Las marcas que le tocan a un ejemplar, para pegarlas a su nombre. */
+export const marcasDe = (ej) => [
+  ej?.shiny ? marcaVariante('shiny') : null,
+  ej?.alpha ? marcaVariante('alpha') : null,
+].filter(Boolean);
+
 export { VIA_3D, VIA_ANIMADO };
 
 /** Un píxel transparente: lo que se le pone a una imagen que no ha cargado para
@@ -345,12 +373,16 @@ function normalizarBusqueda(txt) {
 }
 
 /** Interruptor con etiqueta: se usa para IVs y regiones. */
-export function interruptor(id, etiqueta, activo, onChange) {
+export function interruptor(id, etiqueta, activo, onChange, { marca = null } = {}) {
   const input = el('input', {
     type: 'checkbox', id, checked: !!activo,
     onchange: (e) => onChange(e.target.checked),
   });
-  return el('label.iv', { for: id }, [input, el('span', { texto: etiqueta })]);
+  return el('label.iv', { for: id }, [
+    input,
+    marca ? marcaVariante(marca) : null,
+    el('span', { texto: etiqueta }),
+  ]);
 }
 
 export const numero = (n) => new Intl.NumberFormat('es-ES').format(n);

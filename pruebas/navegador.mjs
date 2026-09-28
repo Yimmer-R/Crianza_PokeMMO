@@ -1307,6 +1307,77 @@ await paso('Alpha y variocolor cambian el árbol entero, y se dice dónde', asyn
   console.log('       Gible Alpha a los enjambres, variocolor a 24.000, y Venusaur Alpha dicho como imposible');
 });
 
+await paso('cada variante lleva su marca dibujada, no un texto', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie', { timeout: 10000 });
+  await pagina.fill('#especie', 'Gible');
+  await confirmarCampo('#especie');
+  await pagina.waitForTimeout(400);
+
+  // La marca va dentro de la propia casilla, al lado del rótulo.
+  for (const [id, clase] of [['var-shiny', 'marca-shiny'], ['var-alpha', 'marca-alpha']]) {
+    const n = await pagina.locator(`label[for="${id}"] .${clase}`).count();
+    if (n !== 1) throw new Error(`la casilla ${id} no lleva su marca (${n})`);
+  }
+
+  // Y no mete ni un carácter en el texto: ése fue el fallo del «RARattata».
+  const rotulo = await pagina.textContent('label[for="var-shiny"]');
+  if (rotulo.trim() !== 'Variocolor') throw new Error(`la marca ensucia el rótulo: "${rotulo}"`);
+
+  // Se dibuja de verdad: tiene tamaño y una máscara, no es un nodo vacío.
+  await pagina.check('#var-alpha');
+  await pagina.waitForTimeout(400);
+  const pintada = await pagina.locator('.ficha-especie .marca-alpha').first().evaluate((n) => {
+    const e = getComputedStyle(n);
+    const caja = n.getBoundingClientRect();
+    return { ancho: caja.width, mascara: e.maskImage || e.webkitMaskImage, fondo: e.backgroundColor };
+  });
+  if (pintada.ancho < 8) throw new Error(`la marca no ocupa nada: ${pintada.ancho}px`);
+  if (!/svg/.test(pintada.mascara ?? '')) throw new Error(`la marca no tiene dibujo: ${pintada.mascara}`);
+
+  // Y el Pokémon objetivo la lleva pegada, no sólo la casilla.
+  if (!(await pagina.locator('.ficha-especie .marca-alpha').count()))
+    throw new Error('el Pokémon objetivo no lleva la marca');
+  await pagina.uncheck('#var-alpha');
+  await pagina.waitForTimeout(300);
+  console.log(`       marca de ${pintada.ancho}px, dibujada con máscara y sin texto dentro`);
+});
+
+await paso('Capturas enlaza a Alphapedia lo que caduca en minutos', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForTimeout(300);
+  // Sin IVs pedidos no hay nada que criar y la vista no tiene tarjetas; con dos
+  // el inventario que dejaron las pruebas de antes ya cubre la cadena entera.
+  for (const iv of ['ps', 'ataque', 'defensa', 'velocidad']) await pagina.check(`#iv-${iv}`);
+  await pagina.check('#var-alpha');
+  await pagina.waitForTimeout(500);
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(600);
+
+  // Un hueco Alpha manda a la lista de Alphas, y con la especie que de verdad
+  // sale en los enjambres: se pide Gible y el enjambre lo canta como Garchomp.
+  const alphas = pagina.locator('a[href*="alpha.pokemmotools.org/alpha-list"]');
+  if (!(await alphas.count())) throw new Error('ninguna captura Alpha enlaza a la lista de Alphas');
+  const hrefs = await alphas.evaluateAll((ns) => ns.map((n) => n.getAttribute('href')));
+  const href = hrefs.find((h) => /pokemon=Garchomp/.test(h));
+  if (!href) throw new Error(`el enlace no filtra por la línea: ${hrefs.join(' ')}`);
+  const uno = alphas.first();
+  if (await uno.getAttribute('target') !== '_blank') throw new Error('el enlace no abre en otra pestaña');
+  if (!/noopener/.test(await uno.getAttribute('rel') ?? '')) throw new Error('el enlace sale sin rel=noopener');
+
+  // Sin Alpha, los enlaces son los de enjambres y fenómenos.
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForTimeout(300);
+  await pagina.uncheck('#var-alpha');
+  await pagina.waitForTimeout(400);
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(600);
+  for (const ruta of ['swarm-list', 'pheno-list'])
+    if (!(await pagina.locator(`a[href*="${ruta}"]`).count()))
+      throw new Error(`falta el enlace a ${ruta}`);
+  console.log(`       ${href}`);
+});
+
 async function contarInventario() {
   const t = await pagina.textContent('.inventario-lista');
   return Number((t.match(/Tu inventario · (\d+)/) ?? [0, 0])[1]);

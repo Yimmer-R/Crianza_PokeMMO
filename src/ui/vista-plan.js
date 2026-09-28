@@ -1,6 +1,6 @@
 // El plan: el árbol de padres, los pasos en orden y el presupuesto.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, sprite } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, numero, sprite, marcasDe } from './componentes.js';
 import { conservando, dejandoDeConservar } from '../nucleo/regalos.js';
 import { NOMBRE_STAT, STATS, IV_MAX, INCUBADORAS, ACELERAR_HUEVO } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar, crianzaActiva } from './estado.js';
@@ -46,6 +46,9 @@ function pintarArbol(nodo, objetivo, sugeridas, esRaiz = true) {
 
   const cabeza = el('span.nodo', {}, [
     especie ? sprite(especie, { tam: 'mini', sexo }) : null,
+    // Todo el árbol es de la variante que se pide, hoja incluida: si sólo se
+    // marcara la raíz, las capturas parecerían normales.
+    ...marcasDe(objetivo),
     el('strong', { texto: etiquetaBonita(nodo, objetivo) }),
     !esRaiz && sexo ? chip(sexo) : null,
     nodo.tipo === 'inventario' ? chip(`ya lo tienes: ${nodo.ejemplar.especie}`, 'bien') : null,
@@ -91,6 +94,7 @@ export function vistaPlan(datos) {
     el('div.etiquetas', {}, [
       chip(`${cuentas.cruces} cruces`, 'si'),
       // La variante va la primera porque cambia TODO el árbol, no un cruce.
+      ...marcasDe(objetivo),
       objetivo.shiny ? chip('variocolor: todo el árbol', 'ojo') : null,
       objetivo.alpha ? chip('Alpha: todo el árbol', 'ojo') : null,
       chip(`${cuentas.conseguir} padres por conseguir`, cuentas.conseguir ? 'ojo' : 'bien'),

@@ -9,7 +9,7 @@
 // Por eso vive aquí y no duplicado en las dos vistas: si el formato cambia, no
 // hay dos sitios que puedan quedarse desincronizados.
 
-import { el, tarjeta, plegable, chip, aviso, frag, tabla, interruptor } from './componentes.js';
+import { el, tarjeta, plegable, chip, aviso, frag, tabla, interruptor, marcasDe } from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar } from './estado.js';
 import { importar as importarTexto, aObjetivo, PLANTILLA } from '../nucleo/importar.js';
@@ -223,8 +223,8 @@ function celdasEditables(datos, ej, guardar) {
     // Variocolor y Alpha son dos casillas, no texto: el OCR no siempre las lee
     // de la ficha y marcarlas a mano tiene que costar un toque.
     el('div.fila-acciones', {}, [
-      interruptor(`ed-shiny-${ej.id}`, 'Var.', !!ej.shiny, (v) => guardar({ shiny: v })),
-      interruptor(`ed-alpha-${ej.id}`, 'Alpha', !!ej.alpha, (v) => guardar({ alpha: v })),
+      interruptor(`ed-shiny-${ej.id}`, 'Var.', !!ej.shiny, (v) => guardar({ shiny: v }), { marca: 'shiny' }),
+      interruptor(`ed-alpha-${ej.id}`, 'Alpha', !!ej.alpha, (v) => guardar({ alpha: v }), { marca: 'alpha' }),
     ]),
   ];
 }
@@ -270,7 +270,7 @@ function revisarInventario(datos, imp) {
                     e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
                     ...filaDeIvs(e),
                     (e.movimientos ?? []).join(', ') || '—',
-                    [e.shiny ? 'variocolor' : null, e.alpha ? 'Alpha' : null].filter(Boolean).join(' · ') || '—',
+                    marcasDe(e).length ? el('span.con-sprite', {}, marcasDe(e)) : '—',
                   ]),
               el('div.fila-acciones', {}, [
                 el(`button.boton.mini${enEdicion ? '' : '.secundario'}`, {

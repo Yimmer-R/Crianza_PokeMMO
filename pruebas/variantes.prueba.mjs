@@ -10,6 +10,9 @@ import { planDeCapturas, intentosEsperados, probabilidadEnAlpha } from '../src/n
 import { distribucionDe } from '../src/nucleo/herencia.js';
 import { REGIONES, STATS, SEXOS, IV_MAX } from '../src/nucleo/constantes.js';
 import { ejemplarNuevo } from '../src/nucleo/inventario.js';
+import {
+  enlaceAlphas, enlaceEnjambres, enlaceFenomenos, enlacesDeCaptura,
+} from '../src/nucleo/alphapedia.js';
 
 const TODAS = REGIONES;
 const objetivo = (parcial) => ({
@@ -161,5 +164,28 @@ bloque('variantes: lo básico', () => {
     igual(sirveLaVariante({ shiny: false }, { shiny: true }).falta, 'shiny');
     igual(sirveLaVariante({ shiny: true }, {}).sobra, 'shiny');
     cierto(sirveLaVariante({ shiny: true, alpha: true }, { shiny: true, alpha: true }).ok);
+  });
+});
+
+bloque('Alphapedia: se enlaza, no se lee', () => {
+  prueba('el enlace de Alphas va filtrado por la especie', () => {
+    igual(enlaceAlphas('Garchomp'), 'https://alpha.pokemmotools.org/alpha-list?pokemon=Garchomp');
+    igual(enlaceAlphas(), 'https://alpha.pokemmotools.org/alpha-list', 'sin especie, la lista entera');
+  });
+
+  prueba('un nombre con espacios o símbolos se escapa', () => {
+    cierto(enlaceEnjambres('Mr Mime').endsWith('?pokemon=Mr%20Mime'));
+    cierto(enlaceFenomenos('Nidoran♀').includes('%E2%99%80'));
+  });
+
+  prueba('un hueco Alpha manda a los Alphas y uno normal a enjambres y fenómenos', () => {
+    const alpha = enlacesDeCaptura('Garchomp', { alpha: true });
+    igual(alpha.length, 1);
+    cierto(alpha[0].url.includes('/alpha-list'));
+
+    const normal = enlacesDeCaptura('Psyduck');
+    igual(normal.map((x) => x.texto), ['Enjambres', 'Fenómenos']);
+    cierto(normal[0].url.includes('/swarm-list'));
+    cierto(normal[1].url.includes('/pheno-list'));
   });
 });
