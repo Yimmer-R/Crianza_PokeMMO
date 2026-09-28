@@ -843,7 +843,9 @@ await paso('importar varios de golpe, y quitar uno antes de guardar', async () =
   await pagina.waitForSelector('text=Revisar antes de guardar · 3', { timeout: 5000 });
 
   // Una tanda de tres no puede obligar a descartar las tres por una mal leída.
-  await pagina.click('.tarjeta:has-text("Revisar antes de guardar") tbody tr:nth-child(2) button');
+  // La fila lleva dos botones: «Editar» y «Quitar». Se pide el segundo por su
+  // texto, no por posición, que es lo que se rompió al añadir el primero.
+  await pagina.click('.tarjeta:has-text("Revisar antes de guardar") tbody tr:nth-child(2) button:text-is("Quitar")');
   await pagina.waitForSelector('text=Revisar antes de guardar · 2', { timeout: 5000 });
 
   const antes = await contarInventario();
@@ -852,6 +854,59 @@ await paso('importar varios de golpe, y quitar uno antes de guardar', async () =
   const despues = await contarInventario();
   if (despues !== antes + 2) throw new Error(`inventario ${antes} -> ${despues}, esperaba +2`);
   console.log(`       3 leídos, 1 quitado, inventario ${antes} -> ${despues}`);
+});
+
+await paso('en la revisión se corrige cada Pokémon por su cuenta', async () => {
+  // El OCR se equivoca y los dedos también. Hasta ahora había que descartar la
+  // tanda entera o pasar UNO al formulario; ahora cada fila se corrige en sitio.
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.click('text=📋 Texto');
+  await pagina.waitForSelector('#texto-importar-inventario');
+  await pagina.fill('#texto-importar-inventario', [
+    'Magikarp ♂ Nv. 5',
+    'IVs: 31/2/3/4/5/6',
+    '',
+    'Poliwag ♀ Nv. 5',
+    'IVs: 7/8/9/10/11/12',
+  ].join('\n'));
+  await pagina.click('text=Leer el texto');
+  await pagina.waitForSelector('text=Revisar antes de guardar · 2', { timeout: 5000 });
+
+  const tarjeta = '.tarjeta:has-text("Revisar antes de guardar")';
+  const fila2 = `${tarjeta} tbody tr:nth-child(2)`;
+  await pagina.click(`${fila2} button:text-is("Editar")`);
+  await pagina.waitForTimeout(250);
+
+  // La especie se resuelve al confirmar, igual que al importar: se escribe mal
+  // a propósito y tiene que salir el nombre bueno.
+  const campos = pagina.locator(`${fila2} input[type="text"]`);
+  await campos.first().fill('poliwhirl');
+  await campos.first().dispatchEvent('change');
+  await pagina.waitForTimeout(300);
+  // Y un IV mal leído se arregla a mano.
+  const numeros = pagina.locator(`${fila2} input[type="number"]`);
+  await numeros.nth(1).fill('31');
+  await numeros.nth(1).dispatchEvent('change');
+  await pagina.waitForTimeout(300);
+
+  await pagina.click(`${fila2} button:text-is("Listo")`);
+  await pagina.waitForTimeout(300);
+  const texto = (await pagina.textContent(fila2)).replace(/\s+/g, ' ');
+  if (!/Poliwhirl/.test(texto)) throw new Error(`no ha resuelto la especie: ${texto}`);
+
+  // La otra fila no se ha tocado: es lo que hace que corregir una no cueste la tanda.
+  const fila1 = (await pagina.textContent(`${tarjeta} tbody tr:nth-child(1)`)).replace(/\s+/g, ' ');
+  if (!/Magikarp/.test(fila1)) throw new Error(`la primera fila ha cambiado: ${fila1}`);
+
+  const antesDe = await contarInventario();
+  await pagina.click('text=Guardar 2 en el inventario');
+  await pagina.waitForTimeout(300);
+  await pagina.click('button[data-vista="inventario"]');
+  await pagina.waitForTimeout(300);
+  const lista = await pagina.textContent('.inventario-lista');
+  if (!/Poliwhirl/.test(lista)) throw new Error('la corrección no ha llegado al inventario');
+  if (!/31/.test(lista)) throw new Error('el IV corregido no ha llegado al inventario');
+  console.log(`       fila 2 corregida a Poliwhirl con 31, la 1 intacta, inventario ${antesDe} -> ${await contarInventario()}`);
 });
 
 await paso('un texto que no se entiende se avisa y no se guarda nada', async () => {

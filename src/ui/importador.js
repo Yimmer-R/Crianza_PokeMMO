@@ -13,10 +13,24 @@ import { el, tarjeta, plegable, chip, aviso, frag, tabla, interruptor } from './
 import { STATS, NOMBRE_STAT, IV_MAX } from '../nucleo/constantes.js';
 import { obtener, fijar, fijarYGuardar } from './estado.js';
 import { importar as importarTexto, aObjetivo, PLANTILLA } from '../nucleo/importar.js';
+import { crearResolutores, resolverSexo } from '../nucleo/nombres.js';
 import { reconocer, PESO_MODELO_MB } from './ocr.js';
 
 /** El texto pegado vive fuera del estado global: cambia en cada tecla. */
 const textoPegado = { inventario: '', objetivo: '' };
+
+/**
+ * Qué fila de la revisión se está corrigiendo a mano, por posición en
+ * `importacion.ejemplares`.
+ *
+ * Vive aquí y no en el estado global por lo mismo que el renombrar de la barra
+ * de crianzas: es de esta tarjeta y no tiene que persistir. `null` = ninguna.
+ */
+let editando = null;
+
+/** Los resolutores de nombres, una sola vez: montarlos cuesta. */
+let resolutores = null;
+const res = (datos) => (resolutores ??= crearResolutores(datos));
 
 export const DESTINOS = { INVENTARIO: 'inventario', OBJETIVO: 'objetivo' };
 
@@ -45,12 +59,11 @@ export function seccionImportar(datos, destino, { comoTarjeta = true } = {}) {
 
   const cuerpo = {
     imagen: () => frag([
-      el('p.nota', {}, [
-        `Sube una captura de la ficha del juego (menú del equipo → Datos), la leo ${queHace}. `,
-        'Siempre te la enseño antes: el OCR se equivoca, y un IV mal leído descuadra el plan ',
-        'sin que se note.',
-        varios ? ' Puedes elegir varias de golpe: salen todas en la misma tabla de revisión.' : '',
-      ]),
+      el('p.nota', {
+        texto: `Sube una captura de la ficha (menú del equipo → Datos) y la leo ${queHace}. `
+          + 'Siempre la revisas antes: el OCR se equivoca.'
+          + (varios ? ' Puedes elegir varias de golpe.' : ''),
+      }),
       el('div.fila', {}, [
         el('label.boton', { for: `ocr-archivo-${destino}`, style: 'cursor:pointer;text-align:center' },
           [varios ? 'Elegir imágenes…' : 'Elegir imagen…']),
@@ -173,6 +186,44 @@ function bloqueAvisos(avisos, titulo = 'Cosas que no he entendido:') {
   ]);
 }
 
+/**
+ * Una fila de la revisión, en modo corrección.
+ *
+ * El OCR se equivoca y los dedos también, y hasta ahora la única salida era
+ * quitar la fila y volver a escribirla entera en el formulario manual — que
+ * además sólo estaba disponible cuando la tanda traía UN Pokémon. Aquí se
+ * corrige en el sitio, sin tocar a los demás de la tanda.
+ *
+ * Los nombres se RESUELVEN al confirmar, igual que al importar: el usuario
+ * puede escribir «Desenrollar» o «jolly» y se guarda lo que entiende la app.
+ * Lo que no se reconozca se queda tal cual y la fila lo enseña en rojo, que es
+ * mejor que tragárselo.
+ */
+function celdasEditables(datos, ej, guardar) {
+  const texto = (valor, alCambiar, ancho = '7em') => el('input', {
+    type: 'text', value: valor ?? '', style: `width:${ancho}`,
+    onchange: (e) => alCambiar(e.target.value.trim()),
+  });
+  const r = res(datos);
+
+  return [
+    texto(ej.especie, (v) => guardar({ especie: v ? (r.especie(v).valor ?? v) : '' }), '7em'),
+    texto(ej.sexo, (v) => guardar({ sexo: resolverSexo(v) ?? v }), '2.6em'),
+    texto(ej.naturaleza, (v) => guardar({ naturaleza: v ? (r.naturaleza(v).valor ?? v) : null }), '6em'),
+    texto(ej.habilidad, (v) => guardar({ habilidad: v ? (r.habilidad(v).valor ?? v) : null }), '6em'),
+    ...STATS.map((st) => el('input', {
+      type: 'number', min: 0, max: IV_MAX, value: ej.ivs[st] ?? 0, style: 'width:3.4em',
+      onchange: (e) => guardar({
+        ivs: { ...ej.ivs, [st]: Math.max(0, Math.min(IV_MAX, Number(e.target.value) || 0)) },
+      }),
+    })),
+    texto((ej.movimientos ?? []).join(', '), (v) => guardar({
+      movimientos: v.split(',').map((m) => m.trim()).filter(Boolean)
+        .map((m) => r.movimiento(m).valor ?? m),
+    }), '9em'),
+  ];
+}
+
 function revisarInventario(datos, imp) {
   const utiles = imp.ejemplares.filter((e) => e.especie);
 
@@ -180,6 +231,7 @@ function revisarInventario(datos, imp) {
   // descartar los otros nueve: cada fila se quita por su cuenta.
   const quitar = (i) => fijar((st) => {
     const quedan = st.importacion.ejemplares.filter((e) => e !== utiles[i]);
+    editando = null; // los índices se mueven al quitar una fila
     return {
       importacion: quedan.some((e) => e.especie)
         ? { ...st.importacion, ejemplares: quedan }
@@ -187,38 +239,59 @@ function revisarInventario(datos, imp) {
     };
   });
 
+  /** Escribe un cambio sobre la fila `pos` de la tanda, sin tocar a las demás. */
+  const guardarEn = (pos) => (parcial) => fijar((st) => ({
+    importacion: {
+      ...st.importacion,
+      ejemplares: st.importacion.ejemplares.map((x, j) => (j === pos ? { ...x, ...parcial } : x)),
+    },
+  }));
+
   return tarjeta(`Revisar antes de guardar · ${utiles.length} Pokémon`, [
-    el('p.nota', {}, ['Comprueba los IVs uno por uno: es lo que más cuesta de leer y lo que más daño hace si está mal.']),
+    el('p.nota', { texto: 'Comprueba los IVs: es lo que peor se lee y lo que más daño hace. Toca «Editar» para corregir.' }),
     bloqueResoluciones(imp),
     bloqueAvisos(imp.avisos),
     utiles.length
       ? tabla(
           ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]), 'Movimientos', ''],
-          utiles.map((e, i) => [
-            e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
-            ...filaDeIvs(e),
-            (e.movimientos ?? []).join(', ') || '—',
-            el('button.boton.mini.secundario', { onclick: () => quitar(i) }, ['Quitar']),
-          ]),
+          utiles.map((e, i) => {
+            const pos = imp.ejemplares.indexOf(e);
+            const enEdicion = editando === pos;
+            return [
+              ...(enEdicion
+                ? celdasEditables(datos, e, guardarEn(pos))
+                : [
+                    e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
+                    ...filaDeIvs(e),
+                    (e.movimientos ?? []).join(', ') || '—',
+                  ]),
+              el('div.fila-acciones', {}, [
+                el(`button.boton.mini${enEdicion ? '' : '.secundario'}`, {
+                  onclick: () => { editando = enEdicion ? null : pos; fijar({}); },
+                }, [enEdicion ? 'Listo' : 'Editar']),
+                el('button.boton.mini.peligro', { onclick: () => quitar(i) }, ['Quitar']),
+              ]),
+            ];
+          }),
           [4, 5, 6, 7, 8, 9],
         )
       : aviso('No he sacado ningún Pokémon con especie reconocible. Prueba con la vía de texto.', 'error'),
     el('div.fila', { style: 'margin-top:12px' }, [
       utiles.length
         ? el('button.boton', {
-            onclick: () => fijarYGuardar((st) => ({
-              inventario: [...st.inventario, ...utiles],
-              importacion: null,
-              ultimaEvaluacion: null,
-            })),
+            onclick: () => {
+              editando = null;
+              fijarYGuardar((st) => ({
+                inventario: [...st.inventario, ...utiles],
+                importacion: null,
+                ultimaEvaluacion: null,
+              }));
+            },
           }, [`Guardar ${utiles.length} en el inventario`])
         : null,
-      utiles.length === 1
-        ? el('button.boton.secundario', {
-            onclick: () => fijar({ importacion: null, alFormulario: utiles[0] }),
-          }, ['Pasarlo al formulario para corregirlo'])
-        : null,
-      el('button.boton.secundario', { onclick: () => fijar({ importacion: null }) }, ['Descartar']),
+      el('button.boton.secundario', {
+        onclick: () => { editando = null; fijar({ importacion: null }); },
+      }, ['Descartar']),
     ]),
   ]);
 }

@@ -40,10 +40,7 @@ export function vistaCapturas(datos) {
       cuando.hora ? chip(cuando.hora, 'si') : null,
       cuando.estacion ? chip(cuando.estacion, 'si') : null,
     ]),
-    el('p.nota', {}, [
-      'Los IVs no se pueden filtrar al capturar, así que la columna de intentos es una media, ',
-      'no una promesa: cada IV suelto es 1 de 32.',
-    ]),
+    el('p.nota', { texto: 'Los intentos son una media, no una promesa: cada IV suelto es 1 de 32.' }),
     capturas.some((c) => c.soloGtl)
       ? aviso('Hay huecos que no se pueden cubrir capturando en tus regiones. Están marcados abajo.')
       : null,
@@ -136,11 +133,10 @@ export function vistaCapturas(datos) {
           )
         : null,
       hayEspina && !rec.noSeCria
-        ? el('p.nota', {}, [
-            'Del huevo sale la forma base, así que para la espina da igual cuál de la línea ',
-            `captures: ${base.viables.map((v) => v.especie).join(', ')} ponen el mismo huevo. `,
-            'Se propone el más fácil de pillar donde juegas.',
-          ])
+        ? el('p.nota', {
+            texto: `Ponen el mismo huevo: ${base.viables.map((v) => v.especie).join(', ')}. `
+              + 'Se propone el más fácil donde juegas.',
+          })
         : null,
       hayLibres
         ? el('p.nota', {}, [

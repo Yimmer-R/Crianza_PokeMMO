@@ -93,18 +93,13 @@ export function vistaObjetivo(datos) {
   const cuantos31 = STATS.filter((s) => objetivo.ivs[s] >= IV_MAX).length;
   const bloqueIvs = frag([
     el('h3', { texto: `IVs a 31 · ${cuantos31} marcados` }),
-    el('p.nota', {}, [
-      'Marca los IVs que quieres perfectos. Cada uno que añades DUPLICA la cadena: ',
-      'un n×31 sale de 2', el('sup', { texto: 'n-1' }), ' padres.',
-    ]),
     el('div.ivs', {}, STATS.map((s) => interruptor(
       `iv-${s}`, NOMBRE_STAT[s], objetivo.ivs[s] >= IV_MAX,
       (activo) => cambiaObjetivo((o) => ({ ivs: { ...o.ivs, [s]: activo ? IV_MAX : 0 } })),
     ))),
-    cuantos31 >= 5 ? aviso(
-      `${cuantos31}×31 son ${2 ** (cuantos31 - 1)} padres de partida, y en PokeMMO los padres se consumen. ` +
-      'Mira el presupuesto en la pestaña Plan antes de empezar.',
-    ) : null,
+    cuantos31 >= 5
+      ? aviso(`${cuantos31}×31 son ${2 ** (cuantos31 - 1)} padres, y se consumen. Mira el presupuesto.`)
+      : null,
   ]);
 
   // --------------------------------------------------------- naturaleza
@@ -123,27 +118,19 @@ export function vistaObjetivo(datos) {
       nat.neutra ? chip('neutra') : null,
       chip(`en inglés: ${nat.ingles}`),
     ]) : null,
-    objetivo.naturaleza ? el('div.nota', {}, [
-      el('p', { style: 'margin:0 0 6px' }, [
-        'La naturaleza sólo la pasa la ', el('strong', { texto: 'Piedraeterna' }),
-        ', y la pasa siempre. Ocupa el hueco de objeto de quien la lleve, así que ese cruce ',
-        'se queda con un solo Recio y sólo puede forzar un IV.',
-      ]),
-      el('p', { style: 'margin:0' }, [
-        'Que los dos padres tengan la misma naturaleza ',
-        el('strong', { texto: 'no sirve de nada' }),
-        ': la cría la saca al azar igual. Con los IVs sí funciona, con la naturaleza no.',
-      ]),
+    // Se queda corta pero entera: la app tuvo esta regla al revés y es la que
+    // más dinero cuesta si se entiende mal.
+    objetivo.naturaleza ? el('p.nota', {}, [
+      'Sólo la pasa la ', el('strong', { texto: 'Piedraeterna' }),
+      ', y ocupa hueco de objeto: ese cruce fuerza un IV en vez de dos. Que los dos padres ',
+      'la compartan ', el('strong', { texto: 'no sirve' }), '.',
     ]) : null,
   ]);
 
   // ----------------------------------------------------------------- EVs
   const totalEv = STATS.reduce((a, s) => a + (objetivo.evs[s] ?? 0), 0);
   const bloqueEvs = tarjeta(`Entrenamiento · ${totalEv} de ${EV_MAX_TOTAL} EVs`, [
-    el('p.nota', {}, [
-      `Máximo ${EV_MAX_POR_STAT} por característica y ${EV_MAX_TOTAL} en total. `,
-      'El reparto típico es 252 + 252 + 6.',
-    ]),
+    el('p.nota', { texto: `${EV_MAX_POR_STAT} por característica, ${EV_MAX_TOTAL} en total. Lo típico: 252 + 252 + 6.` }),
     el('div.rejilla', {}, STATS.map((s) => el('div', {}, [
       el('label', { for: `ev-${s}`, texto: NOMBRE_STAT[s] }),
       el('input', {
@@ -221,13 +208,12 @@ export function vistaObjetivo(datos) {
     el('h3', { texto: `Movimientos · ${objetivo.movimientos.length} de 4` }),
     p
       ? frag([
-          el('p.nota', {}, [
-            `${movsPosibles.length} movimientos posibles para ${objetivo.especie}`,
-            lineaEvolutiva(objetivo.especie, datos.pokedex).length > 1
-              ? ' y su línea evolutiva: los de una fase anterior también valen, y el orden para '
-                + 'conseguirlos sale en Entrenamiento.'
-              : '.',
-          ]),
+          el('p.nota', {
+            texto: `${movsPosibles.length} posibles`
+              + (lineaEvolutiva(objetivo.especie, datos.pokedex).length > 1
+                ? ', contando los de su línea evolutiva. El orden para conseguirlos sale en Entrenamiento.'
+                : '.'),
+          }),
           el('div.etiquetas', { style: 'margin-bottom:10px' }, objetivo.movimientos.map((m) =>
             el('button.boton.mini.secundario', {
               onclick: () => cambiaObjetivo((o) => ({ movimientos: o.movimientos.filter((x) => x !== m) })),
@@ -268,10 +254,7 @@ export function vistaObjetivo(datos) {
 
   // ------------------------------------------------------------- regiones
   const bloqueRegiones = plegable('Regiones desbloqueadas', [
-    el('p.nota', {}, [
-      'Esto filtra TODAS las sugerencias de captura y de entrenamiento. Hay Pokémon que sólo ',
-      'aparecen en una región: si no la tienes, no te lo propongo.',
-    ]),
+    el('p.nota', { texto: 'Filtran las capturas y el entrenamiento: lo que no tengas, no se propone.' }),
     el('div.regiones', {}, REGIONES.map((r) => interruptor(
       `region-${r}`, r, regionesDisponibles.includes(r),
       (activo) => fijarYGuardar((e) => ({
@@ -324,10 +307,9 @@ export function vistaObjetivo(datos) {
     ], { extra: 'imagen, texto o archivo', abierto: !!obtener().importacion }),
     seccionRevisar(datos, DESTINOS.OBJETIVO),
 
-    tarjeta('¿Qué quieres criar?', [bloqueEspecie, bloqueIvs, bloqueNaturaleza]),
+    tarjeta('¿Qué quieres criar?', [bloqueEspecie, bloqueStats, bloqueIvs, bloqueNaturaleza]),
     p ? tarjeta('Habilidad y movimientos', [bloqueHabilidad, bloqueMovimientos]) : null,
     bloqueEvs,
-    bloqueStats,
     bloqueRegiones,
     validacion ? (sueltoAlFinal ? validacion : tarjeta(null, [validacion])) : null,
   ]);
@@ -340,9 +322,13 @@ export function vistaObjetivo(datos) {
  *
  * Va en Objetivo y no en Entrenamiento a propósito: **todo lo que entra en el
  * número se toca en esta misma página** —la especie, los IVs, la naturaleza,
- * los EVs y el nivel—, así que aquí la tarjeta es el resultado de lo de arriba
- * y se mueve mientras el usuario juega con los mandos. Entrenamiento habla de
- * DÓNDE farmear esos EVs, que es otra pregunta.
+ * los EVs y el nivel—, así que aquí es el resultado de lo de arriba y se mueve
+ * mientras el usuario juega con los mandos. Entrenamiento habla de DÓNDE
+ * farmear esos EVs, que es otra pregunta.
+ *
+ * Y va DENTRO de «¿Qué quieres criar?», justo debajo de las etiquetas de la
+ * especie, porque es parte de saber qué Pokémon es: sacada al final de la
+ * página quedaba lejos de la única cosa que la explica, que es la especie.
  *
  * Una sola barra por característica, con dos tramos, que es lo que pidió el
  * usuario: la **base** del Pokémon y encima lo que suman los **IVs y los EVs**.
@@ -389,32 +375,23 @@ function bloqueEstadisticas(objetivo, datos) {
 
   const conIvs = st.filas.filter((f) => f.iv > 0);
 
-  return tarjeta('Estadísticas', [
-    el('div.etiquetas', {}, [
-      chip(`${st.total} de base en total`, 'si'),
-      chip(`a nivel ${st.nivel}`),
-      objetivo.naturaleza ? chip(`naturaleza ${objetivo.naturaleza}`) : null,
-    ]),
+  return frag([
+    el('h3', { texto: `Estadísticas · ${st.total} de base · nivel ${st.nivel}` }),
     el('div.stats', {}, st.filas.map(fila)),
     el('p.leyenda', {}, [
-      el('span.muestra.base', { 'aria-hidden': 'true' }), ' base del Pokémon ',
+      el('span.muestra.base', { 'aria-hidden': 'true' }), ' base ',
       el('span.muestra.bono', { 'aria-hidden': 'true' }), ' lo que suman IVs y EVs ',
-      '· la cifra de la derecha es la característica final',
+      '· a la derecha, la característica final',
     ]),
     el('p.nota', {}, [
       conIvs.length
-        ? `Cuenta los EVs de arriba y los IVs que la crianza entrega de verdad: ${conIvs.map((f) => `${f.nombre} ${f.iv}`).join(', ')}. `
-        : 'Todavía no has pedido ningún IV, así que la parte blanca es sólo lo que ponen los EVs. ',
-      'Los IVs que NO pides cuentan como 0: salen al azar entre 0 y 31 y darlos por altos sería mentir ',
-      '— si alguno te sale bien, anótalo y el número sube solo.',
-    ]),
-    // Regla 2: lo que es inferencia se dice, no se disimula.
-    el('p.nota', {}, [
-      el('strong', { texto: 'Ojo: ' }),
-      'la fórmula es la estándar de 5ª generación. La wiki avisa de que no está comprobado ',
-      'si PokeMMO la usa tal cual o la toca (',
-      el('code', { texto: 'wiki/mecanicas/IVs.md' }),
-      '), así que estos números son una estimación buena, no un dato del juego.',
+        ? `Con los IVs que entrega la crianza (${conIvs.map((f) => `${f.nombre} ${f.iv}`).join(', ')}). `
+        : '',
+      'Los que no pides cuentan como 0: salen al azar. ',
+      // Regla 2: lo que es inferencia se dice, no se disimula.
+      el('strong', { texto: 'Ojo:' }),
+      ' la fórmula es la de 5ª generación y la wiki no ha comprobado si PokeMMO la usa tal cual (',
+      el('code', { texto: 'wiki/mecanicas/IVs.md' }), '), así que es una estimación.',
     ]),
   ]);
 }
