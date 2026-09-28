@@ -13,6 +13,7 @@ const ARCHIVOS = {
   objetos: 'objetos.json',
   sprites: 'sprites.json',
   dondeEntrenar: 'donde-entrenar.json',
+  alphas: 'alphas.json',
   meta: 'meta.json',
 };
 

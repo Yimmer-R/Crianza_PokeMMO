@@ -57,6 +57,25 @@ que traerlo, la pone ♂ —el movimiento lo pasa el padre—, propone las espec
 de verdad pueden saberlo y te dice cómo lo aprende cada una. Y si lo único que
 obliga a criar es el movimiento, se cría igual: por un huevo es la única vía.
 
+**Los señuelos, que no son una captura más.** Hay especies —Chimchar y el resto
+de iniciales entre ellas— que en estado salvaje **sólo** salen en encuentros de
+señuelo. El señuelo es un consumible que se compra y se gasta por pasos, y aun
+con él puesto sólo un 5 % de los encuentros es de especie exclusiva (10 % con los
+premium). Así que esas zonas van las últimas, los encuentros esperados llevan esa
+cuenta dentro, y el presupuesto trae los seis señuelos con su precio y su
+duración. Cuántos hacen falta **no** se calcula: no está documentado cuántos
+pasos cuesta un encuentro.
+
+**Criar Alphas y variocolor.** Las dos reglas se propagan al árbol **entero**, y
+son caras de descubrir tarde: un variocolor no cría con uno que no lo es, y para
+criar Alphas los dos padres tienen que ser Alpha. Marcando la casilla en
+Objetivo, todas las capturas del plan pasan a serlo: un variocolor a 24.000
+encuentros cada uno, un Alpha a los enjambres —cuatro al día real, 75 minutos, en
+un sitio al azar— y sólo de las 112 líneas que los tienen. A cambio, un Alpha
+viene con dos IVs a 31 al azar, y eso baja un 3×31 de 32.768 encuentros a unos
+150; y criar variocolor reparte los IVs con otra tabla, que es mejor. Si la línea
+que pides no sale como Alpha, el plan lo dice antes de montar nada.
+
 **Las seis características, con barra.** En Objetivo, debajo de la especie: la base
 del Pokémon y, en el mismo trazo, lo que suman los IVs y los EVs, más el número
 final al nivel al que juegas y con la naturaleza aplicada. Los dos tramos están
@@ -276,6 +295,7 @@ src/nucleo/             la lógica, sin nada del DOM
   habilidades.js          normal, oculta, y qué objeto hace falta
   sprites.js              qué imagen le toca a cada Pokémon, y con qué sexo
   regalos.js              los IVs que el inventario trae y nadie pidió
+  variantes.js            criar Alphas y variocolor: las reglas de todo el árbol
   estadisticas.js         de las bases al número final, con IVs, EVs y naturaleza
 src/ui/                 vistas y estado; nada de reglas del juego
   estado.js               las crianzas, el inventario y el repintado
@@ -291,7 +311,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                318 pruebas unitarias + una de navegador
+pruebas/                341 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 
@@ -307,8 +327,9 @@ node herramientas/extraer-wiki.mjs [ruta-al-repo-de-la-wiki]
 Busca `../wiki-pokemmo` por defecto, y `../PokeMMO` como respaldo. Saca 667 Pokémon con sus grupos huevo, ratios de
 género, learnsets completos y encuentros por región; las 25 naturalezas; los 177
 movimientos huevo cruzados al revés con sus grupos; las hordas de EVs por
-característica; los precios de los objetos de crianza y entrenamiento; y el
-sprite de cada uno.
+característica; los precios, la duración y los efectos de los seis señuelos; las
+112 líneas que salen como Alpha, con las de temporada aparte; los precios de los
+objetos de crianza y entrenamiento; y el sprite de cada uno.
 
 ## Pruebas
 
@@ -345,5 +366,14 @@ No es una lista de pendientes: son huecos con motivo.
 - **Si la fórmula de característica es la estándar de 5ª generación.** La wiki lo
   deja escrito como pendiente. Las barras de «Estadísticas» y los escalones de
   EVs se apoyan en ella, y las dos cosas lo dicen donde se enseñan.
+
+- **Cuántos pasos cuesta un encuentro.** Sin eso no se puede pasar de «te hacen
+  falta 5.120 encuentros» a «te hacen falta N señuelos», así que el presupuesto
+  da el precio de uno y deja el total fuera.
+- **Dónde y cuándo sale el próximo enjambre Alpha.** Es aleatorio por diseño: lo
+  marca el mapa de la región cuando aparece.
+- **Qué 112 líneas salen como Alpha, según el juego.** La lista que usa la app
+  viene de la wiki de la comunidad, no del volcado de datos, y va marcada como
+  tal.
 
 Mecánicas de 5ª generación: ni tipo Hada ni Megaevoluciones.

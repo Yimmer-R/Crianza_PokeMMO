@@ -19,7 +19,7 @@ const mal = (m) => problemas.push(m);
 const ARCHIVOS = [
   'pokemon.json', 'encuentros.json', 'naturalezas.json', 'movimientos.json',
   'habilidades.json', 'movimientos-huevo.json', 'objetos.json',
-  'sprites.json', 'donde-entrenar.json', 'meta.json',
+  'sprites.json', 'donde-entrenar.json', 'alphas.json', 'meta.json',
 ];
 for (const a of ARCHIVOS) if (!existsSync(join(RAIZ, 'datos', a))) mal(`falta datos/${a}`);
 if (problemas.length) { console.error(problemas.join('\n')); process.exit(1); }
@@ -31,6 +31,7 @@ const habilidades = leer('habilidades.json');
 const movHuevo = leer('movimientos-huevo.json');
 const encuentros = leer('encuentros.json');
 const dondeEntrenar = leer('donde-entrenar.json');
+const alphas = leer('alphas.json');
 const meta = leer('meta.json');
 
 // Recuentos: si uno se desploma, la extracción ha dejado de encontrar una sección.
@@ -65,6 +66,16 @@ if (sinGrupos > 5) mal(`${sinGrupos} Pokémon sin grupo huevo: sospechoso`);
 // Las naturalezas tienen que decir qué suben y qué bajan (salvo las neutras).
 for (const [nombre, n] of Object.entries(naturalezas))
   if (!n.neutra && (!n.sube || !n.baja)) mal(`naturaleza ${nombre}: sin sube/baja`);
+
+// Las líneas Alpha. Son 112 según la propia página, y la app decide con ellas
+// si un objetivo Alpha es posible: si la lista se vacía, diría que no lo es.
+if ((alphas.enjambres ?? []).length !== 112)
+  mal(`alphas: ${alphas.enjambres?.length ?? 0} líneas de enjambre, la wiki dice 112`);
+for (const especie of alphas.enjambres ?? [])
+  if (!pokedex[especie]) mal(`alphas: "${especie}" no está en la pokédex`);
+for (const [evento, lista] of Object.entries(alphas.temporada ?? {}))
+  for (const especie of lista)
+    if (!pokedex[especie]) mal(`alphas (${evento}): "${especie}" no está en la pokédex`);
 
 // Las hordas de EVs, agrupadas por característica.
 for (const s of STATS)

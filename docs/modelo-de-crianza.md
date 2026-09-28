@@ -431,8 +431,106 @@ Con dos objetos, tres de cada cuatro veces sale el promedio. De ahí la regla qu
 mueve el mercado: **el promedio de dos valores mediocres es mediocre**, y por eso
 una cadena empieza comprando 1×31 y no intentando mejorar sobre la marcha.
 
-Al criar shiny × shiny la wiki da el reparto en «n de m» y así se guarda, sin
-convertirlo a porcentaje, en `TABLA_HERENCIA_SHINY`.
+### Criando variocolor la tabla es otra, y mejor
+
+La wiki da el reparto de shiny × shiny contando IVs, no en probabilidad por IV, y
+así se guarda en `TABLA_HERENCIA_SHINY` — sin convertirlo:
+
+| Objetos | Coge el máximo | Promedia | Al 50/50 |
+|---|---|---|---|
+| 0 | 2 de 6 | 2 de 6 | 2 de 6 |
+| 1 | 2 de 5 | 2 de 5 | 1 de 5 |
+| 2 | 2 de 4 | 2 de 4 | 0 de 4 |
+
+`tablaDeHerencia()` (en `variantes.js`) la convierte a la forma que usa
+`distribucionDe()`, y el resultado sale marcado `derivada: true` porque la
+conversión es una deducción, no un dato publicado. Son dos pasos y ninguno tiene
+truco: **cuáles** son esos 2 IVs va al azar, así que cada IV tiene 2/6 de coger
+el máximo; y «al 50/50» quiere decir que ese IV se coge del padre o de la madre,
+o sea mitad del valor alto y mitad del bajo. De ahí:
+
+| Objetos | alto | promedio | bajo |
+|---|---|---|---|
+| 0 | 50 % | 33,3 % | 16,7 % |
+| 1 | 50 % | 40 % | 10 % |
+| 2 | 50 % | 50 % | 0 % |
+
+Comparado con la tabla normal, un 30 enfrentado a un 31 pasa de salir 31 el 25 %
+de las veces al 50 %. La regla que **no** cambia es la importante: con los dos
+padres a 31, alto, promedio y bajo valen 31 los tres, así que sigue estando
+garantizado.
+
+## Alpha y variocolor: reglas que se propagan al árbol entero
+
+Las dos mecánicas tienen la misma forma, y por eso viven juntas en
+`src/nucleo/variantes.js`:
+
+| Cruce | Qué pasa |
+|---|---|
+| variocolor × normal | **no pueden criar** |
+| variocolor × variocolor | huevo variocolor garantizado |
+| Alpha × normal | crían, pero la cría sale **normal** |
+| Alpha × Alpha | cría Alpha |
+
+(`wiki/mecanicas/Shiny y secret shiny.md`, `wiki/mecanicas/Pokémon Alpha.md`.)
+
+De ahí sale, por inducción, lo único que la app necesita: si el objetivo es
+variocolor —o Alpha—, **todos** los nodos del árbol lo son, hojas incluidas. Y
+una hoja es una captura. Ahí está el precio de verdad: un 4×31 variocolor no son
+cuatro capturas afortunadas, son ocho variocolor a 24.000 encuentros cada uno
+(el mejor ritmo permanente, con estado donador y Amuleto Iris; sin nada son
+30.000).
+
+Tres consecuencias en el código:
+
+1. **`cumple()` mira la variante antes que los IVs**, y falla en los dos
+   sentidos. Que a un árbol variocolor no le valga un normal es evidente; que a
+   un árbol normal no le valga un variocolor lo es menos, y es el error caro:
+   no cría peor, es que la guardería lo rechaza.
+2. **El relleno de una cadena Alpha se filtra** (`elegirRelleno(..., { soloAlpha })`):
+   sólo valen las líneas que salen en los enjambres, y primero las del enjambre
+   diario antes que las de un evento de temporada. Sin eso el plan proponía
+   capturar un Alpha de una especie que no existe como Alpha.
+3. **Un Alpha viene con dos IVs a 31 al azar**, y eso sí cambia la cuenta de
+   capturas. `probabilidadEnAlpha()` la hace exacta: la pareja de huecos
+   perfectos es una de las 15 posibles, todas igual de probables, así que se
+   suma sobre cuántos de los pedidos caen dentro. Un 3×31 pasa de 32.768
+   encuentros a unos 150.
+
+La lista de las 112 líneas sale de las «Notas de la comunidad» de la página de la
+wiki, no del volcado del juego, y se extrae a `datos/alphas.json` con su
+procedencia dentro. Las de temporada van aparte (Halloween, Navidad, Año Nuevo
+Lunar) y las de tiempo limitado —los tres iniciales de Kanto, Suicune, Articuno—
+también, porque **no son una vía**: se repartieron una vez y no vuelven, así que
+pedirlas hace el objetivo imposible y el plan lo dice antes de montar nada.
+
+Lo que la app **no** sabe y no suple: dónde y cuándo sale el próximo enjambre. Es
+aleatorio por diseño, así que no hay ruta que recomendar — lo marca el mapa de la
+región cuando aparece.
+
+## Los señuelos no son una zona más
+
+Una fila de encuentro con rareza «Señuelo» no se farmea paseando. Hace falta un
+señuelo activo —un consumible que se compra y se gasta por pasos— y aun así la
+especie exclusiva sale en un **5 %** de los encuentros (10 % con los premium).
+Los dos números salen de la descripción del propio objeto dentro del juego, que
+es lo que extrae `datos/objetos.json`.
+
+Tres consecuencias:
+
+1. **Pesa lo último.** En `PESO_RAREZA` va a 0, por debajo de «raro», y
+   `facilidadDeCaptura()` le resta puntos y no la cuenta entre los sitios donde
+   se puede ir hoy. Antes pesaba lo mismo que «especial» y la app la proponía
+   como si fuera normal.
+2. **Los encuentros esperados llevan la cuenta dentro.** Si TODAS las zonas de
+   una especie son de señuelo, lo que ya pedían los IVs se divide por ese 5 %
+   (`intentosConSenuelo()`). Es un **suelo**: el 5 % se reparte entre todas las
+   exclusivas de la zona, y no está documentado cuántas hay en cada una.
+3. **Va al presupuesto, pero fuera del total** (`senuelosDelPlan()`). Se sabe lo
+   que cuesta cada uno de los seis y cuántos pasos dura; lo que **no** está
+   documentado es cuántos pasos cuesta un encuentro, así que no se puede
+   convertir «5.120 encuentros» en «N señuelos». Poner un total ahí sería
+   inventarlo.
 
 ## Los movimientos huevo atan al padre del cruce final
 

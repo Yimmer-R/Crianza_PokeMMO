@@ -16,6 +16,7 @@
 // padres comparten, más como mucho dos forzados con objetos — uno por padre.
 
 import { STATS, IV_MAX, TABLA_HERENCIA, TABLA_HERENCIA_SHINY } from './constantes.js';
+import { tablaDeHerencia } from './variantes.js';
 
 /** @typedef {{[stat: string]: number}} Ivs */
 /** @typedef {{fuerza: string, tipo: string}|null} ObjetoCrianza */
@@ -144,15 +145,17 @@ export const objetosEnJuego = (objetoA, objetoB) => [objetoA, objetoB].filter(Bo
  * Distribución de un IV concreto que no viene forzado por un objeto.
  * Devuelve el valor posible y su probabilidad.
  */
-export function distribucionDe(stat, ivsA, ivsB, objetoA = null, objetoB = null) {
+export function distribucionDe(stat, ivsA, ivsB, objetoA = null, objetoB = null, { shiny = false } = {}) {
   const va = ivsA[stat] ?? 0;
   const vb = ivsB[stat] ?? 0;
 
   if (statQueFuerza(objetoA) === stat) return [{ valor: va, probabilidad: 1, via: 'forzado' }];
   if (statQueFuerza(objetoB) === stat) return [{ valor: vb, probabilidad: 1, via: 'forzado' }];
 
-  const n = Math.min(2, objetosEnJuego(objetoA, objetoB));
-  const t = TABLA_HERENCIA[n];
+  // Criar shiny × shiny reparte los IVs de otra forma —y a mejor—, así que la
+  // tabla no es la misma. La regla de los dos 31 compartidos no cambia: con
+  // alto = bajo = 31 sale 31 por cualquier rama.
+  const t = tablaDeHerencia(objetosEnJuego(objetoA, objetoB), { shiny });
   const alto = Math.max(va, vb);
   const bajo = Math.min(va, vb);
   const promedio = Math.floor((va + vb) / 2);
@@ -170,8 +173,8 @@ export function distribucionDe(stat, ivsA, ivsB, objetoA = null, objetoB = null)
 }
 
 /** Probabilidad de que un IV salga >= umbral (31 por defecto). */
-export function probabilidadDe(stat, ivsA, ivsB, objetoA = null, objetoB = null, umbral = IV_MAX) {
-  return distribucionDe(stat, ivsA, ivsB, objetoA, objetoB)
+export function probabilidadDe(stat, ivsA, ivsB, objetoA = null, objetoB = null, umbral = IV_MAX, opciones = {}) {
+  return distribucionDe(stat, ivsA, ivsB, objetoA, objetoB, opciones)
     .filter((d) => d.valor >= umbral)
     .reduce((acc, d) => acc + d.probabilidad, 0);
 }
@@ -180,11 +183,11 @@ export function probabilidadDe(stat, ivsA, ivsB, objetoA = null, objetoB = null,
  * Probabilidad de que la cría salga con TODOS los IVs pedidos a 31.
  * Los IVs son independientes entre sí, así que es el producto.
  */
-export function probabilidadDelCruce(statsPedidos, ivsA, ivsB, objetoA = null, objetoB = null) {
+export function probabilidadDelCruce(statsPedidos, ivsA, ivsB, objetoA = null, objetoB = null, opciones = {}) {
   const porStat = {};
   let total = 1;
   for (const stat of statsPedidos) {
-    const p = probabilidadDe(stat, ivsA, ivsB, objetoA, objetoB);
+    const p = probabilidadDe(stat, ivsA, ivsB, objetoA, objetoB, IV_MAX, opciones);
     porStat[stat] = p;
     total *= p;
   }

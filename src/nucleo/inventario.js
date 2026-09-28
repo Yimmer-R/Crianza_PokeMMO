@@ -31,7 +31,11 @@ export function ejemplarNuevo(parcial = {}) {
     evs: Object.fromEntries(STATS.map((s) => [s, 0])),
     movimientos: [],
     nivel: null,
+    // Las dos variantes del juego. Deciden con quién puede cruzarse: un
+    // variocolor sólo cría con otro variocolor y un Alpha sólo da Alphas con
+    // otro Alpha.
     shiny: false,
+    alpha: false,
     nota: '',
     capturadoEn: null,
     ...parcial,
@@ -66,7 +70,8 @@ export function resumen(e) {
   const partes = [p.length ? `${p.length}×31 (${p.join(', ')})` : `${totalIvs(e)}/186`];
   if (e.naturaleza) partes.push(e.naturaleza);
   if (e.sexo) partes.push(e.sexo);
-  if (e.shiny) partes.push('shiny');
+  if (e.shiny) partes.push('variocolor');
+  if (e.alpha) partes.push('Alpha');
   return partes.join(' · ');
 }
 

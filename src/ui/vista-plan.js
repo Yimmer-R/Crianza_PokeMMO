@@ -9,6 +9,7 @@ import { normalizar, ejemplarNuevo, loQueFalta, evaluar } from '../nucleo/invent
 import { presupuestar, formatearYen } from '../nucleo/coste.js';
 import { planearMovimientos } from '../nucleo/movimientos.js';
 import { planearHabilidad } from '../nucleo/habilidades.js';
+import { planDeCapturas } from '../nucleo/capturas.js';
 
 const nombres = (stats) => stats.map((s) => NOMBRE_STAT[s] ?? s).join(', ');
 
@@ -59,7 +60,7 @@ function pintarArbol(nodo, objetivo, sugeridas, esRaiz = true) {
 }
 
 export function vistaPlan(datos) {
-  const { plan, objetivo, regionesDisponibles } = obtener();
+  const { plan, objetivo, regionesDisponibles, cuando } = obtener();
 
   if (!objetivo.especie)
     return tarjeta('Todavía no hay objetivo', [
@@ -78,7 +79,10 @@ export function vistaPlan(datos) {
   const sugeridas = new Map(
     plan.pasos.conseguir.filter((r) => !r.especieLibre).map((r) => [r.nodo, r.especieSugerida]),
   );
-  const pres = presupuestar(plan, datos);
+  // Las capturas entran en el presupuesto porque hay especies que sólo salen
+  // con señuelo, y un señuelo se paga.
+  const capturas = planDeCapturas(plan, datos, regionesDisponibles, cuando);
+  const pres = presupuestar(plan, datos, { capturas });
   const planMovs = planearMovimientos(objetivo, datos, regionesDisponibles);
   const planHab = planearHabilidad(objetivo, datos);
 
@@ -86,6 +90,9 @@ export function vistaPlan(datos) {
   const resumen = tarjeta(`${objetivo.especie}: ${etiquetaBonita(plan.arbol, objetivo)}`, [
     el('div.etiquetas', {}, [
       chip(`${cuentas.cruces} cruces`, 'si'),
+      // La variante va la primera porque cambia TODO el árbol, no un cruce.
+      objetivo.shiny ? chip('variocolor: todo el árbol', 'ojo') : null,
+      objetivo.alpha ? chip('Alpha: todo el árbol', 'ojo') : null,
       chip(`${cuentas.conseguir} padres por conseguir`, cuentas.conseguir ? 'ojo' : 'bien'),
       cuentas.inventario ? chip(`${cuentas.inventario} del inventario`, 'bien') : null,
       chip(`${pres.objetosUsados.reduce((a, o) => a + o.cuantos, 0)} objetos de crianza`),
@@ -205,10 +212,49 @@ export function vistaPlan(datos) {
           el('span.tenue', { texto: 'Un precio de mercado caduca: míralo antes de comprar.' }),
         ])
       : null,
+    bloqueSenuelos(pres.senuelos),
     el('div.nota', {}, [pres.sinPrecio.nota]),
   ]);
 
   return frag([resumen, ahora, bloqueRegalos(objetivo), pasos, arbol, bloqueMovs, bloqueHab, presupuesto]);
+}
+
+/**
+ * Los señuelos del presupuesto.
+ *
+ * Va fuera del total a propósito: se sabe lo que cuesta cada señuelo y no
+ * cuántos hacen falta, porque el señuelo dura pasos y no está documentado
+ * cuántos pasos cuesta un encuentro. Poner un total ahí sería inventarlo.
+ */
+function bloqueSenuelos(sen) {
+  if (!sen) return null;
+  const precio = (s) => (s ? `${numero(s.precio)} ${s.moneda} · ${numero(s.pasos)} pasos` : '—');
+  return el('div.nota', {}, [
+    el('strong', { texto: 'Señuelos: ' }),
+    `${sen.especies.map((e) => e.especie).join(', ')} `,
+    `${sen.especies.length > 1 ? 'sólo salen' : 'sólo sale'} en encuentros de señuelo, que es un `,
+    'consumible. ',
+    el('br'),
+    ...sen.especies.map((e) =>
+      el('span', {}, [
+        `${e.especie}: al menos ${numero(e.encuentros)} encuentros `,
+        `(${numero(e.encuentrosSinSenuelo)} × 1/${Math.round(1 / sen.probExclusiva.normal)}, `,
+        `porque sólo un ${Math.round(sen.probExclusiva.normal * 100)} % de los encuentros con `,
+        'señuelo son de especie exclusiva). ',
+        el('br'),
+      ])),
+    sen.mejorNormal
+      ? el('span', {}, [`${sen.mejorNormal.nombre}: ${precio(sen.mejorNormal)}, en Pokémart. `])
+      : null,
+    sen.mejorPremium
+      ? el('span', {}, [
+          `${sen.mejorPremium.nombre}: ${precio(sen.mejorPremium)} en la Gift Shop, `,
+          `con ${sen.mejorPremium.exclusivas} % de exclusivas en vez de ${sen.mejorNormal?.exclusivas ?? 5} %. `,
+        ])
+      : null,
+    el('br'),
+    el('span.tenue', { texto: `No entra en el total: ${sen.hueco}.` }),
+  ]);
 }
 
 function irAObjetivo(e) {

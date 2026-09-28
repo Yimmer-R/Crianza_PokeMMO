@@ -220,6 +220,12 @@ function celdasEditables(datos, ej, guardar) {
       movimientos: v.split(',').map((m) => m.trim()).filter(Boolean)
         .map((m) => r.movimiento(m).valor ?? m),
     }), '9em'),
+    // Variocolor y Alpha son dos casillas, no texto: el OCR no siempre las lee
+    // de la ficha y marcarlas a mano tiene que costar un toque.
+    el('div.fila-acciones', {}, [
+      interruptor(`ed-shiny-${ej.id}`, 'Var.', !!ej.shiny, (v) => guardar({ shiny: v })),
+      interruptor(`ed-alpha-${ej.id}`, 'Alpha', !!ej.alpha, (v) => guardar({ alpha: v })),
+    ]),
   ];
 }
 
@@ -252,7 +258,8 @@ function revisarInventario(datos, imp) {
     bloqueAvisos(imp.avisos),
     utiles.length
       ? tabla(
-          ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]), 'Movimientos', ''],
+          ['Especie', 'Sexo', 'Naturaleza', 'Habilidad', ...STATS.map((s) => NOMBRE_STAT[s]),
+            'Movimientos', 'Variante', ''],
           utiles.map((e, i) => {
             const pos = imp.ejemplares.indexOf(e);
             const enEdicion = editando === pos;
@@ -263,6 +270,7 @@ function revisarInventario(datos, imp) {
                     e.especie, e.sexo, e.naturaleza ?? '—', e.habilidad ?? '—',
                     ...filaDeIvs(e),
                     (e.movimientos ?? []).join(', ') || '—',
+                    [e.shiny ? 'variocolor' : null, e.alpha ? 'Alpha' : null].filter(Boolean).join(' · ') || '—',
                   ]),
               el('div.fila-acciones', {}, [
                 el(`button.boton.mini${enEdicion ? '' : '.secundario'}`, {

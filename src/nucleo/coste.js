@@ -7,7 +7,7 @@
 // mezclados con el total confirmado.
 
 import {
-  PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, PRECIO_GTL_OBSERVADO, NO_SE_VENDE_EN_TIENDA, SEXOS,
+  PRECIO_ELEGIR_SEXO, PRECIO_RESPALDO, PRECIO_GTL_OBSERVADO, NO_SE_VENDE_EN_TIENDA, SEXOS, SENUELO,
 } from './constantes.js';
 import { costeElegirSexo } from './compatibilidad.js';
 import { ROL } from './planificador.js';
@@ -108,6 +108,65 @@ export function precioEnPb(nombre, objetos) {
 }
 
 /**
+ * Los señuelos que pide el plan.
+ *
+ * Hay especies —iniciales como Chimchar, y unas cuantas más— que en estado
+ * salvaje SÓLO salen en encuentros de señuelo. Eso es un consumible que se
+ * compra y se gasta, así que tiene que estar en el presupuesto; lo que no se
+ * puede es decir cuántos hacen falta, porque **no está documentado cuántos
+ * pasos cuesta un encuentro** y el señuelo se mide en pasos. Así que esta parte
+ * va con el precio POR UNIDAD y fuera del total, que es lo honesto: un total
+ * inventado se leería como un dato.
+ *
+ * `capturas` es la salida de `planDeCapturas()`; sin ella no hay bloque, porque
+ * el presupuesto no sabe qué regiones tiene el usuario.
+ */
+export function senuelosDelPlan(capturas, objetos) {
+  const conSenuelo = (capturas ?? []).filter((c) => c.conSenuelo && c.recomendada);
+  if (!conSenuelo.length) return null;
+
+  const catalogo = Object.entries(objetos?.senuelos ?? {})
+    .map(([nombre, s]) => {
+      const barato = (s.compra ?? [])
+        .map((c) => ({ ...c, p: parsearPrecio(c.precio) }))
+        .filter((c) => c.p)
+        .sort((a, b) => a.p.cantidad - b.p.cantidad)[0];
+      return {
+        nombre,
+        premium: !!s.premium,
+        pasos: s.pasos,
+        masEncuentros: s.masEncuentros,
+        exclusivas: s.exclusivas,
+        precio: barato?.p.cantidad ?? null,
+        moneda: barato?.p.moneda ?? null,
+        donde: barato?.sitio ?? null,
+        // Pasos por PokéYen (o por RP): lo único comparable entre los seis sin
+        // saber cuántos pasos cuesta un encuentro.
+        porUnidad: barato?.p.cantidad ? s.pasos / barato.p.cantidad : null,
+      };
+    })
+    .sort((a, b) => (a.premium - b.premium) || (b.porUnidad ?? 0) - (a.porUnidad ?? 0));
+
+  return {
+    especies: conSenuelo.map((c) => ({
+      especie: c.recomendada.especie,
+      cuantos: c.cuantos,
+      // Encuentros de media: los que ya pedían los IVs, multiplicados por lo que
+      // cuesta que el encuentro sea de especie exclusiva.
+      encuentros: c.recomendada.intentosReales,
+      encuentrosSinSenuelo: c.recomendada.intentos,
+      zonas: c.recomendada.zonas.length,
+    })),
+    catalogo,
+    // El más rentable de cada clase, que es lo que se compra.
+    mejorNormal: catalogo.filter((s) => !s.premium)[0] ?? null,
+    mejorPremium: catalogo.filter((s) => s.premium)[0] ?? null,
+    probExclusiva: SENUELO.probExclusiva,
+    hueco: SENUELO.huecoPasosPorEncuentro,
+  };
+}
+
+/**
  * Presupuesto del plan.
  *
  * Lo que entra en el total: los objetos de crianza (uno por padre y cruce, y se
@@ -115,7 +174,7 @@ export function precioEnPb(nombre, objetos) {
  * Lo que NO entra: los padres de 1×31, porque o se capturan (gratis, cuesta
  * tiempo) o se compran a un precio que sólo sabe el usuario.
  */
-export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
+export function presupuestar(plan, datos, { pagarSexo = true, capturas = null } = {}) {
   if (!plan?.ok) return null;
   const { objetos, pokedex } = datos;
 
@@ -212,7 +271,11 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
   // 3. Dónde conviene comprar cada objeto.
   const dondeComprar = comparaConElGtl(objetosUsados, objetos);
 
-  // 4. Lo que no se puede presupuestar aquí.
+  // 4. Los señuelos, si alguna captura sólo sale por esa vía. Van aparte y
+  //    fuera del total: se sabe el precio de cada uno, no cuántos hacen falta.
+  const senuelos = senuelosDelPlan(capturas, objetos);
+
+  // 5. Lo que no se puede presupuestar aquí.
   const padresQueComprar = plan.pasos.conseguir.length;
 
   return {
@@ -222,6 +285,7 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
     otrasMonedas: [...otrasMonedas].map(([moneda, cantidad]) => ({ moneda, cantidad })),
     objetosUsados: [...objetosUsados].map(([nombre, cuantos]) => ({ nombre, cuantos })),
     pagosSexo,
+    senuelos,
     hayEstimados,
     // La vía sin dinero: lo que costarían en Puntos de Batalla los objetos que
     // se venden por PB. No es un total alternativo de todo el plan —hay cosas

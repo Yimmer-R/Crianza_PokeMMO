@@ -26,6 +26,7 @@ import {
   costeElegirSexo, sirveComoLineaMaterna, quienPoneLaEspecie, padresQuePasanTodos, DITTO,
 } from './compatibilidad.js';
 import { disponibleAhora, CUANDO_CUALQUIERA } from './cuando.js';
+import { sirveLaVariante, avisosDeVariante, saleComoAlpha } from './variantes.js';
 
 let contadorId = 0;
 const nuevoId = () => `n${++contadorId}`;
@@ -122,6 +123,12 @@ export function validarObjetivo(objetivo, datos) {
       ).join('; '),
     );
 
+  // Alpha y variocolor: reglas que se propagan al árbol entero, y una de ellas
+  // puede hacer el objetivo imposible antes de montar nada.
+  const variantes = avisosDeVariante(objetivo, datos);
+  problemas.push(...variantes.problemas);
+  avisos.push(...variantes.avisos);
+
   return { valido: problemas.length === 0, problemas, avisos };
 }
 
@@ -213,23 +220,31 @@ export function facilidadDeCaptura(
   const enc = (encuentros[especie] ?? []).filter((e) => regiones.has(e.region));
   if (!enc.length) return -Infinity; // no se puede capturar donde juega el usuario
 
+  // Una zona de señuelo no cuenta como sitio donde ir a cazar: hace falta un
+  // consumible activo y la especie exclusiva sale en un 5 % de los encuentros.
+  // Si TODO lo que tiene una especie son zonas de señuelo, no es candidata a
+  // rellenar un hueco libre: hay cien especies más fáciles.
+  const deSenuelo = (e) => /se[ñn]uelo/i.test(e.rareza ?? '');
+  const aPie = enc.filter((e) => !deSenuelo(e));
+
   let puntos = 0;
   // Lo que se puede cazar con la hora y la estación que hay puestas pesa
   // mucho: de poco vale la especie más común si sólo sale en invierno.
-  const ahora = enc.filter((e) => disponibleAhora(e, cuando));
+  const ahora = aPie.filter((e) => disponibleAhora(e, cuando));
   if (!ahora.length) puntos -= 20;
   else puntos += Math.min(ahora.length, 6);
   for (const e of enc) {
     const r = (e.rareza ?? '').toLowerCase();
-    if (r.includes('muy común') || r.includes('muy comun')) puntos += 10;
+    if (deSenuelo(e)) puntos -= 3;
+    else if (r.includes('muy común') || r.includes('muy comun')) puntos += 10;
     else if (r.includes('común') || r.includes('comun')) puntos += 8;
     else if (r.includes('horda')) puntos += 6;
     else if (r.includes('poco')) puntos += 3;
     else if (r.includes('raro')) puntos += 1;
     else puntos += 2;
   }
-  puntos += Math.min(enc.length, 8);                       // muchos sitios = fácil
-  puntos += new Set(enc.map((e) => e.region)).size * 2;    // en varias regiones = flexible
+  puntos += Math.min(aPie.length, 8);                       // muchos sitios = fácil
+  puntos += new Set(aPie.map((e) => e.region)).size * 2;    // en varias regiones = flexible
 
   // Un sin género se salta todo esto: no tiene sexos, y exigírselos lo
   // descartaba con -Infinity.
@@ -301,7 +316,8 @@ export function lineaMaterna(especieObjetivo, datos, regionesDisponibles = [], c
  * una región disponible, en sitios comunes, y que dé machos y hembras con soltura
  * (los huecos de relleno necesitan de los dos sexos).
  */
-export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuando = CUANDO_CUALQUIERA) {
+export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuando = CUANDO_CUALQUIERA,
+  { soloAlpha = false } = {}) {
   const { pokedex, encuentros } = datos;
   const regiones = new Set(regionesDisponibles);
 
@@ -315,7 +331,18 @@ export function elegirRelleno(especieObjetivo, datos, regionesDisponibles, cuand
       facilidad: facilidadDeCaptura(c.especie, datos, regionesDisponibles, cuando, { ambosSexos: true }),
     }))
     .filter((c) => Number.isFinite(c.facilidad))
-    .sort((a, b) => b.facilidad - a.facilidad);
+    // En una cadena Alpha el relleno también tiene que ser Alpha, así que sólo
+    // valen las líneas que salen en los enjambres. Sin esto el plan proponía
+    // capturar un Alpha de una especie que no existe como Alpha.
+    .filter((c) => !soloAlpha || saleComoAlpha(c.especie, datos).sale)
+    // Y de las que salen, primero las del enjambre de todos los días: una línea
+    // que sólo sale en Halloween no es una alternativa, es esperar al año que
+    // viene.
+    .sort((a, b) =>
+      (soloAlpha
+        ? (saleComoAlpha(b.especie, datos).via === 'enjambre') - (saleComoAlpha(a.especie, datos).via === 'enjambre')
+        : 0)
+      || b.facilidad - a.facilidad);
 
   return candidatos;
 }
@@ -366,6 +393,12 @@ export function cumple(ejemplar, nodo, datos, objetivo) {
         faltanMovimientos: faltanMovs,
       };
   }
+
+  // La variante manda sobre todo lo demás y por eso va antes de los IVs: un
+  // shiny metido en una cadena normal no cría peor, es que NO CRÍA, y un Alpha
+  // cruzado con un normal da una cría normal — el árbol entero se cae.
+  const variante = sirveLaVariante(ejemplar, objetivo);
+  if (!variante.ok) return { ok: false, motivo: variante.motivo, varianteIncorrecta: true };
 
   if (nodo.naturaleza && ejemplar.naturaleza !== objetivo.naturaleza)
     return {
@@ -1255,7 +1288,8 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
     asignarInventario(arbol, ctx);
   }
 
-  const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
+  const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando,
+    { soloAlpha: !!objetivo.alpha });
   // Un hueco que tiene que pasar un movimiento huevo NO es de especie libre: la
   // especie tiene que poder saber ese movimiento. Se calcula aquí una vez y
   // `aPasos()` lo usa para ese hueco en vez del relleno de siempre.
@@ -1383,6 +1417,11 @@ export function aPasos(arbol, objetivo, datos, relleno = [], espina = null, padr
         // Un Ditto no se cría: este hueco se captura o se compra, punto.
         noSeCria: !!nodo.especieFija,
         movimientos: nodo.movimientosNecesarios ?? [],
+        // Toda hoja de un árbol shiny es un variocolor, y toda hoja de un árbol
+        // Alpha es un Alpha: la regla no admite mezcla, así que se copia del
+        // objetivo tal cual. Es lo que multiplica el coste de cada captura.
+        shiny: !!objetivo.shiny,
+        alpha: !!objetivo.alpha,
         rol: nodo.rol,
       };
       conseguir.push(req);
@@ -1393,7 +1432,8 @@ export function aPasos(arbol, objetivo, datos, relleno = [], espina = null, padr
           (req.especieLibre
             ? ` — cualquier especie del grupo huevo sirve (sugerido: ${especieSlot})`
             : ` de ${especieSlot}${(especiesValidas?.length ?? 0) > 1 ? ' (o cualquiera de su línea)' : ''}`) +
-          (req.movimientos.length ? ` · tiene que saber ${req.movimientos.join(' y ')}` : ''),
+          (req.movimientos.length ? ` · tiene que saber ${req.movimientos.join(' y ')}` : '')
+          + (req.shiny ? ' · variocolor' : '') + (req.alpha ? ' · Alpha' : ''),
         requisito: req,
       });
       return;
@@ -1472,7 +1512,8 @@ export function criaDe(nodo, objetivo, datos) {
   // Lo que queda por debajo de 30 se deja sin anotar: el suelo real sería
   // correcto, pero escribir un 7 que el usuario no ha medido es ruido.
   for (const st of STATS) {
-    const d = distribucionDe(st, eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre);
+    const d = distribucionDe(st, eMadre.ivs ?? {}, ePadre.ivs ?? {}, nodo.objetos.madre, nodo.objetos.padre,
+      { shiny: !!(eMadre.shiny && ePadre.shiny) });
     const suelo = Math.min(...d.map((x) => x.valor));
     if (suelo < IV_PSEUDO) continue;
     ivs[st] = suelo;
@@ -1490,6 +1531,10 @@ export function criaDe(nodo, objetivo, datos) {
 
   return {
     especie: base,
+    // Las dos variantes se heredan igual: sólo si los DOS padres la tienen.
+    // Shiny × no shiny ni siquiera cría, y Alpha × normal da una cría normal.
+    shiny: !!(eMadre.shiny && ePadre.shiny),
+    alpha: !!(eMadre.alpha && ePadre.alpha),
     sexo: nodo.sexoNecesario ?? (nodo.rol === ROL.RAIZ ? (objetivo.sexo ?? SEXOS.MACHO) : SEXOS.MACHO),
     naturaleza: nat.naturaleza,
     ivs,
@@ -1527,6 +1572,9 @@ export function criaDe(nodo, objetivo, datos) {
  * no compensa.
  */
 export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false, tambien = [] } = {}) {
+  // Criar shiny × shiny reparte los IVs con otra tabla. Todo el árbol es shiny
+  // o no lo es ninguno, así que basta con mirarlo aquí una vez.
+  const shiny = !!objetivo?.shiny;
   const suerte = [];
   const suerteExtra = [];
   const cambios = [];
@@ -1552,7 +1600,7 @@ export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false, tambien =
     if (colocarObjetos && nodo.objetos
         && nodo.objetos.madre !== PIEDRAETERNA && nodo.objetos.padre !== PIEDRAETERNA) {
       const suelo = (om, op) => nodo.stats
-        .reduce((acc, st) => acc + Math.min(...distribucionDe(st, a, b, om, op).map((x) => x.valor)), 0);
+        .reduce((acc, st) => acc + Math.min(...distribucionDe(st, a, b, om, op, { shiny }).map((x) => x.valor)), 0);
       const { madre, padre } = nodo.objetos;
       if (madre && padre && madre !== padre && suelo(padre, madre) > suelo(madre, padre)) {
         nodo.objetos = { madre: padre, padre: madre };
@@ -1570,7 +1618,7 @@ export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false, tambien =
     // del plan, es información. Sin `tambien` esto hace exactamente lo de antes.
     for (const st of [...nodo.stats, ...tambien.filter((x) => !nodo.stats.includes(x))]) {
       const pedido = nodo.stats.includes(st);
-      const d = distribucionDe(st, a, b, nodo.objetos?.madre, nodo.objetos?.padre);
+      const d = distribucionDe(st, a, b, nodo.objetos?.madre, nodo.objetos?.padre, { shiny });
       ivs[st] = Math.min(...d.map((x) => x.valor));
       const p = d.filter((x) => x.valor >= IV_MAX).reduce((acc, x) => acc + x.probabilidad, 0);
       if (p > 0 && p < 1) {

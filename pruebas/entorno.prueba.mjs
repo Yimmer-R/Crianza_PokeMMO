@@ -10,7 +10,10 @@ import {
 } from '../src/nucleo/entrenamiento.js';
 import { planearMovimientos, padresQuePasan, mejorVia } from '../src/nucleo/movimientos.js';
 import { planearHabilidad, habilidadesDe } from '../src/nucleo/habilidades.js';
-import { comoConseguir, planDeCapturas, dondeAparece, intentosEsperados } from '../src/nucleo/capturas.js';
+import {
+  comoConseguir, planDeCapturas, dondeAparece, intentosEsperados,
+  intentosConSenuelo, esDeSenuelo, mejoresZonas,
+} from '../src/nucleo/capturas.js';
 import { REGIONES, SEXOS, STATS } from '../src/nucleo/constantes.js';
 
 const TODAS = REGIONES;
@@ -424,5 +427,65 @@ bloque('coste: la Piedraeterna no se vende en tienda', () => {
     cierto(/^\d{4}-\d{2}-\d{2}$/.test(d.gtl.fecha));
     cierto(d.gtl.min < d.gtl.ultimo && d.gtl.ultimo < d.gtl.max, 'el rango tiene que contener al último');
     cierto(d.gtl.fuente.includes('usuario'));
+  });
+});
+
+bloque('señuelos: lo que no se farmea paseando', () => {
+  // Chimchar es el caso que pidió el usuario: un inicial que en estado salvaje
+  // sólo sale en encuentros de señuelo, así que Infernape arrastra esa vía.
+  const objInfernape = {
+    especie: 'Infernape',
+    ivs: ivs({ ps: 31, ataque: 31, velocidad: 31 }),
+    evs: {}, movimientos: [], naturaleza: null,
+  };
+  const plan = planear(objInfernape, datos, { regionesDisponibles: TODAS });
+  const capturas = planDeCapturas(plan, datos, TODAS, plan.objetivo);
+  const chimchar = capturas.find((c) => c.recomendada?.especie === 'Chimchar');
+
+  prueba('una especie cuyas zonas son todas de señuelo se marca', () => {
+    cierto(chimchar, 'la espina de Infernape tiene que pedir su línea');
+    cierto(chimchar.conSenuelo, 'Chimchar sólo aparece en encuentros de señuelo');
+    cierto(chimchar.recomendada.soloConSenuelo);
+  });
+
+  prueba('los encuentros esperados cuentan la probabilidad de exclusiva', () => {
+    // El señuelo no hace salir a Chimchar: hace que un 5 % de los encuentros
+    // sean de especie exclusiva. Así que lo que ya pedían los IVs se divide
+    // por ese 5 %.
+    igual(chimchar.recomendada.intentosReales, chimchar.recomendada.intentos * 20);
+    cierto(chimchar.recomendada.intentos > 0);
+  });
+
+  prueba('intentosConSenuelo respeta el infinito y el premium', () => {
+    igual(intentosConSenuelo(64), 1280);
+    igual(intentosConSenuelo(64, true), 640);
+    igual(intentosConSenuelo(Infinity), Infinity);
+  });
+
+  prueba('una zona de señuelo pesa menos que la más rara a pie', () => {
+    // Psyduck tiene zonas normales y de señuelo: las normales van primero.
+    const zonas = mejoresZonas(datos.encuentros.Psyduck ?? [], 6);
+    cierto(zonas.length, 'Psyduck tiene que aparecer en algún sitio');
+    falso(esDeSenuelo(zonas[0]), 'la primera zona propuesta no puede pedir señuelo');
+  });
+
+  prueba('el presupuesto trae los señuelos, con precio y fuera del total', () => {
+    const pres = presupuestar(plan, datos, { capturas });
+    cierto(pres.senuelos, 'un plan con Chimchar tiene que traer el bloque');
+    igual(pres.senuelos.especies[0].especie, 'Chimchar');
+    igual(pres.senuelos.mejorNormal.moneda, 'PokéYen');
+    igual(pres.senuelos.mejorNormal.precio, 600);
+    igual(pres.senuelos.mejorPremium.moneda, 'RP', 'los premium se pagan en la Gift Shop');
+    igual(pres.senuelos.catalogo.length, 6, 'los seis señuelos del juego');
+    // No se suma al total: se sabe el precio de uno, no cuántos hacen falta.
+    cierto(pres.senuelos.hueco.includes('pasos'));
+    falso(pres.lineas.some((l) => /se[ñn]uelo/i.test(l.concepto)));
+  });
+
+  prueba('un plan sin capturas de señuelo no trae el bloque', () => {
+    const p = planear(objetivoLarvitar, datos, { regionesDisponibles: TODAS });
+    const caps = planDeCapturas(p, datos, TODAS, p.objetivo);
+    falso(caps.some((c) => c.conSenuelo));
+    igual(presupuestar(p, datos, { capturas: caps }).senuelos, null);
   });
 });

@@ -13,6 +13,7 @@ import { lineaEvolutiva } from '../nucleo/aprendizaje.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
 import { crearResolutores } from '../nucleo/nombres.js';
 import { estadisticasDe } from '../nucleo/estadisticas.js';
+import { saleComoAlpha, encuentrosPorShiny } from '../nucleo/variantes.js';
 import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
 
 let resolutores = null;
@@ -87,6 +88,7 @@ export function vistaObjetivo(datos) {
         chip(`Tipos: ${p.tipos.join(' / ')}`),
       ]),
     ]) : el('p.vacio', { texto: 'Escribe una especie para empezar.' }),
+    p ? bloqueVariante(objetivo, datos, cambiaObjetivo) : null,
   ]);
 
   // ----------------------------------------------------------------- IVs
@@ -342,6 +344,46 @@ export function vistaObjetivo(datos) {
  * la imagen de referencia coloreaba por tramos de valor (rojo/verde/azul) y esa
  * escala no existe en esta paleta.
  */
+/**
+ * Variocolor y Alpha: dos casillas que cambian el árbol ENTERO.
+ *
+ * Van aquí, con la especie, porque son parte de qué Pokémon quieres y no de
+ * cómo se cría. Y llevan su nota pegada porque las dos reglas son caras de
+ * descubrir tarde: un variocolor no cría con uno que no lo es, y para criar
+ * Alphas los dos padres tienen que ser Alpha — así que la casilla no encarece
+ * el último cruce, encarece todas las capturas del árbol.
+ */
+function bloqueVariante(objetivo, datos, cambiaObjetivo) {
+  const alpha = objetivo.alpha ? saleComoAlpha(objetivo.especie, datos) : null;
+  return frag([
+    el('div.ivs', { style: 'margin-top:12px' }, [
+      interruptor('var-shiny', 'Variocolor', !!objetivo.shiny, (v) => cambiaObjetivo({ shiny: v })),
+      interruptor('var-alpha', 'Alpha', !!objetivo.alpha, (v) => cambiaObjetivo({ alpha: v })),
+    ]),
+    objetivo.shiny
+      ? el('p.nota', {
+          texto: `Todo el árbol tiene que ser variocolor: un variocolor no cría con uno que no lo `
+            + `es. Cada captura pasa a ${encuentrosPorShiny().toLocaleString('es-ES')} encuentros.`,
+        })
+      : null,
+    objetivo.alpha && alpha?.via === 'enjambre'
+      ? el('p.nota', {
+          texto: `Los dos padres de cada cruce tienen que ser Alpha. ${alpha.especies.join(', ')} `
+            + 'sale en los enjambres, y un Alpha viene con dos IVs a 31 al azar.',
+        })
+      : null,
+    objetivo.alpha && alpha?.via === 'temporada'
+      ? aviso(`Alpha de ${alpha.evento}: ${alpha.especies.join(', ')} sólo sale durante ese evento.`)
+      : null,
+    objetivo.alpha && alpha?.via === 'limitado'
+      ? aviso(`${alpha.especies.join(', ')} se repartió como Alpha una sola vez y no vuelve.`, 'error')
+      : null,
+    objetivo.alpha && alpha && !alpha.sale && !alpha.via
+      ? aviso(`${objetivo.especie} no está entre las líneas que salen como Alpha.`, 'error')
+      : null,
+  ]);
+}
+
 function bloqueEstadisticas(objetivo, datos) {
   const { plan } = obtener();
   // Los IVs que la crianza entrega DE VERDAD, no los que se pidieron: con un
