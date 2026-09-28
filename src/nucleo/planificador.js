@@ -23,7 +23,7 @@ import {
 } from './herencia.js';
 import {
   puedenCriar, padresCompatibles, gruposEnComun, sinGenero, esEsteril, esDitto,
-  costeElegirSexo, sirveComoLineaMaterna, quienPoneLaEspecie, DITTO,
+  costeElegirSexo, sirveComoLineaMaterna, quienPoneLaEspecie, padresQuePasanTodos, DITTO,
 } from './compatibilidad.js';
 import { disponibleAhora, CUANDO_CUALQUIERA } from './cuando.js';
 
@@ -818,6 +818,100 @@ export function extenderPorSexo(arbol, ctx) {
 }
 
 /** Cuántas capturas cuelgan de un nodo: es lo que se ahorra si el inventario lo cubre. */
+/**
+ * La raíz cuando lo único que obliga a criar es un movimiento huevo.
+ *
+ * Un objetivo pequeño —1×31, o ni eso— se captura de una pieza y `construir()`
+ * lo deja como hoja, con razón. Pero un movimiento huevo **sólo entra por un
+ * huevo**: si se pide uno, hay que criar aunque no se pida ni un 31. Sin esto el
+ * plan de «Milotic con Neblina y 31 en PS» era «captura un Feebas con 31 en PS»
+ * y la cría nacía sin el movimiento.
+ *
+ * El cruce es el mínimo que hace falta: la madre pone la especie y el IV —con su
+ * Recio, que lo fuerza— y el padre pone el movimiento y nada más.
+ */
+function raizParaMovimientoHuevo(pedidos, ctx, movsHuevo) {
+  const [hijoA, hijoB] = restriccionesDeLosHijos(ROL.RAIZ, ctx.espina);
+  const forzado = pedidos[0] ?? null;
+  const nodo = {
+    id: nuevoId(),
+    stats: [...pedidos],
+    naturaleza: false,
+    rol: ROL.RAIZ,
+    profundidad: 0,
+    objeto: null,
+    sexoNecesario: null,
+    especieFija: null,
+    tipo: 'cruce',
+    objetos: { madre: forzado ? RECIO_DE[forzado] : null, padre: null },
+    forzados: forzado ? [forzado] : [],
+    compartidos: [],
+    explicacion: `${movsHuevo.join(' y ')} sólo entra${movsHuevo.length > 1 ? 'n' : ''} por un huevo, `
+      + 'así que hay que criar aunque el resto se pudiera capturar. '
+      + (forzado ? `${NOMBRE_STAT[forzado]} lo fuerza la madre con su ${RECIO_DE[forzado]}.` : ''),
+    hijos: [],
+  };
+  nodo.hijos = [
+    construir({
+      stats: forzado ? [forzado] : [],
+      naturaleza: false,
+      objeto: forzado ? RECIO_DE[forzado] : null,
+      ...hijoA,
+    }, ctx, 1),
+    construir({ stats: [], naturaleza: false, ...hijoB }, ctx, 1),
+  ];
+  nodo.hijos[1].movimientosNecesarios = [...movsHuevo];
+  return nodo;
+}
+
+/**
+ * Baja un movimiento huevo por la rama paterna hasta una HOJA.
+ *
+ * Un movimiento huevo lo pasa el **padre**, y en un árbol de crianza el padre
+ * del cruce final casi nunca se captura: es a su vez una cría. Entonces quien
+ * tiene que saber el movimiento es el padre de ESE cruce, y así hasta abajo —
+ * hasta un hueco que se captura o se compra, que es el único sitio donde el
+ * movimiento puede entrar de verdad.
+ *
+ * Sin esto la marca se quedaba en un nodo de tipo `cruce` y no la miraba nadie:
+ * `cumple()` sólo la comprueba al colocar un ejemplar y `loQueFalta()` sólo la
+ * enseña en los huecos por conseguir. El plan de un Milotic con Neblina salía
+ * con cuatro capturas y ninguna pedía el movimiento — se hacían los siete pasos
+ * y la cría nacía sin él.
+ *
+ * El macho del cruce se elige aquí y se deja marcado; `asignarSexos()` respeta
+ * los sexos ya puestos y le da a su pareja el contrario, así que no hay pelea.
+ *
+ * Con una espina sin machos (sin género, o línea que sólo cría con Ditto) no hay
+ * padre que lo pase: se devuelve en `sinPadre` y el plan lo dice en vez de
+ * prometer un movimiento que no va a llegar.
+ */
+export function bajarMovimientosHuevo(arbol) {
+  const sinPadre = [];
+
+  (function recorre(nodo) {
+    const movs = nodo.movimientosNecesarios ?? [];
+    if (movs.length && nodo.tipo === 'cruce') {
+      // El macho del cruce: el que ya venga marcado, o el segundo hijo, que es
+      // al que asignarSexos() le daría ♂ por defecto.
+      const yaMacho = nodo.hijos.find((h) => h.sexoNecesario === SEXOS.MACHO);
+      const libre = nodo.hijos.find((h) => !h.sexoNecesario);
+      const macho = yaMacho ?? libre;
+      if (!macho) {
+        sinPadre.push(...movs);
+      } else {
+        macho.sexoNecesario = SEXOS.MACHO;
+        macho.movimientosNecesarios = [...new Set([...(macho.movimientosNecesarios ?? []), ...movs])];
+        // Deja de pedírselo al cruce: lo pide su padre, que es quien lo pasa.
+        nodo.movimientosNecesarios = [];
+      }
+    }
+    nodo.hijos.forEach(recorre);
+  })(arbol);
+
+  return { sinPadre: [...new Set(sinPadre)] };
+}
+
 export function hojasBajo(nodo) {
   if (nodo.tipo === 'conseguir') return 1;
   if (nodo.tipo === 'inventario') return 0;
@@ -1114,7 +1208,13 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
   // Cuatro pasadas, en este orden: el árbol de requisitos, los movimientos huevo
   // que atan al padre final, el inventario encima, y el reparto de sexos, que es
   // lo único que depende de todo lo anterior.
-  const crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
+  let crudo = construir({ stats: pedidos, naturaleza: !!objetivo.naturaleza, rol: ROL.RAIZ }, ctx);
+
+  // Un movimiento huevo obliga a criar aunque el objetivo se capturase entero.
+  if (movsHuevo.length && crudo.tipo !== 'cruce') {
+    contadorId = 0;
+    crudo = raizParaMovimientoHuevo(pedidos, ctx, movsHuevo);
+  }
 
   if (movsHuevo.length && crudo.tipo === 'cruce') {
     // El movimiento lo pasa el PADRE, así que el hueco que deja de ser libre es
@@ -1123,6 +1223,9 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
     const padreFinal = crudo.hijos.find((h) => h.rol === ROL.LIBRE) ?? crudo.hijos[1];
     if (padreFinal) padreFinal.movimientosNecesarios = movsHuevo;
   }
+  // Y si ese padre es a su vez una cría, el movimiento baja hasta la hoja: lo
+  // pasa el padre de cada cruce, no aparece a mitad de la cadena.
+  let movsSinPadre = bajarMovimientosHuevo(crudo).sinPadre;
 
   // El inventario primero, y sólo DESPUÉS se mira si hay que alargar la espina.
   //
@@ -1132,7 +1235,12 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
   // hembra cae en el hueco donde de verdad aprovecha, y sólo se alarga si
   // después sigue sobrando alguna que no encaja en ningún sitio.
   asignarInventario(crudo, ctx);
-  if (extenderEspinaPorEspecie(crudo, ctx).alargada) asignarInventario(crudo, ctx);
+  if (extenderEspinaPorEspecie(crudo, ctx).alargada) {
+    // Alargar la espina convierte una hoja en cruce: si la que llevaba el
+    // movimiento era ésa, hay que volver a bajarlo.
+    movsSinPadre = [...new Set([...movsSinPadre, ...bajarMovimientosHuevo(crudo).sinPadre])];
+    asignarInventario(crudo, ctx);
+  }
 
   const arbol = asignarSexos(crudo, objetivo, ctx.espina);
 
@@ -1142,10 +1250,17 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
   // libres no tienen sexo, y un hueco sin sexo se lo habría quedado ya el
   // inventario en la primera pasada. O sea que lo que llega hasta aquí con un
   // sexo pedido es porque de verdad no le queda otro: su pareja ya está atada.
-  if (extenderPorSexo(arbol, ctx).alargada) asignarInventario(arbol, ctx);
+  if (extenderPorSexo(arbol, ctx).alargada) {
+    movsSinPadre = [...new Set([...movsSinPadre, ...bajarMovimientosHuevo(arbol).sinPadre])];
+    asignarInventario(arbol, ctx);
+  }
 
   const relleno = elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando);
-  const pasos = aPasos(arbol, objetivo, datos, relleno, ctx.espina);
+  // Un hueco que tiene que pasar un movimiento huevo NO es de especie libre: la
+  // especie tiene que poder saber ese movimiento. Se calcula aquí una vez y
+  // `aPasos()` lo usa para ese hueco en vez del relleno de siempre.
+  const padresDelMovimiento = padresQuePasanTodos(movsHuevo, objetivo.especie, datos, regionesDisponibles);
+  const pasos = aPasos(arbol, objetivo, datos, relleno, ctx.espina, padresDelMovimiento);
 
   // Lo que el árbol entrega de verdad. Con todo a 31 es lo pedido; con algún 30
   // del inventario, el suelo baja y aparecen los cruces a suerte.
@@ -1160,6 +1275,11 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
     !pedidos.includes(st) && inventario.some((e) => (e.ivs?.[st] ?? 0) >= IV_PSEUDO));
   const entrega = ivsDelArbol(arbol, objetivo, { colocarObjetos: true, tambien: deRegalo });
   const avisos = [...(validacion.avisos ?? [])];
+  if (movsSinPadre.length)
+    avisos.push(
+      `${movsSinPadre.join(', ')} ${movsSinPadre.length > 1 ? 'son movimientos huevo' : 'es movimiento huevo'} `
+      + 'y esta línea no tiene ningún macho que pueda pasarlo: tendría que venir ya en el Pokémon.',
+    );
   if (entrega.cortos.length)
     avisos.push(
       `con lo que hay en el inventario, ${entrega.cortos.map((x) => NOMBRE_STAT[x]).join(', ')} `
@@ -1204,7 +1324,7 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
 }
 
 /** Recorre el árbol en post-orden: los padres antes que sus crías, que es el orden real de juego. */
-export function aPasos(arbol, objetivo, datos, relleno = [], espina = null) {
+export function aPasos(arbol, objetivo, datos, relleno = [], espina = null, padresDelMovimiento = []) {
   const pasos = [];
   const conseguir = [];
 
@@ -1221,11 +1341,17 @@ export function aPasos(arbol, objetivo, datos, relleno = [], espina = null) {
     // Sólo la espina tiene la especie atada, y «atada» quiere decir atada a la
     // LÍNEA, no a la forma final: del huevo sale la base, así que un Staryu
     // pone el mismo huevo que un Starmie. Se sugiere el más fácil de pillar.
+    // Un hueco que tiene que pasar un movimiento huevo deja de ser libre: sólo
+    // valen las especies que pueden saberlo. Sin esto el plan proponía capturar
+    // un Magikarp «con Neblina», que Magikarp no puede tener.
+    const pideMovimiento = (nodo.movimientosNecesarios ?? []).length > 0;
     const especieSlot = nodo.especieFija
-      ?? (nodo.rol === ROL.LIBRE
-        ? (relleno[0]?.especie ?? objetivo.especie)
-        : (espina?.sugerida ?? objetivo.especie));
+      ?? (pideMovimiento && padresDelMovimiento.length ? padresDelMovimiento[0].especie
+        : nodo.rol === ROL.LIBRE
+          ? (relleno[0]?.especie ?? objetivo.especie)
+          : (espina?.sugerida ?? objetivo.especie));
     const especiesValidas = nodo.especieFija ? [nodo.especieFija]
+      : pideMovimiento && padresDelMovimiento.length ? padresDelMovimiento.map((c) => c.especie)
       : nodo.rol === ROL.LIBRE ? null
       : (espina?.especies ?? [objetivo.especie]);
 
@@ -1247,7 +1373,10 @@ export function aPasos(arbol, objetivo, datos, relleno = [], espina = null) {
         naturaleza: nodo.naturaleza ? objetivo.naturaleza : null,
         sexo: sexoNecesario,
         especieSugerida: especieSlot,
-        especieLibre: nodo.rol === ROL.LIBRE && !nodo.especieFija,
+        especieLibre: nodo.rol === ROL.LIBRE && !nodo.especieFija && !pideMovimiento,
+        // Cómo sabe el movimiento cada una de las que valen: es lo que Capturas
+        // necesita para decir cómo conseguirlo, no sólo a quién capturar.
+        padresDelMovimiento: pideMovimiento ? padresDelMovimiento : null,
         // Para la espina: cualquiera de estas pone la misma especie en el
         // huevo. Null en un hueco libre, donde vale todo el grupo huevo.
         especiesValidas,

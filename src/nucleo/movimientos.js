@@ -16,71 +16,28 @@
 // Fuente del cruce inverso: wiki/movimientos/*.md, sección "Como movimiento
 // huevo", que ya trae la columna de grupos huevo.
 
-import { vias } from './planificador.js';
-import { gruposEnComun, sinGenero, esEsteril } from './compatibilidad.js';
+import { viasEnLaLinea } from './planificador.js';
+import { padresQuePasan } from './compatibilidad.js';
+
+// Se re-exporta desde aquí porque es donde se buscaba antes: la función vive en
+// compatibilidad.js para que el planificador la pueda usar sin un ciclo.
+export { padresQuePasan };
 
 const PRIORIDAD = { nivel: 1, mt: 2, tutor: 3, especial: 4, evolucion: 5, preevolucion: 6, huevo: 7 };
 
-/** La vía más cómoda de las que tenga la especie. */
+/**
+ * La vía más cómoda de las que tenga la LÍNEA evolutiva, no la forma final.
+ *
+ * Mirando sólo la forma final, Neblina en un Milotic salía como «Milotic no
+ * aprende Neblina»: el movimiento huevo es de **Feebas**, que es lo que sale del
+ * huevo. Es la misma trampa que ya estaba documentada para `aprendizaje.js`, y
+ * aquí se había colado igual.
+ */
 export function mejorVia(especie, movimiento, pokedex) {
-  const p = pokedex[especie];
-  if (!p) return null;
-  const todas = vias(p, movimiento);
+  if (!pokedex[especie]) return null;
+  const todas = viasEnLaLinea(especie, movimiento, pokedex);
   if (!todas.length) return null;
   return [...todas].sort((a, b) => (PRIORIDAD[a.via] ?? 9) - (PRIORIDAD[b.via] ?? 9))[0];
-}
-
-/**
- * Padres que pueden pasar un movimiento huevo a una madre dada.
- *
- * Se ordenan poniendo delante los que lo aprenden por nivel, MT o tutor: ésos se
- * consiguen sin criar nada, mientras que un padre que también lo tenga sólo de
- * huevo abre una segunda cadena.
- */
-export function padresQuePasan(movimiento, especieMadre, datos, regionesDisponibles = []) {
-  const { pokedex, movimientosHuevo, encuentros } = datos;
-  const madre = pokedex[especieMadre];
-  if (!madre) return [];
-
-  const regiones = new Set(regionesDisponibles);
-  const candidatos = new Map();
-
-  const añade = (especie, comoLoSabe) => {
-    const p = pokedex[especie];
-    if (!p || esEsteril(p) || sinGenero(p)) return;
-    if ((p.genero?.macho ?? 0) <= 0) return;      // el que pasa el movimiento es el padre
-    const comunes = gruposEnComun(madre, p);
-    if (!comunes.length) return;                  // sin grupo en común no hay nada que hacer
-    const zonas = (encuentros[especie] ?? []).filter((e) => regiones.has(e.region));
-    const ya = candidatos.get(especie);
-    const entrada = {
-      especie, gruposEnComun: comunes, comoLoSabe,
-      capturable: zonas.length > 0,
-      zonas: zonas.slice(0, 4),
-      soloEnOtraRegion: zonas.length === 0 && (encuentros[especie] ?? []).length > 0,
-      ratioMacho: p.genero?.macho ?? 0,
-    };
-    if (!ya || (PRIORIDAD[comoLoSabe.via] ?? 9) < (PRIORIDAD[ya.comoLoSabe.via] ?? 9))
-      candidatos.set(especie, entrada);
-  };
-
-  // Los que lo aprenden sin criar: la opción buena.
-  for (const c of movimientosHuevo.otrosModos?.[movimiento] ?? []) {
-    const via = c.via === 'mt' ? 'mt' : c.via?.startsWith?.('nivel') ? 'nivel' : c.via;
-    añade(c.especie, { via: via ?? 'otra', detalle: c.via });
-  }
-  // Los que sólo lo traen de huevo: valen, pero hay que criarlos aparte.
-  for (const c of movimientosHuevo.deHuevo?.[movimiento] ?? []) {
-    añade(c.especie, { via: 'huevo', detalle: 'sólo de huevo' });
-  }
-
-  return [...candidatos.values()].sort((a, b) => {
-    const pa = PRIORIDAD[a.comoLoSabe.via] ?? 9;
-    const pb = PRIORIDAD[b.comoLoSabe.via] ?? 9;
-    if (pa !== pb) return pa - pb;
-    if (a.capturable !== b.capturable) return a.capturable ? -1 : 1;
-    return b.ratioMacho - a.ratioMacho;
-  });
 }
 
 /**
@@ -147,10 +104,13 @@ export function planearMovimientos(objetivo, datos, regionesDisponibles = []) {
     // padres distintos en el mismo huevo.
     crucesExtra: padreUnico ? 0 : Math.max(0, deHuevo.length - 1),
     avisos: deHuevo.length
-      ? [`${deHuevo.length} movimiento(s) vienen de huevo: el padre del cruce final ya no es libre.` +
-         (padreUnico
-           ? ` ${padreUnico.especie} los lleva todos, así que basta un padre.`
-           : ' No hay un padre que lleve todos, así que harán falta cruces adicionales.')]
+      ? [(deHuevo.length === 1
+        ? `${deHuevo[0].movimiento} viene de huevo: el padre del cruce final ya no es libre, `
+          + 'tiene que ser uno que lo sepa.'
+        : `${deHuevo.length} movimientos vienen de huevo: el padre del cruce final ya no es libre.`
+          + (padreUnico
+            ? ` ${padreUnico.especie} los lleva todos, así que basta un padre.`
+            : ' No hay un padre que lleve todos, así que harán falta cruces adicionales.'))]
       : [],
   };
 }

@@ -290,3 +290,82 @@ export function quienPoneLaEspecie(especieObjetivo, pokedex) {
       : nadieCria,
   };
 }
+
+// --------------------------------------------- pasar un movimiento huevo
+
+/** Orden de comodidad de las vías: primero lo que no obliga a criar nada. */
+const PRIORIDAD = { nivel: 1, mt: 2, tutor: 3, especial: 4, evolucion: 5, preevolucion: 6, huevo: 7 };
+/**
+ * Padres que pueden pasar un movimiento huevo a una madre dada.
+ *
+ * Se ordenan poniendo delante los que lo aprenden por nivel, MT o tutor: ésos se
+ * consiguen sin criar nada, mientras que un padre que también lo tenga sólo de
+ * huevo abre una segunda cadena.
+ */
+export function padresQuePasan(movimiento, especieMadre, datos, regionesDisponibles = []) {
+  const { pokedex, movimientosHuevo, encuentros } = datos;
+  const madre = pokedex[especieMadre];
+  if (!madre) return [];
+
+  const regiones = new Set(regionesDisponibles);
+  const candidatos = new Map();
+
+  const añade = (especie, comoLoSabe) => {
+    const p = pokedex[especie];
+    if (!p || esEsteril(p) || sinGenero(p)) return;
+    if ((p.genero?.macho ?? 0) <= 0) return;      // el que pasa el movimiento es el padre
+    const comunes = gruposEnComun(madre, p);
+    if (!comunes.length) return;                  // sin grupo en común no hay nada que hacer
+    const zonas = (encuentros[especie] ?? []).filter((e) => regiones.has(e.region));
+    const ya = candidatos.get(especie);
+    const entrada = {
+      especie, gruposEnComun: comunes, comoLoSabe,
+      capturable: zonas.length > 0,
+      zonas: zonas.slice(0, 4),
+      soloEnOtraRegion: zonas.length === 0 && (encuentros[especie] ?? []).length > 0,
+      ratioMacho: p.genero?.macho ?? 0,
+    };
+    if (!ya || (PRIORIDAD[comoLoSabe.via] ?? 9) < (PRIORIDAD[ya.comoLoSabe.via] ?? 9))
+      candidatos.set(especie, entrada);
+  };
+
+  // Los que lo aprenden sin criar: la opción buena.
+  for (const c of movimientosHuevo.otrosModos?.[movimiento] ?? []) {
+    const via = c.via === 'mt' ? 'mt' : c.via?.startsWith?.('nivel') ? 'nivel' : c.via;
+    añade(c.especie, { via: via ?? 'otra', detalle: c.via });
+  }
+  // Los que sólo lo traen de huevo: valen, pero hay que criarlos aparte.
+  for (const c of movimientosHuevo.deHuevo?.[movimiento] ?? []) {
+    añade(c.especie, { via: 'huevo', detalle: 'sólo de huevo' });
+  }
+
+  return [...candidatos.values()].sort((a, b) => {
+    const pa = PRIORIDAD[a.comoLoSabe.via] ?? 9;
+    const pb = PRIORIDAD[b.comoLoSabe.via] ?? 9;
+    if (pa !== pb) return pa - pb;
+    if (a.capturable !== b.capturable) return a.capturable ? -1 : 1;
+    return b.ratioMacho - a.ratioMacho;
+  });
+}
+
+
+/**
+ * Padres que pueden pasar TODOS estos movimientos huevo a la vez.
+ *
+ * No es la unión, es la intersección: un huevo tiene un solo padre, así que si
+ * se piden dos movimientos huevo el mismo Pokémon tiene que saber los dos. De
+ * cada especie se queda la vía más incómoda de las que necesita, que es la que
+ * marca lo que cuesta de verdad.
+ */
+export function padresQuePasanTodos(movimientos, especieMadre, datos, regionesDisponibles = []) {
+  if (!movimientos?.length) return [];
+  const listas = movimientos.map((m) => padresQuePasan(m, especieMadre, datos, regionesDisponibles));
+  const [primera, ...resto] = listas;
+  return primera
+    .filter((c) => resto.every((otra) => otra.some((x) => x.especie === c.especie)))
+    .map((c) => {
+      const suyas = listas.map((l) => l.find((x) => x.especie === c.especie).comoLoSabe);
+      const peor = suyas.reduce((a, b) => ((PRIORIDAD[b.via] ?? 9) > (PRIORIDAD[a.via] ?? 9) ? b : a));
+      return { ...c, comoLoSabe: peor, comoSabeCada: movimientos.map((m, i) => ({ movimiento: m, ...suyas[i] })) };
+    });
+}

@@ -503,6 +503,51 @@ await paso('cada Pokémon sale con su sprite, y el que no lo tenga deja su hueco
 });
 
 
+await paso('un movimiento huevo llega hasta la captura, y dice cómo conseguirlo', async () => {
+  // El caso real: Milotic con Neblina. El movimiento es de Feebas —la forma
+  // base—, lo pasa el padre y el plan tiene que pedirlo en una captura concreta.
+  await pagina.click('text=+ Nueva');
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie');
+  await pagina.fill('#especie', 'Milotic');
+  await confirmarCampo('#especie');
+  await pagina.waitForTimeout(400);
+  await pagina.check('#iv-ps');
+  await pagina.check('#iv-defensa');
+  await pagina.waitForSelector('#nuevo-mov');
+  await pagina.fill('#nuevo-mov', 'Neblina');
+  await confirmarCampo('#nuevo-mov');
+  await pagina.waitForTimeout(600);
+
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(500);
+  const faltan = await pagina.textContent('.tarjeta:has-text("Ahora mismo")');
+  if (!/con Neblina/.test(faltan))
+    throw new Error(`ningún padre pide el movimiento: ${faltan.replace(/\s+/g, ' ').slice(0, 220)}`);
+  // Y el hueco que lo pide es ♂: el movimiento huevo lo pasa el padre.
+  const fila = await pagina.locator('tr', { hasText: 'con Neblina' }).first().textContent();
+  if (!/♂/.test(fila)) throw new Error(`el hueco del movimiento debería ser ♂: ${fila.replace(/\s+/g, ' ')}`);
+
+  // La tarjeta de movimientos ya no dice que Milotic no lo aprenda.
+  const vista = await pagina.textContent('#vista');
+  if (/no aprende Neblina/.test(vista)) throw new Error('sigue diciendo que Milotic no aprende Neblina');
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(600);
+  const capturas = await pagina.textContent('#vista');
+  if (!/tiene que pasar Neblina/.test(capturas))
+    throw new Error('Capturas no dice que ese hueco tenga que pasar el movimiento');
+  if (!/(lo aprende al|se le enseña con|se lo da el tutor|sólo de huevo)/.test(capturas))
+    throw new Error('Capturas no dice CÓMO se consigue el movimiento');
+  const quien = (capturas.match(/([A-Z][a-zé]+): (lo aprende al nivel \d+|se le enseña con la MT\/MO|se lo da el tutor)/) ?? [])[0];
+  console.log(`       Neblina: pedida en una captura ♂ · ${(quien ?? 'sin detalle').trim()}`);
+
+  await pagina.click('text=Borrar');
+  await pagina.waitForTimeout(250);
+  await pagina.click('.crianza:has-text("Larvitar")');
+  await pagina.waitForTimeout(200);
+});
+
 await paso('Entrenamiento guía los movimientos contando con la evolución', async () => {
   await pagina.click('text=+ Nueva');
   await pagina.click('button[data-vista="objetivo"]');

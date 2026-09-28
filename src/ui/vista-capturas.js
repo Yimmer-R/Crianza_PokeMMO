@@ -65,11 +65,24 @@ export function vistaCapturas(datos) {
 
   const queBuscar = (c) => {
     const req = c.requisito;
+    const movs = (req.movimientos ?? []).length ? ` · con ${req.movimientos.join(', ')}` : '';
     // Hay huecos que no piden nada: sólo el sexo. Dejar la celda vacía parecía
     // un error, y es justo la captura más fácil de todas.
-    if (!req.stats.length && !req.naturaleza) return 'cualquiera: no le pido IVs ni naturaleza';
-    return (req.stats.length ? `31 en ${req.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '') +
-      (req.naturaleza ? `${req.stats.length ? ' + ' : ''}naturaleza ${req.naturaleza}` : '');
+    if (!req.stats.length && !req.naturaleza)
+      return (movs ? 'cualquiera' : 'cualquiera: no le pido IVs ni naturaleza') + movs;
+    return (req.stats.length ? `31 en ${req.stats.map((x) => NOMBRE_STAT[x]).join(' + ')}` : '')
+      + (req.naturaleza ? `${req.stats.length ? ' + ' : ''}naturaleza ${req.naturaleza}` : '')
+      + movs;
+  };
+
+  /** «lo aprende al nivel 36» / «con la MT/MO» / «sólo de huevo: otra cadena». */
+  const comoSabe = (como) => {
+    if (!como) return null;
+    if (como.via === 'nivel') return `lo aprende al ${como.detalle}`;
+    if (como.via === 'mt') return 'se le enseña con la MT/MO';
+    if (como.via === 'tutor') return 'se lo da el tutor';
+    if (como.via === 'huevo') return 'sólo de huevo: hace falta criarlo aparte';
+    return como.detalle ?? como.via;
   };
 
   const bloques = [...porEspecie.entries()].map(([especie, grupo]) => {
@@ -80,7 +93,12 @@ export function vistaCapturas(datos) {
     const rec = base.recomendada;
     const cuantos = grupo.reduce((a, c) => a + c.cuantos, 0);
     const hayLibres = grupo.some((c) => c.requisito.especieLibre);
-    const hayEspina = grupo.some((c) => !c.requisito.especieLibre);
+    // Un hueco que tiene que pasar un movimiento huevo tampoco es libre, pero NO
+    // es la espina materna: es el PADRE del cruce. Confundirlos hacía que la
+    // tarjeta dijera «espina materna» y «ponen el mismo huevo» de una lista de
+    // padres que no ponen ningún huevo.
+    const porElMovimiento = (rec.movimientos ?? []).length > 0;
+    const hayEspina = !porElMovimiento && grupo.some((c) => !c.requisito.especieLibre);
 
     return tarjeta(`${especie} · ${cuantos} ${cuantos === 1 ? 'captura' : 'capturas'}`, [
       // A quién hay que buscar, en grande. En una lista de cinco tarjetas de
@@ -101,6 +119,10 @@ export function vistaCapturas(datos) {
                 'ojo',
               )
             : null,
+          // El movimiento huevo es lo que ata este hueco: si no se dice aquí, la
+          // captura parece libre y la cría nace sin él.
+          porElMovimiento ? chip(`padre del cruce: tiene que pasar ${rec.movimientos.join(' y ')}`, 'ojo') : null,
+          rec.comoLoSabe ? chip(`${especie}: ${comoSabe(rec.comoLoSabe)}`, rec.comoLoSabe.via === 'huevo' ? 'mal' : 'bien') : null,
           rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
           chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
           (cuando.hora || cuando.estacion)
@@ -119,6 +141,17 @@ export function vistaCapturas(datos) {
             + `${rec.evolucionar.especie}${rec.evolucionar.condicion ? ` (${rec.evolucionar.condicion})` : ''}`
             + ' antes de cruzarlo.',
           )
+        : null,
+      // El movimiento lo pasa el PADRE, y eso decide el sexo del hueco: sin
+      // decirlo, «♂» parece un capricho del plan.
+      (rec.movimientos ?? []).length
+        ? el('p.nota', {
+            texto: `${rec.movimientos.join(' y ')} ${rec.movimientos.length > 1 ? 'son movimientos huevo' : 'es movimiento huevo'}: `
+              + `lo pasa el padre, así que este hueco es ♂ y tiene que venir ya con ${rec.movimientos.length > 1 ? 'ellos' : 'él'}. `
+              + (rec.comoLoSabe?.via === 'huevo'
+                ? 'Este lo sabe sólo de huevo, así que a su vez hay que criarlo.'
+                : `En ${especie}, ${comoSabe(rec.comoLoSabe)}.`),
+          })
         : null,
       rec.noSeCria
         ? aviso(
@@ -177,7 +210,9 @@ export function vistaCapturas(datos) {
       base.viables.length > 1
         ? plegable(`Otras ${base.viables.length - 1} especies que valen igual`, [
             tabla(
-              ['Especie', 'Grupo en común', 'Sexo pedido', 'Intentos', 'Zonas al alcance'],
+              (rec.movimientos ?? []).length
+                ? ['Especie', 'Cómo sabe el movimiento', 'Sexo pedido', 'Intentos', 'Zonas al alcance']
+                : ['Especie', 'Grupo en común', 'Sexo pedido', 'Intentos', 'Zonas al alcance'],
               base.viables.slice(1, 6).map((o) => [
                 el('span.con-sprite', {}, [
                   sprite(o.especie, { tam: 'mini' }),
@@ -186,7 +221,10 @@ export function vistaCapturas(datos) {
                       ? `${o.especie} (evoluciónalo a ${o.evolucionar.especie})` : o.especie,
                   }),
                 ]),
-                o.gruposEnComun.join(' / '), `${o.ratioSexo} %`,
+                (rec.movimientos ?? []).length
+                  ? (comoSabe(o.comoLoSabe) ?? '—')
+                  : o.gruposEnComun.join(' / '),
+                `${o.ratioSexo} %`,
                 comoOportunidad(o.intentos), numero(o.zonas.length),
               ]),
               [3, 4],

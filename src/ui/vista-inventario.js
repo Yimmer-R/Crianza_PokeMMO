@@ -84,7 +84,11 @@ function bloqueFaltan(plan) {
               : (f.especiesValidas?.length ?? 0) > 1
                 ? el('span.chip.ojo.con-sprite', {}, [
                     sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
-                    el('span', { texto: `${f.especieSugerida} o su línea` }),
+                    el('span', {
+                      texto: (f.movimientos ?? []).length
+                        ? `${f.especieSugerida} u otro que lo sepa`
+                        : `${f.especieSugerida} o su línea`,
+                    }),
                   ])
                 : el('span.con-sprite', {}, [
                     sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),

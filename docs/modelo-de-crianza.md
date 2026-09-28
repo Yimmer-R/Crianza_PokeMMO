@@ -453,6 +453,36 @@ En la app: `movimientosSoloDeHuevo()` separa los que tocan la crianza (sólo ví
 Por eso el inventario guarda los cuatro movimientos de cada Pokémon: sin ellos no
 hay forma de saber si un padre sirve para pasar nada.
 
+### El padre del cruce final tampoco se captura: hay que seguir bajando
+
+Y aquí estaba el agujero. **El padre del cruce final casi nunca se captura**: en
+cuanto el objetivo pasa de 2×31, ese padre es a su vez una cría. Entonces quien
+tiene que saber el movimiento es el padre de ESE cruce, y así hasta abajo — hasta
+un hueco que se captura o se compra, que es el único sitio por donde el
+movimiento puede entrar.
+
+Sin bajarlo, la marca se quedaba en un nodo de tipo `cruce`, donde no la mira
+nadie: `cumple()` sólo la comprueba al colocar un ejemplar del inventario y
+`loQueFalta()` sólo la enseña en los huecos por conseguir. El plan de un Milotic
+con Neblina salía con cuatro capturas y **ninguna pedía el movimiento**: se hacían
+los siete pasos y la cría nacía sin él. Lo baja `bajarMovimientosHuevo()`, que de
+paso marca ♂ el hueco elegido — `asignarSexos()` respeta los sexos ya puestos.
+
+Tres consecuencias:
+
+1. **un hueco con movimiento deja de ser de especie libre.** No vale «cualquiera
+   del grupo huevo»: tiene que poder saber el movimiento. `padresQuePasanTodos()`
+   dice quiénes, y con dos movimientos es la **intersección**, no la unión — un
+   huevo tiene un solo padre;
+2. **un movimiento huevo obliga a criar aunque el objetivo se capturase entero.**
+   Un 1×31 se captura de una pieza y el planificador lo deja como hoja, con razón;
+   pero por un huevo es la única vía de que traiga el movimiento, así que la raíz
+   se envuelve en un cruce mínimo: la madre pone la especie y el IV con su Recio,
+   y el padre pone el movimiento;
+3. **Capturas dice cómo se consigue**, no sólo a quién capturar: «lo aprende al
+   nivel 36», «se le enseña con la MT/MO» o «sólo de huevo», que es el caso caro
+   porque abre otra cadena. Entre dos que valen, primero el que no obliga a criar.
+
 Si pides varios movimientos huevo y **no** hay una sola especie que los sepa
 todos, cada uno cuesta un cruce más: los padres se consumen, y no caben dos
 padres distintos en el mismo huevo.
