@@ -131,7 +131,7 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
     const precio = precioEnYen(nombre, objetos);
     objetosUsados.set(nombre, (objetosUsados.get(nombre) ?? 0) + cuantos);
     if (!precio) {
-      lineas.push({ concepto: nombre, cuantos, coste: null, nota: 'la wiki no trae precio de compra' });
+      lineas.push({ concepto: nombre, cuantos, coste: null, nota: 'sin precio de tienda conocido' });
       return;
     }
     const total = precio.cantidad * cuantos;
@@ -205,7 +205,7 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
         cuantos: estimados.length,
         coste: estimados.reduce((a, p) => a + p.precio, 0),
         moneda: 'PokéYen', fuente: 'estimado',
-        nota: 'la wiki sólo publica los extremos 5.000 y 25.000; este tramo es una estimación',
+        nota: 'sólo están publicados los extremos 5.000 y 25.000: este tramo es una estimación',
       });
   }
 
@@ -233,9 +233,8 @@ export function presupuestar(plan, datos, { pagarSexo = true } = {}) {
     ],
     sinPrecio: {
       padres: padresQueComprar,
-      nota: `Los ${padresQueComprar} padres de partida no van en el total: o los capturas (gratis, ` +
-        `cuesta tiempo) o los compras en el GTL. La wiki no guarda precios de mercado a propósito, ` +
-        `porque caducan en semanas, así que ese número lo pones tú.`,
+      nota: `Los ${padresQueComprar} padres de partida no van en el total: o los capturas o los `
+        + 'compras en el GTL, y ese precio cambia cada semana.',
     },
   };
 }
@@ -269,9 +268,9 @@ export function comparaConElGtl(objetosUsados, objetos) {
       gtl,
       total: precio.cantidad * cuantos,
       consejo: soloGtl
-        ? `No se vende en ninguna tienda: o la farmeas a Pokémon salvajes o la compras en el GTL. `
-          + `El presupuesto usa ${formatearYen(gtl.ultimo)}, que es lo que valía el ${gtl.fecha}.`
-        : `El GTL estaba a ${formatearYen(gtl.ultimo)} el ${gtl.fecha}; en la tienda, `
+        ? 'No se vende en tienda: o la farmeas a Pokémon salvajes o la compras en el GTL. '
+          + `El presupuesto usa ${formatearYen(gtl.ultimo)} (${gtl.fecha}).`
+        : `En el GTL, ${formatearYen(gtl.ultimo)} (${gtl.fecha}); en tienda, `
           + `${formatearYen(precio.cantidad)}.`,
     });
   }

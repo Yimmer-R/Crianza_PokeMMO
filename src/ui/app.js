@@ -195,9 +195,9 @@ async function arrancar() {
   const meta = document.getElementById('pie-meta');
   if (meta)
     meta.textContent =
-      `Extraídos el ${datos.meta.generado}: ${datos.meta.recuentos.pokemon} Pokémon, ` +
-      `${datos.meta.recuentos.conEncuentros} con encuentros, ` +
-      `${datos.meta.recuentos.movimientosHuevo} movimientos huevo.`;
+      `${datos.meta.recuentos.pokemon} Pokémon, ${datos.meta.recuentos.conEncuentros} con `
+      + `encuentros y ${datos.meta.recuentos.movimientosHuevo} movimientos huevo, `
+      + `al día del ${datos.meta.generado}.`;
 
   alPintar(programarPintado);
   restaurar();

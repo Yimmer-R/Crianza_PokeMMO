@@ -48,10 +48,9 @@ export function selectorCuando(sufijo) {
           '. Lo que no, se queda abajo marcado con cuándo sí.',
         ])
       : el('p.nota', {}, [
-          'Sin elegir nada, la columna ', el('strong', { texto: 'Cuándo' }),
-          ' dice a qué horas sale cada sitio: ',
+          'En la columna ', el('strong', { texto: 'Cuándo' }), ': ',
           el('strong', { texto: 'M' }), ' mañana, ', el('strong', { texto: 'D' }), ' día, ',
-          el('strong', { texto: 'N' }), ' noche — y combinadas (M/D, D/N, M/D/N) cuando sale en varias.',
+          el('strong', { texto: 'N' }), ' noche; combinadas cuando sale en varias.',
         ]),
   ]);
 }

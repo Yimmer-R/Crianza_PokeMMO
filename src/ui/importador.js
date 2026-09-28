@@ -85,18 +85,17 @@ export function seccionImportar(datos, destino, { comoTarjeta = true } = {}) {
           ])
         : null,
       activo?.error ? aviso(activo.error, 'error') : null,
-      el('p.nota', {}, [
-        `La primera vez descarga el modelo de español (~${PESO_MODELO_MB} MB) y se queda guardado. `,
-        'Si estás con datos del móvil, mejor la vía de texto.',
-      ]),
+      el('p.nota', {
+        texto: `La primera vez descarga ~${PESO_MODELO_MB} MB. Con datos del móvil, mejor la vía de texto.`,
+      }),
       varios ? notaSinExport() : null,
     ]),
 
     texto: () => frag([
-      el('p.nota', {}, [
-        'Pega la ficha tal cual. El orden de las líneas da igual y los dos puntos son opcionales.',
-        varios ? ' Puedes pegar todos los que quieras, separados por una línea en blanco.' : '',
-      ]),
+      el('p.nota', {
+        texto: 'Pega la ficha tal cual: el orden da igual.'
+          + (varios ? ' Varios seguidos, separados por una línea en blanco.' : ''),
+      }),
       el('textarea', {
         id: `texto-importar-${destino}`,
         value: textoPegado[destino],
@@ -248,7 +247,7 @@ function revisarInventario(datos, imp) {
   }));
 
   return tarjeta(`Revisar antes de guardar · ${utiles.length} Pokémon`, [
-    el('p.nota', { texto: 'Comprueba los IVs: es lo que peor se lee y lo que más daño hace. Toca «Editar» para corregir.' }),
+    el('p.nota', { texto: 'Comprueba los IVs. Toca «Editar» para corregir cualquiera.' }),
     bloqueResoluciones(imp),
     bloqueAvisos(imp.avisos),
     utiles.length

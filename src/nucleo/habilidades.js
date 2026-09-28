@@ -59,7 +59,7 @@ export function planearHabilidad(objetivo, datos) {
       ],
       objetos: [PARCHE],
       huecos: [
-        'La wiki no documenta si la habilidad oculta se hereda al criar, así que el plan ' +
+        'No está documentado si la habilidad oculta se hereda al criar, así que el plan ' +
         'cuenta con el Parche y no con la suerte.',
       ],
     };
@@ -84,7 +84,7 @@ export function planearHabilidad(objetivo, datos) {
     ],
     objetos: [PILDORA],
     huecos: [
-      'La wiki no documenta con qué probabilidad se hereda cada habilidad normal al criar, ' +
+      'No está documentado con qué probabilidad se hereda cada habilidad normal al criar, ' +
       'así que no pongo un número: cuenta con la Píldora por si sale la otra.',
     ],
   };

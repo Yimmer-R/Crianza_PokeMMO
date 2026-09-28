@@ -73,7 +73,7 @@ export function sprite(especie, { sexo = null, tam = 'normal', via = VIA_3D } = 
 
   const sprites = datosCargados()?.sprites;
   const url = urlSprite(especie, sprites, { sexo, via });
-  if (!url) return hueco(`${especie}: la wiki no trae su sprite`);
+  if (!url) return hueco(`${especie}: no tengo su imagen`);
 
   return el(`img.sprite.sprite-${tam}`, {
     src: url,

@@ -651,7 +651,7 @@ await paso('el checklist: marcar un cruce gasta los padres y anota la cría', as
   await pagina.waitForSelector('#vaciar-inventario');
   await pagina.click('#vaciar-inventario');
   await pagina.click('#vaciar-si');
-  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
+  await pagina.waitForSelector('text=Vacío: anota lo que tengas', { timeout: 5000 });
 
   await pagina.click('text=+ Nueva');
   await pagina.click('button[data-vista="objetivo"]');
@@ -734,7 +734,7 @@ await paso('Inventario: marcar varios y borrarlos por tandas', async () => {
 
   await pagina.click('#vaciar-inventario');
   await pagina.click('#vaciar-si');
-  await pagina.waitForSelector('text=Vacío. Anota lo que tengas', { timeout: 5000 });
+  await pagina.waitForSelector('text=Vacío: anota lo que tengas', { timeout: 5000 });
   console.log(`       ${antes} -> 0 tras confirmar`);
 });
 

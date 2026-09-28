@@ -182,7 +182,7 @@ export function vistaObjetivo(datos) {
       : el('p.vacio', { texto: 'Elige una especie primero.' }),
     habs.ocultas.includes(objetivo.habilidad) ? aviso(
       'Es la habilidad oculta: la vía documentada es un Parche de Habilidad sobre la cría terminada. ' +
-      'La wiki no dice si se hereda al criar, así que el plan no cuenta con la suerte.',
+      'No está documentado si se hereda al criar, así que el plan no cuenta con la suerte.',
     ) : null,
   ]);
 
@@ -380,8 +380,7 @@ function bloqueEstadisticas(objetivo, datos) {
     el('div.stats', {}, st.filas.map(fila)),
     el('p.leyenda', {}, [
       el('span.muestra.base', { 'aria-hidden': 'true' }), ' base ',
-      el('span.muestra.bono', { 'aria-hidden': 'true' }), ' lo que suman IVs y EVs ',
-      '· a la derecha, la característica final',
+      el('span.muestra.bono', { 'aria-hidden': 'true' }), ' lo que suman IVs y EVs',
     ]),
     el('p.nota', {}, [
       conIvs.length
@@ -390,8 +389,7 @@ function bloqueEstadisticas(objetivo, datos) {
       'Los que no pides cuentan como 0: salen al azar. ',
       // Regla 2: lo que es inferencia se dice, no se disimula.
       el('strong', { texto: 'Ojo:' }),
-      ' la fórmula es la de 5ª generación y la wiki no ha comprobado si PokeMMO la usa tal cual (',
-      el('code', { texto: 'wiki/mecanicas/IVs.md' }), '), así que es una estimación.',
+      ' la fórmula es la de 5ª generación y no está comprobada contra PokeMMO, así que es una estimación.',
     ]),
   ]);
 }

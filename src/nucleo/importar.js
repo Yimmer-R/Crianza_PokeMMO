@@ -398,7 +398,7 @@ export function aObjetivo(ejemplar, datos, { todosLosIvs = false } = {}) {
   const movimientos = [];
   for (const m of ejemplar.movimientos ?? []) {
     if (learnset.has(m)) { if (movimientos.length < 4) movimientos.push(m); }
-    else avisos.push(`${ejemplar.especie} no aprende ${m} según la wiki: lo dejo fuera`);
+    else avisos.push(`${ejemplar.especie} no aprende ${m}: lo dejo fuera`);
   }
 
   const evs = {};

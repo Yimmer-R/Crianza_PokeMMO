@@ -131,8 +131,8 @@ export function vistaEntrenamiento(datos) {
           ], { pequeno: true, id: `hordas-${s.stat}` })
         : null,
       el('p.nota', {}, [
-        'Alternativa sin moverse: ', el('strong', { texto: `${s.vitamina.cuantas} × ${s.vitamina.nombre}` }),
-        `. ${s.vitamina.nota}.`,
+        'Sin moverte: ', el('strong', { texto: `${s.vitamina.cuantas} × ${s.vitamina.nombre}` }),
+        ` — ${s.vitamina.nota}.`,
       ]),
     ]);
   });
@@ -340,12 +340,9 @@ function bloqueGuia(objetivo, datos) {
     g.conRecordador.length
       ? el('p.nota', {}, [
           el('strong', { texto: `${RECORDADOR}: ` }),
-          'está en todos los centros Pokémon y cobra en ',
-          el('strong', { texto: PAGO_RECORDADOR }),
-          ' (de 1 a 4 según la potencia del movimiento). Puede enseñar los de cualquier nivel '
-          + 'aunque no hayas llegado, y los de una evolución anterior aunque nunca los haya '
-          + 'sabido. Lo único que NO puede es añadir un movimiento huevo después: ése tiene '
-          + 'que venir en el huevo.',
+          'en cualquier centro Pokémon, de 1 a 4 ', el('strong', { texto: PAGO_RECORDADOR }),
+          '. Enseña los de cualquier nivel y los de una evolución anterior; lo único que no '
+          + 'puede es añadir un movimiento huevo después.',
         ])
       : null,
 

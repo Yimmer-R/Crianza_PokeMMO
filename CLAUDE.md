@@ -49,6 +49,12 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
    declarado —una nota visible en la vista y una entrada en el README— no como
    estimación disfrazada de dato. Lo que sí sea estimación va marcado
    (`confianza: 'estimado'`) y se muestra en su propia línea.
+   **En la interfaz, el hueco se dice sin nombrar la wiki**: al jugador le
+   importa que un dato no esté comprobado, no de qué repositorio sale. «No está
+   documentado si…», no «la wiki no dice si…». La procedencia se sigue
+   documentando aquí, en el README y en `docs/`, que es donde se consulta.
+   El campo interno `fuente: 'wiki'` de `coste.js` se queda como está: no sale
+   a pantalla.
 3. **`src/nucleo/` no toca el DOM y `src/ui/` no contiene reglas del juego.** Es
    lo que permite probar la lógica en Node sin navegador. Por eso el OCR vive en
    `src/ui/ocr.js` (necesita canvas) pero sólo produce texto: interpretarlo es de
@@ -284,6 +290,13 @@ Tres trampas que ya han costado caro y que no se ven en las pruebas unitarias:
   vez y la página entra en bucle síncrono y se cuelga. `fijar()` compara antes de
   emitir, y `campoConSugerencias` comprueba `isConnected` y el valor previo. No
   quites ninguna de las dos guardas.
+- **Los textos son cortos, y eso es una decisión del usuario.** Una nota sólo se
+  queda si cambia lo que el jugador va a hacer: la Piedraeterna, los 30 contra
+  31, que la fórmula de característica es una estimación, que no se pueden sacar
+  las cajas del juego. Lo que se deduce del propio encabezado o del sentido común
+  se borra — «Marca los IVs que quieres perfectos» debajo de «IVs a 31 · 2
+  marcados» era eso. Antes de añadir un párrafo, mira si el rótulo de al lado ya
+  lo dice.
 - **Lo secundario va plegado.** Una vista con nueve tarjetas iguales no es una
   vista, es un pasillo. El plan tenía 31 pasos en una lista plana y medía cinco
   pantallas; ahora «Ahora mismo» dice lo accionable y el resto va en
