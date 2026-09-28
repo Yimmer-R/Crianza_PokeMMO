@@ -149,7 +149,7 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
     nota: viables.length !== 0 ? null
       : opciones.length && opciones.every((o) => o.noSalvaje)
         ? `Ni ${candidatas[0]} ni el resto de su línea aparecen en estado salvaje: en el juego `
-          + 'salen por otra vía (fósil, regalo, intercambio…) o por el GTL. La wiki no trae esa '
+          + 'salen por otra vía (fósil, regalo, intercambio…) o por el GTL. No tengo esa '
           + 'vía, así que no me la invento.'
         : 'Ninguna de las especies compatibles aparece en tus regiones: toca el GTL, y ahí el precio lo pones tú.',
   };

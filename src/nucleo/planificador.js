@@ -92,7 +92,7 @@ export function validarObjetivo(objetivo, datos) {
   for (const mov of objetivo.movimientos ?? []) {
     const enLaLinea = viasEnLaLinea(objetivo.especie, mov, pokedex);
     if (!enLaLinea.length) {
-      problemas.push(`${objetivo.especie} no aprende ${mov} por ninguna vía que traiga la wiki`);
+      problemas.push(`${objetivo.especie} no aprende ${mov} por ninguna vía conocida`);
       continue;
     }
     if (!enLaLinea.some((v) => v.especie === objetivo.especie))
@@ -537,13 +537,11 @@ function construir(nodoPedido, ctx, profundidad = 0) {
     nodo.compartidos = resto;
     nodo.piedraEnLaMadre = enLaMadre;
     nodo.explicacion =
-      `La Piedraeterna pasa la naturaleza pero ocupa un hueco de objeto, así que este cruce ` +
-      `sólo puede forzar un IV (${NOMBRE_STAT[forzado]}), y lo fuerza `
-      + `${enLaMadre ? 'el padre' : 'la madre'} con su ${RECIO_DE[forzado]}. ` +
-      (resto.length
-        ? `${resto.map((st) => NOMBRE_STAT[st]).join(', ')} tiene${resto.length > 1 ? 'n' : ''} que venir a 31 en los DOS padres. `
-        : 'No queda ningún IV que tengan que compartir. ') +
-      `La Piedraeterna la lleva ${conLaPiedra}.`;
+      `La Piedraeterna la lleva ${conLaPiedra} y ocupa su hueco, así que sólo se fuerza `
+      + `${NOMBRE_STAT[forzado]}, con el ${RECIO_DE[forzado]} de ${enLaMadre ? 'el padre' : 'la madre'}.`
+      + (resto.length
+        ? ` ${resto.map((st) => NOMBRE_STAT[st]).join(', ')} tiene${resto.length > 1 ? 'n' : ''} que venir a 31 en los dos.`
+        : '');
 
     // El que NO lleva la Piedraeterna carga con todos los IVs: el forzado,
     // porque lleva el Recio, y los compartidos, porque tienen que estar en los
@@ -564,10 +562,10 @@ function construir(nodoPedido, ctx, profundidad = 0) {
   nodo.forzados = [f1, f2];
   nodo.compartidos = compartidos;
   nodo.explicacion =
-    `Se fuerzan ${NOMBRE_STAT[f1]} y ${NOMBRE_STAT[f2]} con objetos Recios, uno en cada padre. ` +
-    (compartidos.length
-      ? `${compartidos.map((s) => NOMBRE_STAT[s]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''} porque los dos padres lo tienen a 31, y el promedio de 31 y 31 es 31.`
-      : 'No hay IVs compartidos: los dos forzados son todo el objetivo.');
+    `Se fuerzan ${NOMBRE_STAT[f1]} y ${NOMBRE_STAT[f2]} con un Recio en cada padre.`
+    + (compartidos.length
+      ? ` ${compartidos.map((s) => NOMBRE_STAT[s]).join(', ')} sale${compartidos.length > 1 ? 'n' : ''} solo${compartidos.length > 1 ? 's' : ''}: los dos padres lo${compartidos.length > 1 ? 's' : ''} tienen a 31.`
+      : '');
 
   const [hijoA, hijoB] = restriccionesDeLosHijos(nodo.rol, ctx.espina);
   nodo.hijos = [

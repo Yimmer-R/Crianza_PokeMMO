@@ -208,7 +208,7 @@ export function comoAprender(movimiento, especie, datos) {
             + `RETRASAR la evolución hasta el ${primera.nivel} (cancela la evolución con B) y `
             + 'aprenderlo primero.'
           : null,
-        'La lista de «Prevo» de la wiki puede no estar completa, así que mira en el recordador '
+        'La lista de «Prevo» puede no estar completa, así que mira en el recordador '
         + 'antes de darlo por perdido: si sale ahí, te ahorras todo esto.',
       ].filter(Boolean).join(' '),
     };
@@ -217,7 +217,7 @@ export function comoAprender(movimiento, especie, datos) {
   return {
     ...base,
     situacion: 'imposible',
-    texto: `Nadie de la línea de ${especie} aprende ${movimiento} por ninguna vía que traiga la wiki.`,
+    texto: `Nadie de la línea de ${especie} aprende ${movimiento} por ninguna vía conocida.`,
   };
 }
 

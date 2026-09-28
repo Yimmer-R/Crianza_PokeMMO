@@ -24,7 +24,7 @@
   <p class="lema">Dime el Pokémon que quieres y te digo cómo llegar desde lo que ya tienes.</p>
   <!-- El cuadro con borde de la plantilla, donde ponía «EDITION 2022»: aquí
        dice de cuándo son los datos, que es lo que de verdad caduca. -->
-  <div class="edicion">Datos de la wiki<b id="edicion-fecha">—</b></div>
+  <div class="edicion">Datos de<b id="edicion-fecha">—</b></div>
 </header>
 
 <div id="crianzas" class="crianzas-hueco" aria-label="Crianzas en marcha"></div>
@@ -38,19 +38,12 @@
 </nav>
 
 <main id="vista" class="vista">
-  <p class="cargando">Cargando los datos de la wiki…</p>
+  <p class="cargando">Cargando…</p>
 </main>
 
 <footer class="pie">
-  <p>
-    Los datos salen de la <a href="https://github.com/Yimmer-R/Wiki-PokeMMO">wiki de PokeMMO</a>
-    y se regeneran con <code>node herramientas/extraer-wiki.mjs</code>.
-    <span id="pie-meta"></span>
-  </p>
-  <p class="tenue">
-    Mecánicas de 5ª generación: ni tipo Hada ni Megaevoluciones. Los precios de mercado del GTL
-    no están aquí a propósito: caducan en semanas.
-  </p>
+  <p><span id="pie-meta"></span></p>
+  <p class="tenue">Mecánicas de 5ª generación: ni tipo Hada ni Megaevoluciones.</p>
 </footer>
 
 <script type="module" src="src/ui/app.js"></script>

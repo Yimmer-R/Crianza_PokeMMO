@@ -258,8 +258,7 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
         // aparte: la wiki no dice si las vitaminas tienen tope de EVs en
         // PokeMMO, así que esta cuenta es una división y puede no valer a
         // partir de cierto punto.
-        nota: 'la wiki las desaconseja (con hordas los EVs salen gratis) y tampoco dice si '
-          + 'tienen tope, así que este número sale de dividir',
+        nota: 'con hordas salen gratis; no consta si tienen tope, así que el número sale de dividir',
       },
       sinHordasAlAlcance: hordas.length === 0,
       hayHordasEnOtraRegion:
@@ -289,11 +288,9 @@ export function planearEvs(evsObjetivo, evsActuales, datos, opciones = {}) {
         : []),
     ],
     huecos: [
-      'La wiki no documenta si las vitaminas tienen tope de EVs en PokeMMO, así que ' +
-      'el número de vitaminas sale de dividir y puede no valer a partir de cierto punto.',
-      'Los escalones de EVs tampoco están en la wiki: salen de tu experiencia jugando ' +
-      '(26-09-2026) y cuadran con la fórmula de característica de 5ª generación. ' +
-      'Convendría subirlos a la wiki como fuente nueva.',
+      'No consta si las vitaminas tienen tope de EVs, así que su número sale de dividir.',
+      'Los escalones de EVs salen de tu experiencia jugando (26-09-2026) y cuadran con la '
+      + 'fórmula de característica de 5ª generación.',
     ],
   };
 }

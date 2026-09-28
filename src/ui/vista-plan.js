@@ -104,7 +104,7 @@ export function vistaPlan(datos) {
       ? el('div.aviso', {}, [el('ul', {}, plan.avisos.map((x) => el('li', { texto: x })))])
       : null,
     cuentas.inventario === 0 && obtener().inventario.length > 0
-      ? aviso('Nada de tu inventario encaja en esta cadena. Mira la pestaña Inventario para ver por qué.')
+      ? aviso('Nada de tu inventario encaja en esta cadena.')
       : null,
     bloqueSobrantes(plan, datos),
   ]);
@@ -156,35 +156,36 @@ export function vistaPlan(datos) {
       ? el('p.nota', { texto: `Alternativa en otras monedas: ${pres.otrasMonedas.map((m) => `${numero(m.cantidad)} ${m.moneda}`).join(' · ')}` })
       : null,
     tabla(
-      ['Concepto', 'Para qué', 'Cantidad', 'Unidad', 'Total', 'En PB', 'Fuente'],
+      ['Concepto', 'Para qué', 'Cantidad', 'Unidad', 'Total', 'En PB'],
       pres.lineas.map((l) => [
         l.concepto,
         // Cuál es cuál: en la tienda «Franja Recia» a secas no dice nada.
         l.para ?? '—',
         numero(l.cuantos),
-        l.precioUnidad != null ? `${numero(l.precioUnidad)} ${l.moneda}` : (l.nota ?? '—'),
+        // Lo estimado se marca aquí mismo: es la regla 2 y es lo único que
+        // aportaba la columna «Fuente», que sobraba entera.
+        l.precioUnidad != null
+          ? el('span.con-sprite', {}, [
+              `${numero(l.precioUnidad)} ${l.moneda}`,
+              l.fuente === 'estimado' ? chip('estimado', 'ojo') : null,
+            ])
+          : (l.nota ?? '—'),
         l.coste != null ? numero(l.coste) : '—',
         // La vía sin dinero. Lo que no se puede pagar en PB se dice, no se deja
         // en blanco: la Piedraeterna y el pago del sexo no tienen precio en PB.
         l.pb != null ? `${numero(l.pb)} BP` : chip('no se paga en PB', 'ojo'),
-        l.fuente === 'wiki' ? chip('wiki', 'bien')
-          : l.fuente === 'estimado' ? chip('estimado', 'ojo')
-          : l.fuente === 'respaldo' ? chip('respaldo', 'ojo') : '—',
       ]),
       [2, 4],
     ),
     pres.totalPb
       ? el('p.nota', {}, [
           el('strong', { texto: `${numero(pres.totalPb)} BP` }),
-          ' es lo que costarían en Puntos de Batalla los objetos que se venden por PB ',
-          `(los Recios, a 750 BP en la ${pres.lineas.find((l) => l.pbDonde)?.pbDonde ?? 'Torre Batalla'}). `,
-          pres.pbNoCubre.length
-            ? `Lo que NO se puede pagar en PB: ${pres.pbNoCubre.join(', ')} — eso va en PokéYen y no hay alternativa.`
-            : '',
+          ` si pagas los Recios en la ${pres.lineas.find((l) => l.pbDonde)?.pbDonde ?? 'Torre Batalla'}. `,
+          pres.pbNoCubre.length ? `En PB no entran: ${pres.pbNoCubre.join(', ')}.` : '',
         ])
       : null,
     pres.hayEstimados
-      ? aviso('Hay líneas estimadas. La wiki sólo publica los extremos del pago por sexo (5.000 y 25.000); los tramos de en medio no están en ninguna fuente.')
+      ? aviso('Del pago por sexo sólo están publicados los extremos (5.000 y 25.000): los tramos de en medio son una estimación.')
       : null,
 
     // Casi todo el presupuesto son precios de tienda, que no se mueven. La
@@ -196,16 +197,12 @@ export function vistaPlan(datos) {
             el('span', {}, [
               el('strong', { texto: `${d.objeto} × ${d.cuantos}: ` }),
               `${d.consejo} `,
-              `En el último año se movió entre ${numero(d.gtl.min)} (${d.gtl.minFecha}) y `,
-              `${numero(d.gtl.max)} (${d.gtl.maxFecha}), así que las ${d.cuantos} pueden salirte `,
-              `desde ${numero(d.gtl.min * d.cuantos)} hasta ${numero(d.gtl.max * d.cuantos)} PokéYen.`,
+              `Las ${d.cuantos} pueden salirte desde ${numero(d.gtl.min * d.cuantos)} hasta `,
+              `${numero(d.gtl.max * d.cuantos)} PokéYen según cómo esté el GTL.`,
             ]),
             el('br'),
           ]),
-          el('span.tenue', {
-            texto: `El precio de mercado sale de ${pres.dondeComprar[0].gtl.fuente} y caduca: `
-              + 'vuelve a mirarlo antes de comprar. Lo demás son precios de tienda, que no se mueven.',
-          }),
+          el('span.tenue', { texto: 'Un precio de mercado caduca: míralo antes de comprar.' }),
         ])
       : null,
     el('div.nota', {}, [pres.sinPrecio.nota]),
@@ -486,7 +483,7 @@ function bloquePasos(plan, objetivo, datos) {
         ? el('button.boton.mini', {
             onclick: () => completarCruce(nodo, objetivo, datos),
           }, ['Hecho: quitar los padres'])
-        : el('span.porque', { texto: 'Primero los dos padres de este cruce.' }),
+        : null,
     ]);
   });
 
@@ -496,11 +493,9 @@ function bloquePasos(plan, objetivo, datos) {
       'recalcula solo.',
     ]),
     el('p.nota', {}, [
-      `Los huevos eclosionan en incubadora, y tienes ${INCUBADORAS}: `,
-      `${INCUBADORAS} a la vez como mucho. Se aceleran con `,
+      `${INCUBADORAS} huevos a la vez. Se aceleran con `,
       ACELERAR_HUEVO.map((a) => `${a.que} (−${Math.round(a.rebaja * 100)} %)`).join(' y con '),
-      ', y las dos cosas se suman. El de Cuerpo Llama va DENTRO de la incubadora, no en el ',
-      'equipo: no es como en los juegos originales.',
+      ', y se suman; el de Cuerpo Llama va DENTRO de la incubadora, no en el equipo.',
     ]),
     deshacer
       ? el('div.aviso', {}, [

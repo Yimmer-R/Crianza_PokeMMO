@@ -132,10 +132,7 @@ function bloqueManual(datos) {
     )));
 
   return tarjeta('Anotar una captura a mano', [
-    el('p.nota', {}, [
-      'Los IVs se leen directamente en el juego: menú del equipo → Datos → cuarta pestaña. ',
-      'No hay que estimar nada.',
-    ]),
+    el('p.nota', { texto: 'Los IVs se leen en el juego: menú del equipo → Datos → cuarta pestaña.' }),
     el('div.fila', {}, [
       campoConSugerencias('b-especie', 'Especie', borrador.especie, datos.especies,
         (v) => {
@@ -192,7 +189,7 @@ function bloqueEvaluacion(ev) {
           texto: `Mejor hueco: ${ev.mejor.hueco.stats.map((s) => NOMBRE_STAT[s]).join(' + ') || 'el de naturaleza'}` +
             ` · ahorra ${ev.mejor.ahorro} captura(s).`,
         })
-      : el('p.nota', { texto: 'Puedes guardarlo igual: si cambias el objetivo o el plan avanza, quizá sirva después.' }),
+      : el('p.nota', { texto: 'Puedes guardarlo igual: quizá sirva más adelante.' }),
     el('button.boton.mini.secundario', { onclick: () => fijar({ ultimaEvaluacion: null }) }, ['Cerrar']),
   ]);
 }
@@ -282,7 +279,7 @@ function bloqueLista(inventario, seleccion) {
             filas, [5],
           ),
         ])
-      : el('p.vacio', { texto: 'Vacío. Anota lo que tengas y el plan se recalculará con ello.' }),
+      : el('p.vacio', { texto: 'Vacío: anota lo que tengas.' }),
   ], 'inventario-lista');
 }
 
