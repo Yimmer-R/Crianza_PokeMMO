@@ -167,6 +167,38 @@ Tres listas, y la diferencia entre ellas decide si un objetivo es posible:
 - **`limitados`**: los tres iniciales de Kanto, Suicune y Articuno. **No son una
   vía**: se repartieron una vez y la propia página dice que no vuelven.
 
+## Alphapedia: por qué se enlaza y no se lee
+
+[Alphapedia](https://alpha.pokemmotools.org/) tiene justo lo que a esta app le
+falta: qué Alpha está activo ahora mismo, qué enjambres se han cantado y qué
+fenómenos hay. Son datos que avisan los propios jugadores y que caducan en
+minutos, así que no pueden vivir en `datos/`.
+
+Se miró si la app podía leerlos, y **no puede**. Comprobado el 28-09-2026:
+
+- **No hay API pública.** `/alpha-list`, `/swarm-list` y `/pheno-list` son HTML
+  montado en el servidor. El único JSON suelto son dos contadores
+  (`/api/subscriber-count`, `/api/webhook-count`) y un canal de eventos
+  (`/events/stream`) que es para su propia página. No hay `/api/docs` ni
+  `openapi.json`: los dos dan 404.
+- **No hay CORS.** Ninguna respuesta trae `access-control-allow-origin`, así que
+  el navegador **no deja** a una página servida desde `yimmer-r.github.io` leer
+  ese dominio. Esto no se arregla con código: o lo pone Alphapedia, o hace falta
+  un servidor propio que haga de intermediario, y esta app es estática.
+- **La vía que ellos ofrecen es Discord**, con su bot y sus webhooks, y sus
+  condiciones de uso son de uso personal y no comercial.
+- **`robots.txt` no pone ninguna directiva**: sólo el preámbulo de las «content
+  signals», que sin valores ni concede ni restringe nada.
+
+Así que la app hace lo que vale igual y no depende de nada: **enlaza**. Cada
+tarjeta de captura lleva su enlace a la lista en vivo, ya filtrada con
+`?pokemon=<especie>`, que es un parámetro que su propia página lee al abrir. En
+un hueco Alpha se enlaza la especie de la LÍNEA que sale en los enjambres, no la
+que se cría: se pide un Gible y el enjambre lo canta como Garchomp.
+
+Está en `src/nucleo/alphapedia.js`. Si algún día publican un JSON con CORS, lo
+único que hay que añadir ahí es la llamada.
+
 ## Cómo comprobar que la extracción sigue bien
 
 `node herramientas/extraer-wiki.mjs` imprime los recuentos y los huecos que

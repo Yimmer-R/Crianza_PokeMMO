@@ -1,7 +1,7 @@
 // El formulario del Pokémon objetivo: lo que el usuario quiere conseguir.
 
 import {
-  el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor, sprite,
+  el, tarjeta, plegable, chip, aviso, frag, campoConSugerencias, interruptor, sprite, marcasDe,
 } from './componentes.js';
 import {
   STATS, NOMBRE_STAT, REGIONES, EV_MAX_POR_STAT, EV_MAX_TOTAL, IV_MAX, SEXOS,
@@ -76,6 +76,8 @@ export function vistaObjetivo(datos) {
     p ? el('div.ficha-especie', {}, [
       sprite(objetivo.especie, { tam: 'grande', sexo: objetivo.sexo }),
       el('div.etiquetas', {}, [
+        // Las marcas primero: es lo que cambia el árbol entero.
+        ...marcasDe(objetivo),
         chip(`Grupo huevo: ${p.gruposHuevo.join(' / ')}`, 'si'),
         chip(`Género: ${p.genero.sinGenero ? 'sin género' : `${p.genero.macho}% ♂ / ${p.genero.hembra}% ♀`}`),
         // De la línea sale la base, así que se enseña también a quién se cría
@@ -357,8 +359,10 @@ function bloqueVariante(objetivo, datos, cambiaObjetivo) {
   const alpha = objetivo.alpha ? saleComoAlpha(objetivo.especie, datos) : null;
   return frag([
     el('div.ivs', { style: 'margin-top:12px' }, [
-      interruptor('var-shiny', 'Variocolor', !!objetivo.shiny, (v) => cambiaObjetivo({ shiny: v })),
-      interruptor('var-alpha', 'Alpha', !!objetivo.alpha, (v) => cambiaObjetivo({ alpha: v })),
+      interruptor('var-shiny', 'Variocolor', !!objetivo.shiny, (v) => cambiaObjetivo({ shiny: v }),
+        { marca: 'shiny' }),
+      interruptor('var-alpha', 'Alpha', !!objetivo.alpha, (v) => cambiaObjetivo({ alpha: v }),
+        { marca: 'alpha' }),
     ]),
     objetivo.shiny
       ? el('p.nota', {

@@ -4,13 +4,14 @@
 // región que el usuario no tiene desbloqueada no es una sugerencia, es ruido.
 
 import {
-  el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunidad, sprite,
+  el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunidad, sprite, marcasDe,
 } from './componentes.js';
 import { NOMBRE_STAT, SENUELO, ALPHA } from '../nucleo/constantes.js';
 import { obtener } from './estado.js';
 import { planDeCapturas, regionesQueHacenFalta, esDeSenuelo } from '../nucleo/capturas.js';
 import { sinGenero } from '../nucleo/compatibilidad.js';
 import { encuentrosPorShiny } from '../nucleo/variantes.js';
+import { enlacesDeCaptura, POR_QUE_ENLACE } from '../nucleo/alphapedia.js';
 import { cuandoLegible, siglaDeHoras, siglaDeEstaciones } from '../nucleo/cuando.js';
 import { selectorCuando } from './selector-cuando.js';
 
@@ -107,6 +108,9 @@ export function vistaCapturas(datos) {
       el('div.ficha-especie', {}, [
         sprite(especie, { tam: 'grande', sexo: base.requisito.sexo }),
         el('div.etiquetas', {}, [
+          // La captura tiene que ser de la variante que pide el plan, así que
+          // la marca va con el Pokémon, no sólo en el aviso de abajo.
+          ...marcasDe(base.requisito),
           hayLibres
             ? chip(
                 sinGeneroObjetivo ? 'hueco libre: su línea o un Ditto' : 'hueco libre: la especie no está atada',
@@ -249,6 +253,11 @@ export function vistaCapturas(datos) {
         ]),
       ),
 
+      // Para un hueco Alpha se enlaza la especie que de VERDAD sale en los
+      // enjambres, que es la de la línea que aparece en la lista: se pide un
+      // Gible y el enjambre lo canta como Garchomp.
+      bloqueEnVivo(rec.alpha ? (rec.comoSaleDeAlpha?.especies?.[0] ?? especie) : especie, rec.alpha),
+
       base.viables.length > 1
         ? plegable(`Otras ${base.viables.length - 1} especies que valen igual`, [
             tabla(
@@ -313,6 +322,28 @@ export function vistaCapturas(datos) {
  * lo que hay que esperar — que no es lo mismo esperar a la noche (minutos) que
  * a otra estación (semanas).
  */
+/**
+ * Lo que esta app no puede saber y Alphapedia sí.
+ *
+ * Qué Alpha está activo, qué enjambres se han cantado y qué fenómenos hay son
+ * datos de hace un rato, no del juego: los avisan los jugadores y caducan en
+ * minutos. Guardarlos aquí sería mentir a la hora siguiente, así que se enlaza
+ * a la lista en vivo, ya filtrada por la especie que el plan pide. Ver
+ * `src/nucleo/alphapedia.js`, que explica por qué no se leen desde dentro.
+ */
+function bloqueEnVivo(especie, esAlpha) {
+  const enlaces = enlacesDeCaptura(especie, { alpha: esAlpha });
+  return el('p.nota', {}, [
+    el('strong', { texto: esAlpha ? 'Ahora mismo: ' : 'Hoy: ' }),
+    ...enlaces.flatMap((x, i) => [
+      i ? ' · ' : '',
+      el('a', { href: x.url, target: '_blank', rel: 'noopener noreferrer', texto: x.texto }),
+    ]),
+    ' en Alphapedia. ',
+    el('span.tenue', { texto: POR_QUE_ENLACE }),
+  ]);
+}
+
 function celdaCuando(z, cuando) {
   // Sin filtro puesto interesa el dato crudo y abreviado: M, D, N y sus
   // combinaciones. Con filtro interesa si sirve o cuánto hay que esperar.

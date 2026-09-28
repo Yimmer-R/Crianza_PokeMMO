@@ -77,7 +77,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Veinte cosas que no son evidentes leyendo un archivo suelto:
+Veintiuna cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -290,6 +290,32 @@ Veinte cosas que no son evidentes leyendo un archivo suelto:
    comunidad de la wiki, no del volcado, y va marcada como tal; las de tiempo
    limitado —los tres iniciales de Kanto, Suicune, Articuno— **no son una vía**:
    se repartieron una vez y pedirlas hace el objetivo imposible.
+   **La marca de cada variante es un DIBUJO, no un carácter**
+   (`marcaVariante()`): el destello del variocolor y el anillo del contorno rojo
+   con el que el juego marca a un Alpha, pintados con una máscara CSS desde dos
+   tokens de `:root`. Va así por la misma trampa del punto 14 —un carácter
+   dentro del nodo entra en el `textContent` del nombre que tiene al lado— y
+   porque una imagen con el color quemado se sale de la paleta. Las dos van en
+   la insignia blanca y las distingue la FORMA: el carmesí es de las acciones y
+   el rojo anaranjado de las alertas, y un tercer rojo era justo lo que la
+   paleta evita.
+
+21. **Lo que caduca en minutos se enlaza, no se guarda.** Qué Alpha está activo
+   ahora, qué enjambres se han cantado y qué fenómenos hay son datos de hace un
+   rato que avisan los propios jugadores, y el sitio donde viven es
+   [Alphapedia](https://alpha.pokemmotools.org/). **La app no los lee, y está
+   comprobado por qué** (28-09-2026, en `src/nucleo/alphapedia.js`): no hay API
+   pública —las listas son HTML montado en el servidor y el único JSON suelto
+   son dos contadores—, y sobre todo **no hay CORS**: ninguna respuesta trae
+   `access-control-allow-origin`, así que el navegador no deja a esta página
+   leer ese dominio. Eso no se arregla con código: o lo pone Alphapedia, o hace
+   falta un servidor propio de intermediario, y esta app es estática y se
+   publica en Pages. La vía que ellos ofrecen es su bot de Discord y sus
+   webhooks, con condiciones de uso personal y no comercial. Así que Capturas
+   **enlaza** a la lista en vivo ya filtrada por especie (`?pokemon=`), y en un
+   hueco Alpha enlaza la especie de la línea que de verdad sale en los enjambres
+   —se pide un Gible y el enjambre lo canta como Garchomp—. Si algún día
+   publican un JSON con CORS, lo único que falta es la llamada.
 
 ## El aspecto
 
@@ -395,7 +421,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 341 pruebas unitarias
+node pruebas/ejecutar.mjs             # 344 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

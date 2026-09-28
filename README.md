@@ -76,6 +76,13 @@ viene con dos IVs a 31 al azar, y eso baja un 3×31 de 32.768 encuentros a unos
 150; y criar variocolor reparte los IVs con otra tabla, que es mejor. Si la línea
 que pides no sale como Alpha, el plan lo dice antes de montar nada.
 
+**Lo que caduca en minutos se enlaza.** Qué Alpha está activo ahora, qué
+enjambres se han cantado y qué fenómenos hay los avisan los jugadores en
+[Alphapedia](https://alpha.pokemmotools.org/) y duran un rato, así que no se
+guardan aquí: cada tarjeta de captura lleva el enlace a la lista en vivo ya
+filtrada por la especie que el plan pide. La app no lee esos datos desde dentro
+y el porqué está comprobado, no supuesto — ver «Lo que esta app no sabe».
+
 **Las seis características, con barra.** En Objetivo, debajo de la especie: la base
 del Pokémon y, en el mismo trazo, lo que suman los IVs y los EVs, más el número
 final al nivel al que juegas y con la naturaleza aplicada. Los dos tramos están
@@ -296,6 +303,7 @@ src/nucleo/             la lógica, sin nada del DOM
   sprites.js              qué imagen le toca a cada Pokémon, y con qué sexo
   regalos.js              los IVs que el inventario trae y nadie pidió
   variantes.js            criar Alphas y variocolor: las reglas de todo el árbol
+  alphapedia.js           enlaces a lo que caduca: Alphas activos, enjambres, fenómenos
   estadisticas.js         de las bases al número final, con IVs, EVs y naturaleza
 src/ui/                 vistas y estado; nada de reglas del juego
   estado.js               las crianzas, el inventario y el repintado
@@ -311,7 +319,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                341 pruebas unitarias + una de navegador
+pruebas/                344 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 
@@ -375,5 +383,12 @@ No es una lista de pendientes: son huecos con motivo.
 - **Qué 112 líneas salen como Alpha, según el juego.** La lista que usa la app
   viene de la wiki de la comunidad, no del volcado de datos, y va marcada como
   tal.
+- **Qué Alpha está activo ahora, y qué enjambres o fenómenos hay.** Eso lo tiene
+  [Alphapedia](https://alpha.pokemmotools.org/), que lo recoge de los propios
+  jugadores. Comprobado el 28-09-2026: no publica ninguna API y sus respuestas
+  no traen cabeceras CORS, así que un navegador no deja a esta página leerlas —
+  y esta app es estática, no tiene servidor que pueda hacer de intermediario.
+  Lo que hace en su lugar es enlazar a la lista en vivo, ya filtrada por
+  especie.
 
 Mecánicas de 5ª generación: ni tipo Hada ni Megaevoluciones.
