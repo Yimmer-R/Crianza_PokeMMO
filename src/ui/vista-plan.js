@@ -280,13 +280,13 @@ function bloqueRegalos(objetivo) {
       r.estado === 'a-suerte'
         ? el('p.nota', {
             texto: r.tiradas.every((t) => t.esRaiz)
-              ? 'Se juega en el ÚLTIMO cruce, así que si sale te lo quedas.'
-              : 'Se juega en un cruce intermedio: aunque salga, todavía tiene que sobrevivir a los '
-                + 'de encima. Si te toca, anota la cría y el plan lo recoge.',
+              ? 'Se juega en el ÚLTIMO cruce: si sale, te lo quedas.'
+              : 'Se juega en un cruce intermedio, así que todavía tiene que sobrevivir a los de '
+                + 'encima. Si te toca, anótalo y el plan lo recoge.',
           })
         : null,
       r.estado === 'garantizado'
-        ? el('p.nota', { texto: 'Los dos padres de ese cruce lo tienen, así que sale solo. No hay nada que decidir.' })
+        ? el('p.nota', { texto: 'Los dos padres lo tienen: sale solo.' })
         : el('p', {}, [
             el('button.boton.mini', {
               onclick: () => cambia(conservando(objetivo, r.stat)),
@@ -324,12 +324,9 @@ function bloqueRegalos(objetivo) {
 
   return plegable('IVs de regalo', [
     el('p.nota', {}, [
-      'Un cruce garantiza los 31 que comparten los ',
-      el('strong', { texto: 'DOS' }),
-      ' padres, más los que fuerce un Recio — y los Recios de este plan ya están todos ',
-      'comprometidos con lo que pediste. Así que un IV que no se pide no se conserva solo: ',
-      'o coincide y sale gratis, o se juega a una tirada. Para tenerlo garantizado hay que ',
-      'pedirlo, y eso agranda el árbol.',
+      'Los Recios de este plan ya están todos ocupados, así que un IV que no se pide no se ',
+      'conserva solo: o coincide y sale gratis, o se juega a una tirada. Garantizarlo es pedirlo, ',
+      'y eso agranda el árbol.',
     ]),
     ...conservados.map(filaConservado),
     ...candidatos.map(filaCandidato),
@@ -368,11 +365,9 @@ function bloqueAhora(plan, objetivo, datos) {
       ? el('div', {}, [
           el('h3', { texto: `Cruces que ya puedes hacer · ${listos.length}` }),
           listos.length > INCUBADORAS
-            ? el('p.nota', {}, [
-                `Tienes ${listos.length} listos pero sólo ${INCUBADORAS} incubadoras, que son `,
-                `${INCUBADORAS} huevos a la vez: el techo de la crianza en paralelo. `,
-                'Van por tandas.',
-              ])
+            ? el('p.nota', {
+                texto: `${listos.length} listos y sólo ${INCUBADORAS} incubadoras: van por tandas.`,
+              })
             : null,
           el('ul.listos', {}, listos.map((n) => el('li', {}, [
             el('span', {}, [
@@ -433,10 +428,8 @@ function bloqueAhora(plan, objetivo, datos) {
             [0],
           ),
           el('p.nota', {}, [
-            '«Libre» quiere decir que vale cualquier especie que comparta grupo huevo: sólo la ',
-            'madre de la cadena tiene la especie atada, porque la cría sale de ella. Y «atada» es ',
-            'a la LÍNEA evolutiva, no a la forma final: del huevo sale la base, así que vale ',
-            'cualquiera de la línea — se sugiere el más fácil de pillar.',
+            '«Libre» = cualquier especie del grupo huevo. Sólo la madre tiene la especie atada, y ',
+            'atada a la LÍNEA, no a la forma final: se sugiere la más fácil de pillar.',
           ]),
         ])
       : null,
@@ -499,9 +492,8 @@ function bloquePasos(plan, objetivo, datos) {
 
   return plegable('Todos los pasos, en orden', [
     el('p.nota', {}, [
-      'De abajo hacia arriba. Un cruce se puede marcar cuando sus dos padres están en el ',
-      'inventario; al marcarlo se gastan —en PokeMMO los padres se consumen— y la cría entra ',
-      'en el inventario con los 31 que el cruce garantiza. El plan se recalcula solo.',
+      'De abajo arriba. Al marcar un cruce se gastan sus dos padres y entra la cría: el plan se ',
+      'recalcula solo.',
     ]),
     el('p.nota', {}, [
       `Los huevos eclosionan en incubadora, y tienes ${INCUBADORAS}: `,
@@ -565,10 +557,7 @@ function bloqueSobrantes(plan, datos) {
   });
 
   return plegable(`Del inventario no uso ${sobrantes.length}`, [
-    el('p.nota', {}, [
-      'Ni se pierden ni estorban: siguen en el inventario para la siguiente crianza. ',
-      'Esto es sólo para que no parezca que el plan no se ha enterado.',
-    ]),
+    el('p.nota', { texto: 'Siguen en el inventario para la siguiente crianza.' }),
     tabla(['Cuál', 'IVs a 31', 'Naturaleza', 'Por qué no entra'], filas),
   ], { pequeno: true, id: 'sobrantes' });
 }

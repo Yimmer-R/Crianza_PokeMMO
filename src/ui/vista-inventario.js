@@ -159,12 +159,12 @@ function bloqueManual(datos) {
     camposIv,
 
     el('h3', { texto: 'Movimientos' }),
-    el('p.nota', {}, [
-      borrador.especie
-        ? `${learnset.length} movimientos posibles para ${borrador.especie}.`
-        : 'Pon la especie y te sugiero sólo los que puede aprender.',
-      ' Hacen falta para los movimientos huevo: un padre sólo pasa lo que sabe.',
-    ]),
+    el('p.nota', {
+      texto: (borrador.especie
+        ? `${learnset.length} posibles para ${borrador.especie}.`
+        : 'Pon la especie y te sugiero los suyos.')
+        + ' Un padre sólo pasa los movimientos huevo que sabe.',
+    }),
     camposMovimiento,
     borrador._avisoMov ? aviso(borrador._avisoMov) : null,
 
@@ -288,10 +288,7 @@ function bloqueLista(inventario, seleccion) {
 
 function bloqueCopia(inventario, avisoPersistencia) {
   return plegable('Copia de seguridad', [
-    el('p.nota', {}, [
-      'El inventario se guarda en este navegador (localStorage), así que no viaja a ningún sitio ',
-      'ni se comparte. Si cambias de equipo, expórtalo.',
-    ]),
+    el('p.nota', { texto: 'Se guarda sólo en este navegador. Si cambias de equipo, expórtalo.' }),
     avisoPersistencia
       ? aviso(`No he podido guardar en este navegador (${avisoPersistencia}). La app funciona igual, pero el inventario se perderá al recargar.`)
       : null,

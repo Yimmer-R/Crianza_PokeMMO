@@ -358,12 +358,26 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
    específica en vez de ir arriba con las demás. */
 .chip.con-sprite { display: inline-flex; padding: 2px 9px 2px 2px; gap: 6px; }
 
+/* Los dos botones de una fila de revisión, juntos y sin partirse: en modo
+   corrección la fila se llena de campos y la última columna es la primera que
+   el navegador intenta encoger. */
+.fila-acciones { display: flex; gap: 6px; flex-wrap: nowrap; }
+td:has(.fila-acciones) { white-space: nowrap; width: 1%; }
+.fila-acciones .boton { flex: none; }
+/* En modo corrección la fila se llena de campos: apretados, que son catorce. */
+td input { padding: 5px 7px; font-size: 0.82rem; }
+/* Sin la ruedecita: en una fila de seis IVs se come la mitad del ancho y los
+   números salían cortados («3» por «31»). Se escriben a mano, que es más rápido. */
+td input[type="number"] { text-align: right; -moz-appearance: textfield; appearance: textfield; }
+td input[type="number"]::-webkit-outer-spin-button,
+td input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* ------------------------------------------------------- características */
 
 /* Una fila por característica: nombre, base, barra y el número final.
    La rejilla es fija a los lados y elástica en el medio, que es lo que deja
    que la barra encoja en el móvil sin que se desalineen las columnas. */
-.stats { display: grid; gap: 7px; margin: 12px 0 10px; }
+.stats { display: grid; gap: 7px; margin: 10px 0 8px; }
 .stat {
   display: grid; align-items: center; gap: 10px;
   grid-template-columns: minmax(78px, 112px) 30px 1fr 44px;

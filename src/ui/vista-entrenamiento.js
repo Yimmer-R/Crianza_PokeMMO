@@ -189,12 +189,11 @@ function bloqueOptimizar(o, pseudo = []) {
 
   return tarjeta(`Optimizar el reparto · recuperas ${o.recuperados} EVs`, [
     el('p.nota', {}, [
-      'Los EVs suben la característica por escalones, y lo que queda entre un escalón y el ',
-      'siguiente no da nada. ',
+      'Los EVs suben por escalones y lo de en medio no da nada. ',
       o.nivel === 100
-        ? 'A nivel 100 un punto son 4 EVs, así que cualquier múltiplo de 4 aprovecha el 100 %.'
-        : 'A nivel 50 un punto son 8 EVs, pero el primero llega antes si el IV es impar: ' +
-          'con IV impar los escalones caen en 4, 12, 20… y con IV par en 8, 16, 24…',
+        ? 'A nivel 100 un punto son 4 EVs.'
+        : 'A nivel 50 son 8, y el corte depende de la paridad del IV: impar en 4, 12, 20…; '
+          + 'par en 8, 16, 24…',
     ]),
     tabla(['Característica', 'Pedías', 'Escalón', 'Sobra', 'Por qué ahí'], filas, [1, 2]),
 
@@ -209,11 +208,9 @@ function bloqueOptimizar(o, pseudo = []) {
       : null,
 
     o.sobrantes
-      ? el('p.nota', {}, [
-          `Quedan ${o.sobrantes} EVs que no completan ningún punto más en lo que has pedido. `,
-          'Puedes dejarlos sin gastar o meterlos en una característica que no estés usando: ',
-          'no cambian nada en combate.',
-        ])
+      ? el('p.nota', {
+          texto: `Quedan ${o.sobrantes} EVs que ya no completan ningún punto: déjalos o tíralos donde quieras.`,
+        })
       : null,
 
     el('div.etiquetas', {}, [
