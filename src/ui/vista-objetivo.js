@@ -12,6 +12,7 @@ import { sexosPosibles } from '../nucleo/compatibilidad.js';
 import { lineaEvolutiva } from '../nucleo/aprendizaje.js';
 import { habilidadesDe } from '../nucleo/habilidades.js';
 import { crearResolutores } from '../nucleo/nombres.js';
+import { estadisticasDe } from '../nucleo/estadisticas.js';
 import { seccionImportar, seccionRevisar, DESTINOS } from './importador.js';
 
 let resolutores = null;
@@ -174,6 +175,9 @@ export function vistaObjetivo(datos) {
     totalEv > EV_MAX_TOTAL ? aviso(`Te pasas: ${totalEv} de ${EV_MAX_TOTAL}.`, 'error') : null,
   ]);
 
+  // ------------------------------------------------------- características
+  const bloqueStats = bloqueEstadisticas(objetivo, datos);
+
   // ------------------------------------------------- habilidad y movimientos
   const habs = p ? habilidadesDe(objetivo.especie, datos.pokedex) : { normales: [], ocultas: [] };
   const bloqueHabilidad = frag([
@@ -323,7 +327,94 @@ export function vistaObjetivo(datos) {
     tarjeta('¿Qué quieres criar?', [bloqueEspecie, bloqueIvs, bloqueNaturaleza]),
     p ? tarjeta('Habilidad y movimientos', [bloqueHabilidad, bloqueMovimientos]) : null,
     bloqueEvs,
+    bloqueStats,
     bloqueRegiones,
     validacion ? (sueltoAlFinal ? validacion : tarjeta(null, [validacion])) : null,
+  ]);
+}
+
+// -------------------------------------------------------- características
+
+/**
+ * Las seis características del objetivo, con barra.
+ *
+ * Va en Objetivo y no en Entrenamiento a propósito: **todo lo que entra en el
+ * número se toca en esta misma página** —la especie, los IVs, la naturaleza,
+ * los EVs y el nivel—, así que aquí la tarjeta es el resultado de lo de arriba
+ * y se mueve mientras el usuario juega con los mandos. Entrenamiento habla de
+ * DÓNDE farmear esos EVs, que es otra pregunta.
+ *
+ * Una sola barra por característica, con dos tramos, que es lo que pidió el
+ * usuario: la **base** del Pokémon y encima lo que suman los **IVs y los EVs**.
+ * Los dos tramos están en la misma unidad y eso no es un apaño de dibujo: sale
+ * de la propia fórmula, donde un IV y unos EVs valen exactamente
+ * `(IV + ⌊EV/4⌋)/2` puntos de base, sin depender del nivel. Ver
+ * `nucleo/estadisticas.js`.
+ *
+ * Los colores: la base en gris y lo que tú aportas en la insignia blanca. El
+ * carmesí NO se usa aquí — es de las acciones, y una barra de datos no lo es;
+ * la imagen de referencia coloreaba por tramos de valor (rojo/verde/azul) y esa
+ * escala no existe en esta paleta.
+ */
+function bloqueEstadisticas(objetivo, datos) {
+  const { plan } = obtener();
+  // Los IVs que la crianza entrega DE VERDAD, no los que se pidieron: con un
+  // pseudo 31 el número final es otro. Es el mismo criterio de Entrenamiento.
+  const ivsReales = plan?.ok ? { ...objetivo.ivs, ...plan.ivsFinales } : objetivo.ivs;
+  const st = estadisticasDe(objetivo, datos, { ivs: ivsReales });
+  if (!st) return null;
+
+  const pct = (n) => `${Math.max(0, Math.min(100, (n / st.tope) * 100))}%`;
+
+  const fila = (f) => el('div.stat', {}, [
+    el('span.stat-nombre', {}, [
+      f.nombre,
+      f.efecto
+        ? el('span', {
+            class: `stat-nat ${f.efecto}`,
+            title: `La naturaleza ${objetivo.naturaleza} se la ${f.efecto} un 10 %`,
+            texto: f.efecto === 'sube' ? ' ▲' : ' ▼',
+          })
+        : null,
+    ]),
+    el('span.stat-base-num', { texto: String(f.base) }),
+    el('span.stat-barra', {
+      title: `${f.base} de base + ${f.bono} que ponen ${f.iv} IVs y ${f.ev} EVs`,
+    }, [
+      el('i.stat-tramo-base', { style: `width:${pct(f.base)}` }),
+      f.bono ? el('i.stat-tramo-bono', { style: `width:${pct(f.bono)}` }) : null,
+    ]),
+    el('span.stat-cifra', {}, [el('strong', { texto: String(f.valor) })]),
+  ]);
+
+  const conIvs = st.filas.filter((f) => f.iv > 0);
+
+  return tarjeta('Estadísticas', [
+    el('div.etiquetas', {}, [
+      chip(`${st.total} de base en total`, 'si'),
+      chip(`a nivel ${st.nivel}`),
+      objetivo.naturaleza ? chip(`naturaleza ${objetivo.naturaleza}`) : null,
+    ]),
+    el('div.stats', {}, st.filas.map(fila)),
+    el('p.leyenda', {}, [
+      el('span.muestra.base', { 'aria-hidden': 'true' }), ' base del Pokémon ',
+      el('span.muestra.bono', { 'aria-hidden': 'true' }), ' lo que suman IVs y EVs ',
+      '· la cifra de la derecha es la característica final',
+    ]),
+    el('p.nota', {}, [
+      conIvs.length
+        ? `Cuenta los EVs de arriba y los IVs que la crianza entrega de verdad: ${conIvs.map((f) => `${f.nombre} ${f.iv}`).join(', ')}. `
+        : 'Todavía no has pedido ningún IV, así que la parte blanca es sólo lo que ponen los EVs. ',
+      'Los IVs que NO pides cuentan como 0: salen al azar entre 0 y 31 y darlos por altos sería mentir ',
+      '— si alguno te sale bien, anótalo y el número sube solo.',
+    ]),
+    // Regla 2: lo que es inferencia se dice, no se disimula.
+    el('p.nota', {}, [
+      el('strong', { texto: 'Ojo: ' }),
+      'la fórmula es la estándar de 5ª generación. La wiki avisa de que no está comprobado ',
+      'si PokeMMO la usa tal cual o la toca (',
+      el('code', { texto: 'wiki/mecanicas/IVs.md' }),
+      '), así que estos números son una estimación buena, no un dato del juego.',
+    ]),
   ]);
 }

@@ -86,6 +86,57 @@ await paso('marcar 4 IVs y una naturaleza', async () => {
   await pagina.waitForSelector('text=+10 % Ataque', { timeout: 5000 });
 });
 
+await paso('Objetivo pinta las seis características, con base y número final', async () => {
+  // Las bases tienen que ser las de la wiki, no unas cualesquiera: se leen del
+  // mismo JSON que sirve la app y se comparan una a una.
+  const dePokedex = await pagina.evaluate(async () => {
+    const d = await (await fetch('datos/pokemon.json')).json();
+    return d.Larvitar.stats;
+  });
+  const orden = ['ps', 'ataque', 'defensa', 'at-esp', 'def-esp', 'velocidad'];
+  const filas = await pagina.$$eval('.stat', (ns) => ns.map((n) => ({
+    nombre: n.querySelector('.stat-nombre').textContent.trim(),
+    base: Number(n.querySelector('.stat-base-num').textContent),
+    valor: Number(n.querySelector('.stat-cifra').textContent),
+    tramos: [...n.querySelectorAll('.stat-barra > i')].map((i) => i.className),
+  })));
+  if (filas.length !== 6) throw new Error(`${filas.length} filas, esperaba 6`);
+  orden.forEach((s, i) => {
+    if (filas[i].base !== dePokedex[s]) throw new Error(`${s}: base ${filas[i].base} y la wiki dice ${dePokedex[s]}`);
+    if (!(filas[i].valor > 0)) throw new Error(`${s}: sin número final`);
+  });
+
+  // Audaz (Brave) sube Ataque y baja Velocidad — lo dice la wiki, no el nombre
+  // en español, que suena a otra cosa. Las flechas tienen que caer justo ahí:
+  // es lo que comprueba que la naturaleza entra de verdad en la cuenta.
+  const nat = await pagina.evaluate(async () => (await (await fetch('datos/naturalezas.json')).json()).Audaz);
+  const conFlecha = filas.filter((f) => /[▲▼]/.test(f.nombre)).map((f) => f.nombre.replace(/\s+/g, ' '));
+  if (conFlecha.length !== 2) throw new Error(`flechas de naturaleza: ${JSON.stringify(conFlecha)}`);
+  if (!conFlecha.some((n) => n.startsWith(nat.sube) && n.endsWith('▲')))
+    throw new Error(`Audaz sube ${nat.sube}: ${JSON.stringify(conFlecha)}`);
+  if (!conFlecha.some((n) => n.startsWith(nat.baja) && n.endsWith('▼')))
+    throw new Error(`Audaz baja ${nat.baja}: ${JSON.stringify(conFlecha)}`);
+
+  // Y la tarjeta es viva: subir los EVs de Ataque sube su número y alarga su
+  // tramo blanco, que es el que dibuja lo que aportan IVs y EVs.
+  const antes = filas[1];
+  await pagina.fill('#ev-ataque', '252');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.waitForTimeout(450);
+  const despues = await pagina.$$eval('.stat', (ns) => ({
+    valor: Number(ns[1].querySelector('.stat-cifra').textContent),
+    tramos: ns[1].querySelectorAll('.stat-barra > i').length,
+  }));
+  if (!(despues.valor > antes.valor))
+    throw new Error(`252 EVs en Ataque no han subido nada: ${antes.valor} -> ${despues.valor}`);
+  if (despues.tramos !== 2) throw new Error('falta el tramo de IVs y EVs en la barra');
+  await pagina.fill('#ev-ataque', '0');
+  await pagina.dispatchEvent('#ev-ataque', 'change');
+  await pagina.waitForTimeout(350);
+  console.log(`       Larvitar: bases de la wiki, Audaz ▲${nat.sube} ▼${nat.baja}, `
+    + `Ataque ${antes.valor} -> ${despues.valor} con 252 EVs`);
+});
+
 await paso('la pestaña Plan pinta pasos, árbol y presupuesto', async () => {
   await pagina.click('button[data-vista="plan"]');
   // Lo secundario va plegado; se abren una vez y se quedan abiertos.
