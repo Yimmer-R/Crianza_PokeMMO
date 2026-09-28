@@ -19,6 +19,7 @@ export const datos = {
   movimientosHuevo: leer('movimientos-huevo.json'),
   habilidades: leer('habilidades.json'),
   dondeEntrenar: leer('donde-entrenar.json'),
+  alphas: leer('alphas.json'),
   meta: leer('meta.json'),
 };
 

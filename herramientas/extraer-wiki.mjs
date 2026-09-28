@@ -633,6 +633,38 @@ const OBJETOS_HABILIDAD = {
   'Parche de Habilidad': { efecto: 'desbloquea la habilidad oculta; se consume' },
 };
 
+/**
+ * Los seis señuelos, que son lo que hace falta para las especies exclusivas.
+ *
+ * Los `premium` se compran en la Gift Shop con RP, no con PokéYen. Lo demás
+ * —pasos que dura, cuánto sube los encuentros y qué probabilidad da de que
+ * salga una especie exclusiva— se saca de la DESCRIPCIÓN del propio objeto,
+ * que es texto del juego, no de una guía.
+ */
+const SENUELOS = {
+  Señuelo: { premium: false },
+  'Super Señuelo': { premium: false },
+  'Señuelo Experto': { premium: false },
+  'Señuelo Premium': { premium: true },
+  'Super Señuelo Premium': { premium: true },
+  'Señuelo Premium Máximo': { premium: true },
+};
+
+/** "durante 100 pasos" -> 100; "aumentan un 10%" -> 10; "5% de probabilidad de encontrar especies exclusivas" -> 5. */
+function efectosDelSenuelo(descripcion = '') {
+  const num = (rx) => {
+    const m = descripcion.match(rx);
+    return m ? Number(m[1]) : null;
+  };
+  return {
+    pasos: num(/durante\s+(\d+)\s+pasos/i),
+    masEncuentros: num(/encuentro[^.]*?aumentan? un (\d+)\s*%/i),
+    exclusivas: num(/(\d+)\s*%\s*de probabilidad de encontrar especies exclusivas/i)
+      ?? num(/[Aa]umenta en un (\d+)\s*%\s*la probabilidad de encontrar especies exclusivas/i),
+    secretShiny: num(/'?Variocolor Secreto'?[^.]*?(\d+)\s*%/i),
+  };
+}
+
 /** Precios de compra que la propia wiki documenta en "De dónde sale". */
 function preciosDe(nombreObjeto) {
   const ruta = join(WIKI, 'wiki', 'objetos', `${nombreObjeto}.md`);
@@ -653,7 +685,7 @@ function preciosDe(nombreObjeto) {
   return { encontrado: true, descripcion: desc, compra };
 }
 
-const objetos = { crianza: {}, entrenamiento: {}, vitaminas: {}, bayasEv: {}, habilidad: {} };
+const objetos = { crianza: {}, entrenamiento: {}, vitaminas: {}, bayasEv: {}, habilidad: {}, senuelos: {} };
 
 for (const [nombre, def] of Object.entries(OBJETOS_CRIANZA)) {
   objetos.crianza[nombre] = { ...def, ...preciosDe(nombre) };
@@ -670,6 +702,79 @@ for (const [nombre, stat] of Object.entries(BAYAS_EV)) {
 for (const [nombre, def] of Object.entries(OBJETOS_HABILIDAD)) {
   objetos.habilidad[nombre] = { ...def, ...preciosDe(nombre) };
 }
+for (const [nombre, def] of Object.entries(SENUELOS)) {
+  const datosObjeto = preciosDe(nombre);
+  objetos.senuelos[nombre] = { ...def, ...datosObjeto, ...efectosDelSenuelo(datosObjeto.descripcion ?? '') };
+  if (datosObjeto.encontrado && !objetos.senuelos[nombre].pasos)
+    avisa(`no he sacado los pasos que dura "${nombre}" de su descripción`);
+}
+
+// ------------------------------------------------------- líneas Alpha
+
+/**
+ * Qué líneas evolutivas salen como Alpha.
+ *
+ * Importa porque un Alpha sólo se cría con otro Alpha: si el objetivo es Alpha
+ * y su línea no está en esta lista, no hay cadena posible y hay que decirlo
+ * antes de montar el árbol, no después.
+ *
+ * La lista vive en las «Notas de la comunidad» de la página, que es una wiki de
+ * jugadores y no el volcado del juego. Por eso cada bloque sale marcado con su
+ * procedencia y la app lo enseña como tal: la wiki del proyecto lo tiene
+ * apuntado como hueco de la ingesta, y lo sigue siendo.
+ */
+function extraerAlphas() {
+  // Los nombres van en texto pelado, pero por si algún día los enlazan: si hay
+  // wikilink manda el nombre de archivo, que es la regla 1 de la wiki.
+  const nombreVisible = (celda) => (enlace(celda) ?? celda).replace(/\*/g, '').trim();
+  const ruta = join(WIKI, 'wiki', 'mecanicas', 'Pokémon Alpha.md');
+  if (!existsSync(ruta)) {
+    avisa('no hay wiki/mecanicas/Pokémon Alpha.md: la app no sabe qué líneas salen como Alpha');
+    return null;
+  }
+  const texto = readFileSync(ruta, 'utf8');
+
+  // La tabla de los enjambres normales no tiene cabecera de verdad: la primera
+  // fila ya son ocho Pokémon. `filas()` se come la primera como cabecera, así
+  // que aquí se parte a mano y se recuperan las ocho.
+  const bloqueNormales = seccion(texto, '#### Alpha normales');
+  const enjambres = [...new Set(
+    bloqueNormales
+      .split('\n')
+      .filter((l) => l.trim().startsWith('|') && !/^\|[\s|:-]+\|$/.test(l.trim()))
+      .flatMap((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/))
+      .map((c) => nombreVisible(c.trim()))
+      .filter(Boolean),
+  )].sort();
+
+  const lista = (encabezado) => seccion(texto, encabezado)
+    .split('\n')
+    .filter((l) => /^-\s+\S/.test(l.trim()))
+    .map((l) => nombreVisible(l.trim().replace(/^-\s+/, '')))
+    .filter(Boolean);
+
+  const temporada = {
+    Halloween: lista('#### Halloween'),
+    Navidad: lista('#### Navidad'),
+    'Año Nuevo Lunar': lista('#### Año Nuevo Lunar'),
+  };
+  // Los de tiempo limitado NO se pueden conseguir: la propia página dice que los
+  // iniciales de Kanto no se volverán a lanzar. Van aparte para poder decirlo.
+  const limitados = lista('#### Alpha por tiempo limitado');
+
+  if (enjambres.length !== 112)
+    avisa(`la tabla de Alpha normales trae ${enjambres.length} líneas y la página dice 112`);
+
+  return {
+    enjambres,
+    temporada,
+    limitados,
+    fuente: 'wiki de la comunidad, recogida en wiki/mecanicas/Pokémon Alpha.md',
+    confianza: 'wiki de la comunidad',
+  };
+}
+
+const alphas = extraerAlphas();
 
 // ---------------------------------------------------------- dónde entrenar
 
@@ -740,6 +845,7 @@ const meta = {
     habilidades: Object.keys(habilidades).length,
     movimientosHuevo: Object.keys(movimientosHuevo).length,
     conSprite: Object.keys(sprites.de).length,
+    lineasAlpha: alphas?.enjambres.length ?? 0,
   },
   regiones,
   gruposHuevo: [...new Set(Object.values(pokemon).flatMap((p) => p.gruposHuevo))].sort(),
@@ -763,6 +869,7 @@ escribe('movimientos-huevo.json', { deHuevo: movimientosHuevo, otrosModos: loApr
 escribe('objetos.json', objetos);
 escribe('sprites.json', sprites);
 escribe('donde-entrenar.json', dondeEntrenar);
+escribe('alphas.json', alphas ?? { enjambres: [], temporada: {}, limitados: [] });
 escribe('meta.json', meta);
 
 console.log('\nRecuentos:', JSON.stringify(meta.recuentos));

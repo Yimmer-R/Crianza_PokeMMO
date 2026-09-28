@@ -6,10 +6,11 @@
 import {
   el, tarjeta, plegable, chip, aviso, frag, tabla, numero, comoOportunidad, sprite,
 } from './componentes.js';
-import { NOMBRE_STAT } from '../nucleo/constantes.js';
+import { NOMBRE_STAT, SENUELO, ALPHA } from '../nucleo/constantes.js';
 import { obtener } from './estado.js';
-import { planDeCapturas, regionesQueHacenFalta } from '../nucleo/capturas.js';
+import { planDeCapturas, regionesQueHacenFalta, esDeSenuelo } from '../nucleo/capturas.js';
 import { sinGenero } from '../nucleo/compatibilidad.js';
+import { encuentrosPorShiny } from '../nucleo/variantes.js';
 import { cuandoLegible, siglaDeHoras, siglaDeEstaciones } from '../nucleo/cuando.js';
 import { selectorCuando } from './selector-cuando.js';
 
@@ -125,6 +126,9 @@ export function vistaCapturas(datos) {
           rec.comoLoSabe ? chip(`${especie}: ${comoSabe(rec.comoLoSabe)}`, rec.comoLoSabe.via === 'huevo' ? 'mal' : 'bien') : null,
           rec.gruposEnComun.length ? chip(`grupo huevo: ${rec.gruposEnComun.join(' / ')}`) : null,
           chip(`${rec.zonas.length} ${rec.zonas.length === 1 ? 'zona' : 'zonas'} a tu alcance`),
+          rec.soloConSenuelo ? chip('sólo con señuelo', 'mal') : null,
+          rec.shiny ? chip('variocolor', 'mal') : null,
+          rec.alpha ? chip(rec.comoSaleDeAlpha?.via === 'enjambre' ? 'Alpha: enjambre' : 'Alpha', 'mal') : null,
           (cuando.hora || cuando.estacion)
             ? chip(
                 rec.zonasAhora ? `${rec.zonasAhora} ahora mismo` : 'ninguna ahora mismo',
@@ -152,6 +156,42 @@ export function vistaCapturas(datos) {
                 ? 'Este lo sabe sólo de huevo, así que a su vez hay que criarlo.'
                 : `En ${especie}, ${comoSabe(rec.comoLoSabe)}.`),
           })
+        : null,
+      // Un Alpha no está en la ruta donde sale la especie: sale en enjambres, a
+      // una hora y en un sitio al azar. La tabla «Dónde» sigue valiendo para
+      // saber dónde vive, pero no es donde hay que ir a buscarlo.
+      rec.alpha
+        ? aviso(
+            `Los dos padres de cada cruce tienen que ser Alpha, así que esta captura es un Alpha. `
+            + (rec.comoSaleDeAlpha?.via === 'temporada'
+              ? `${rec.comoSaleDeAlpha.especies.join(', ')} sólo sale en el evento de `
+                + `${rec.comoSaleDeAlpha.evento}.`
+              : `Sale en los enjambres: ${ALPHA.enjambresPorDiaReal} al día real, de `
+                + `${ALPHA.minutosPorEnjambre} minutos, y ${ALPHA.huecoUbicacion}.`)
+            + ` Viene con ${ALPHA.ivsPerfectos} IVs a 31 al azar —por eso los encuentros de la `
+            + `tabla bajan tanto— y con tasa de captura ${ALPHA.tasaCaptura}, no la de su especie.`,
+          )
+        : null,
+      // Un árbol variocolor es variocolor hoja por hoja: cada captura es un
+      // variocolor, no la cría final.
+      rec.shiny
+        ? aviso(
+            'Esta captura tiene que ser variocolor: un variocolor no cría con uno que no lo es, así '
+            + `que lo es el árbol entero. Son ${numero(encuentrosPorShiny())} encuentros de media por `
+            + 'variocolor con estado donador y Amuleto Iris, y eso ya está en la cuenta de la tabla.',
+          )
+        : null,
+      // Una zona de señuelo no se farmea paseando: sin decirlo, la tarjeta
+      // propone ir a una ruta donde la especie NO va a salir.
+      rec.soloConSenuelo
+        ? aviso(
+            `${especie} no aparece en la hierba: sólo sale en encuentros de señuelo, que es un `
+            + 'consumible que se compra y se gasta por pasos. Y aun con el señuelo puesto, sólo un '
+            + `${Math.round(SENUELO.probExclusiva.normal * 100)} % de los encuentros es de especie `
+            + `exclusiva (${Math.round(SENUELO.probExclusiva.premium * 100)} % con los premium), así `
+            + 'que los encuentros de la tabla ya llevan esa cuenta y son un mínimo. El precio está '
+            + 'en el presupuesto del plan.',
+          )
         : null,
       rec.noSeCria
         ? aviso(
@@ -191,7 +231,7 @@ export function vistaCapturas(datos) {
           `×${c.cuantos}`,
           queBuscar(c),
           c.requisito.sexo ?? 'cualquiera',
-          comoOportunidad(c.recomendada.intentos),
+          comoOportunidad(c.recomendada.intentosReales),
         ]),
         [0, 3],
       ),
@@ -203,7 +243,9 @@ export function vistaCapturas(datos) {
       tabla(
         ['Región', 'Zona', 'Método', 'Nivel', 'Rareza', 'Cuándo'],
         rec.zonas.map((z) => [
-          chip(z.region, 'si'), z.zona, z.metodo, z.nivel, z.rareza, celdaCuando(z, cuando),
+          chip(z.region, 'si'), z.zona, z.metodo, z.nivel,
+          esDeSenuelo(z) ? chip(z.rareza, 'mal') : z.rareza,
+          celdaCuando(z, cuando),
         ]),
       ),
 
@@ -225,7 +267,7 @@ export function vistaCapturas(datos) {
                   ? (comoSabe(o.comoLoSabe) ?? '—')
                   : o.gruposEnComun.join(' / '),
                 `${o.ratioSexo} %`,
-                comoOportunidad(o.intentos), numero(o.zonas.length),
+                comoOportunidad(o.intentosReales), numero(o.zonas.length),
               ]),
               [3, 4],
             ),

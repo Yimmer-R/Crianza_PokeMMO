@@ -35,6 +35,10 @@ function objetivoVacio() {
     habilidad: null,
     movimientos: [],
     sexo: null,
+    // Las dos variantes. No son un adorno del objetivo: se propagan al árbol
+    // entero, porque las dos piden que los DOS padres de cada cruce lo sean.
+    shiny: false,
+    alpha: false,
     nivel: 50,
     objetoEntrenamiento: 'Vínculo de Entrenamiento',
   };
@@ -54,7 +58,8 @@ export function nombreDeCrianza(c) {
   const o = c.objetivo;
   if (!o.especie) return 'Crianza sin objetivo';
   const n = STATS.filter((s) => (o.ivs[s] ?? 0) >= 31).length;
-  return [o.especie, n ? `${n}×31` : null, o.naturaleza].filter(Boolean).join(' ');
+  return [o.shiny ? 'Variocolor' : null, o.alpha ? 'Alpha' : null,
+    o.especie, n ? `${n}×31` : null, o.naturaleza].filter(Boolean).join(' ');
 }
 
 const primera = crianzaVacia();

@@ -176,3 +176,93 @@ export const LO_PONE_EL_USUARIO = [
 ];
 
 export const SEXOS = { MACHO: '♂', HEMBRA: '♀', SIN_GENERO: '—' };
+
+// ------------------------------------------------------------- señuelos
+
+/**
+ * Los señuelos: lo que hace falta para las especies exclusivas.
+ *
+ * Una zona marcada «Señuelo» NO se farmea paseando. Hace falta un señuelo
+ * activo —que es un consumible, se compra y se gasta por pasos— y aun así la
+ * especie exclusiva sale sólo en un porcentaje de los encuentros. Los números
+ * salen de la descripción del propio objeto dentro del juego, que es lo que
+ * extrae `datos/objetos.json`:
+ *
+ *   · normales (Señuelo, Super, Experto): +10 % de encuentros y **5 %** de que
+ *     sean de especie exclusiva. Se compran en Pokémart por PokéYen;
+ *   · premium: +25 % y **10 %**, más un +25 % a que un variocolor salga secreto.
+ *     Se compran en la Gift Shop con RP, no con PokéYen.
+ *
+ * El 5 % es «de especie exclusiva», no «de ESTA especie»: si la zona tiene
+ * varias exclusivas, el reparto se divide más. Por eso todo lo que se calcule
+ * con esto es un **suelo**, no una promesa, y la app lo dice con «al menos».
+ */
+export const SENUELO = {
+  /** Probabilidad de que un encuentro bajo señuelo sea de especie exclusiva. */
+  probExclusiva: { normal: 0.05, premium: 0.10 },
+  /** Lo que la app NO sabe, y por eso no calcula cuántos señuelos hacen falta. */
+  huecoPasosPorEncuentro:
+    'no está documentado cuántos pasos cuesta un encuentro, así que no se puede '
+    + 'convertir el número de encuentros en número de señuelos',
+};
+
+// ------------------------------------------------------- shiny y Alpha
+
+/**
+ * Variocolor: lo que cuesta encontrar uno y qué se puede criar con él.
+ *
+ * (wiki/mecanicas/Shiny y secret shiny.md, verificada el 23-09-2026.)
+ *
+ * La regla que manda sobre todo el árbol es la primera: **un shiny no cría con
+ * uno que no lo sea**. No es que salga peor: es que el juego no deja. Así que
+ * un objetivo shiny obliga a que TODO el árbol sea shiny, hoja por hoja, y cada
+ * hoja es una captura a 1 de 30.000. Eso hay que decirlo antes de empezar.
+ */
+export const SHINY = {
+  /** Encuentros por variocolor, según lo que tengas activo. */
+  probabilidad: {
+    base: 1 / 30000,
+    donador: 1 / 27000,
+    donadorYAmuleto: 1 / 24000,
+  },
+  /** El mejor ritmo permanente que existe, y de ahí sale el suelo de encuentros. */
+  mejor: 1 / 24000,
+  /** De cada variocolor, 1 de 16 es además secreto — y nunca en horda. */
+  secreto: 1 / 16,
+  /** Sube un 25 % la probabilidad de que un variocolor sea secreto. */
+  masSecretoConSenueloPremium: 0.25,
+  reglas: {
+    conNoShiny: 'un shiny y uno que no lo es no pueden criar',
+    shinyPorShiny: 'shiny × shiny da huevo shiny garantizado',
+    secretoPorShiny: 'secreto × shiny da secreto garantizado',
+    normales: 'dos normales pueden dar shiny, a las probabilidades de siempre',
+  },
+};
+
+/**
+ * Alpha: habilidad oculta y dos IVs perfectos al azar.
+ *
+ * (wiki/mecanicas/Pokémon Alpha.md, verificada el 23-09-2026.)
+ *
+ * Igual que con el shiny, la regla de crianza es lo que manda: **los dos padres
+ * tienen que ser Alpha**, así que un objetivo Alpha obliga a que lo sea el árbol
+ * entero. Y un Alpha no se captura donde salga la especie: sale en enjambres, a
+ * una hora y en un sitio al azar.
+ */
+export const ALPHA = {
+  enjambresPorDiaReal: 4,
+  minutosPorEnjambre: 75,
+  /** No usa la tasa de su especie: 10 para todos, 3 para Tyranitar. */
+  tasaCaptura: 10,
+  tasaCapturaTyranitar: 3,
+  /** Lo que trae de serie: dos IVs a 31 elegidos al azar. */
+  ivsPerfectos: 2,
+  reglas: {
+    crianza: 'para criar Alphas los dos padres tienen que ser Alpha',
+    conNormal: 'un Alpha con uno normal da una cría normal',
+  },
+  /** Lo que la wiki NO sabe y la app no puede suplir. */
+  huecoUbicacion:
+    'el enjambre sale en un sitio y a una hora al azar, así que no hay ruta que '
+    + 'recomendar: lo marca el mapa de la región cuando aparece',
+};

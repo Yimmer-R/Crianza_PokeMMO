@@ -13,7 +13,7 @@
 // en silencio.
 
 import {
-  el, tarjeta, plegable, chip, aviso, frag, tabla, campoConSugerencias, sprite,
+  el, tarjeta, plegable, chip, aviso, frag, tabla, campoConSugerencias, sprite, interruptor,
 } from './componentes.js';
 import { STATS, NOMBRE_STAT, IV_MAX, SEXOS } from '../nucleo/constantes.js';
 import { obtener, fijarYGuardar, fijar } from './estado.js';
@@ -156,6 +156,14 @@ function bloqueManual(datos) {
         { placeholder: 'opcional' }),
     ]),
 
+    // Las dos variantes. No son un adorno: un variocolor no cría con uno que no
+    // lo es, así que anotarlo mal hace que el plan cuente con un padre que en
+    // la guardería va a ser rechazado.
+    el('div.ivs', { style: 'margin-top:12px' }, [
+      interruptor('b-shiny', 'Variocolor', !!borrador.shiny, (v) => { borrador.shiny = v; }),
+      interruptor('b-alpha', 'Alpha', !!borrador.alpha, (v) => { borrador.alpha = v; }),
+    ]),
+
     el('h3', { texto: 'IVs' }),
     camposIv,
 
@@ -220,6 +228,10 @@ function bloqueLista(inventario, seleccion) {
       ? el('span.con-sprite', {}, [
           sprite(e.especie, { tam: 'mini', sexo: e.sexo }),
           el('span', { texto: e.especie }),
+          // Se ve en la fila porque decide con quién puede cruzarse: un
+          // variocolor sólo cría con otro variocolor.
+          e.shiny ? chip('variocolor', 'si') : null,
+          e.alpha ? chip('Alpha', 'si') : null,
         ])
       : '(sin especie)',
     e.sexo,

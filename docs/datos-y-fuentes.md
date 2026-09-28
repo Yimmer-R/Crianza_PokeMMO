@@ -53,9 +53,10 @@ estación restringida, que es lo que pasaría si el sufijo se volviera a perder.
 | `movimientos.json` | `wiki/movimientos/*.md` | 559 movimientos |
 | `movimientos-huevo.json` | sección «Como movimiento huevo» de cada ficha de movimiento | los 177, con las especies que los traen **y sus grupos huevo**; más las especies que los aprenden por otra vía y sirven igual de padre |
 | `habilidades.json` | `wiki/habilidades/*.md` + cruce con las fichas | 170, con quién las tiene y si es la oculta |
-| `objetos.json` | `wiki/objetos/*.md` | objetos de crianza, entrenamiento, vitaminas, bayas de EV y habilidad, con sus precios de compra documentados |
+| `objetos.json` | `wiki/objetos/*.md` | objetos de crianza, entrenamiento, vitaminas, bayas de EV y habilidad, con sus precios de compra documentados; y los **seis señuelos**, con los pasos que duran y el porcentaje de exclusivas sacados de la descripción del propio objeto |
 | `sprites.json` | `wiki/sprites/*.md` | la imagen de las 667: el render 3D de Pokémon HOME y el sprite animado de 5ª generación, más la variante ♀ de las 97 que se dibujan distintas |
 | `donde-entrenar.json` | `wiki/mecanicas/Dónde entrenar EVs.md` | 581 hordas agrupadas por la característica que dan, con su hora y estación |
+| `alphas.json` | notas de la comunidad de `wiki/mecanicas/Pokémon Alpha.md` | las 112 líneas de los enjambres diarios, las de temporada por evento y las de tiempo limitado, con su procedencia dentro |
 | `meta.json` | — | fecha de extracción, recuentos, regiones, grupos huevo y huecos detectados |
 
 ## Los sprites se enlazan, no se copian
@@ -131,6 +132,41 @@ su propia línea. No se mezcla con el total confirmado.
 guarda a propósito: un precio apuntado miente a los dos meses. Los padres de
 partida quedan fuera del presupuesto con una nota que lo dice.
 
+## Los señuelos: los números salen del objeto, no de una guía
+
+De los seis señuelos (`Señuelo`, `Super Señuelo`, `Señuelo Experto` y sus tres
+versiones premium) hace falta saber tres cosas, y las tres están en la
+**descripción del propio objeto** dentro del juego, que es lo que la wiki copia:
+cuántos pasos dura, cuánto sube los encuentros y qué probabilidad da de que el
+encuentro sea de especie exclusiva. `efectosDelSenuelo()` las saca con tres
+expresiones regulares sobre ese texto.
+
+Importa porque **circula otra versión**: que los premium dan +20 % de encuentros
+y 8 % de exclusivas. El texto del juego dice **+25 % y 10 %**, y ése es el número
+que usa la app. Los normales dan +10 % y 5 %.
+
+Lo que **no** está en ninguna parte es cuántos pasos cuesta un encuentro, y sin
+eso no se puede convertir «te hacen falta 5.120 encuentros» en «te hacen falta N
+señuelos». Por eso el presupuesto da el precio de uno y deja el total fuera.
+
+## Las 112 líneas Alpha vienen de la comunidad, no del volcado
+
+El `CLAUDE.md` de la wiki tiene «las 112 líneas evolutivas que salen como Alpha»
+apuntado como hueco de la ingesta, y lo sigue siendo: la lista existe, pero en las
+**notas de la comunidad** de la página, rastreadas de una wiki de jugadores. Se
+extrae igual —es la única fuente que hay— y `datos/alphas.json` lleva dentro
+`fuente` y `confianza: 'wiki de la comunidad'` para que no se lea como un dato
+del juego.
+
+Tres listas, y la diferencia entre ellas decide si un objetivo es posible:
+
+- **`enjambres`**: las 112 de todos los días. `comprobar-datos.mjs` comprueba que
+  sigan siendo 112 y que las 112 estén en la pokédex;
+- **`temporada`**: por evento (Halloween, Navidad, Año Nuevo Lunar). Son una vía,
+  pero sólo durante el evento;
+- **`limitados`**: los tres iniciales de Kanto, Suicune y Articuno. **No son una
+  vía**: se repartieron una vez y la propia página dice que no vuelven.
+
 ## Cómo comprobar que la extracción sigue bien
 
 `node herramientas/extraer-wiki.mjs` imprime los recuentos y los huecos que
@@ -138,7 +174,8 @@ detecta. Con la wiki de septiembre de 2026 deben salir:
 
 ```
 {"pokemon":667,"conEncuentros":548,"naturalezas":25,
- "movimientos":559,"habilidades":170,"movimientosHuevo":177}
+ "movimientos":559,"habilidades":170,"movimientosHuevo":177,
+ "conSprite":667,"lineasAlpha":112}
 ```
 
 Si un número baja de golpe, ha cambiado el formato de la wiki y hay algún

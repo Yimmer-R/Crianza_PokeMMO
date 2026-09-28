@@ -77,7 +77,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Dieciocho cosas que no son evidentes leyendo un archivo suelto:
+Veinte cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -257,6 +257,40 @@ Dieciocho cosas que no son evidentes leyendo un archivo suelto:
    y por eso decía «Milotic no aprende Neblina» — el movimiento es de **Feebas**.
    La misma trampa, en otro archivo.
 
+19. **El señuelo NO es una rareza más.** Una fila de encuentro con rareza
+   «Señuelo» pide un consumible activo, y aun con él sólo un **5 %** de los
+   encuentros es de especie exclusiva (10 % con los premium; los dos números
+   salen de la descripción del propio objeto). Así que pesa 0 en `PESO_RAREZA`
+   —por debajo de «raro»—, `facilidadDeCaptura()` le resta y no la cuenta entre
+   los sitios de hoy, y si TODAS las zonas de una especie son de señuelo los
+   encuentros esperados se dividen por ese 5 % (`intentosConSenuelo()`). Es un
+   suelo, no una promesa: ese 5 % se reparte entre todas las exclusivas de la
+   zona y no está documentado cuántas hay. Va al presupuesto
+   (`senuelosDelPlan()`) con el precio y la duración de los seis, pero **fuera
+   del total**: no está documentado cuántos pasos cuesta un encuentro, así que
+   pasar de «5.120 encuentros» a «N señuelos» sería inventarlo. Y ojo con la
+   fuente: el texto del juego dice **+25 % de encuentros y 10 % de exclusivas**
+   en los premium, no el +20 %/8 % que circula por ahí.
+
+20. **Alpha y variocolor se propagan al ÁRBOL ENTERO, no a un cruce.** Un
+   variocolor no cría con uno que no lo es, y para criar Alphas los dos padres
+   tienen que ser Alpha; por inducción, todas las hojas lo son, y una hoja es una
+   captura. De ahí `src/nucleo/variantes.js` y cuatro cosas que ya han costado
+   caro: **`cumple()` mira la variante antes que los IVs y falla en los dos
+   sentidos** —meter un variocolor en una cadena normal no cría peor, es que la
+   guardería lo rechaza—; **el relleno de una cadena Alpha se filtra**
+   (`elegirRelleno(..., { soloAlpha })`), y con el enjambre diario por delante
+   del evento de temporada, porque si no el plan proponía capturar un Alpha de
+   una especie que no existe como Alpha; **un Alpha trae dos IVs a 31 al azar** y
+   eso sí cambia la cuenta —`probabilidadEnAlpha()` la hace exacta y baja un 3×31
+   de 32.768 encuentros a unos 150—; y **criar shiny × shiny usa otra tabla de
+   herencia**, mejor, que `tablaDeHerencia()` deriva de la de la wiki y marca
+   `derivada: true` porque la wiki la publica contando IVs, no en probabilidad.
+   La lista de las 112 líneas (`datos/alphas.json`) sale de las notas de la
+   comunidad de la wiki, no del volcado, y va marcada como tal; las de tiempo
+   limitado —los tres iniciales de Kanto, Suicune, Articuno— **no son una vía**:
+   se repartieron una vez y pedirlas hace el objetivo imposible.
+
 ## El aspecto
 
 La **forma** sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
@@ -361,7 +395,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 318 pruebas unitarias
+node pruebas/ejecutar.mjs             # 341 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```

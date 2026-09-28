@@ -36,6 +36,10 @@ const ETIQUETAS = {
   nivel: ['nivel', 'nv', 'level', 'lv'],
   mote: ['mote', 'apodo', 'nickname', 'nombre'],
   nota: ['nota', 'notas', 'comentario'],
+  // Las dos variantes. Importan porque deciden con quién puede criar: un
+  // variocolor no cría con uno que no lo es.
+  shiny: ['shiny', 'variocolor', 'varicolor'],
+  alpha: ['alpha', 'alfa'],
   // Se reconocen para poder ignorarlas: la ficha del juego las trae y no aportan.
   ignorar: ['estadisticas', 'estadisticas totales', 'stats', 'marcas', 'marks', 'cinta', 'objeto equipado'],
 };
@@ -49,6 +53,14 @@ const STAT_POR_ETIQUETA = {
   'def esp': 'def-esp', 'defensa especial': 'def-esp', spd: 'def-esp', 'defesp': 'def-esp',
   velocidad: 'velocidad', spe: 'velocidad', vel: 'velocidad',
 };
+
+/**
+ * "sí", "si", "true", "1" o nada -> true. Sólo un "no" explícito lo apaga.
+ *
+ * Una línea que pone «Variocolor» a secas ya está diciendo que lo es: pedir
+ * «Variocolor: sí» sería exigirle al OCR una palabra que la ficha no trae.
+ */
+const esQueSi = (valor) => !/^(no|false|0)$/i.test(String(valor ?? '').trim());
 
 function queEtiqueta(clave) {
   const k = normalizar(clave);
@@ -196,6 +208,8 @@ function parsearBloque(lineas, ctx) {
       if (resto) sinEtiqueta.unshift(resto);
       continue;
     }
+    if (campo === 'shiny') { out.shiny = esQueSi(valor); continue; }
+    if (campo === 'alpha') { out.alpha = esQueSi(valor); continue; }
     if (campo === 'mote') { out.mote = valor; continue; }
     if (campo === 'nota') { out.nota = valor; continue; }
 
@@ -216,6 +230,11 @@ function parsearBloque(lineas, ctx) {
 
     // Una línea que sólo es un tipo elemental es la etiqueta de tipo de la ficha.
     if (tipos.has(normalizar(limpia))) continue;
+
+    // Una línea suelta que sólo dice «Variocolor» o «Alpha» es la marca de la
+    // ficha, no un movimiento ni la especie.
+    const soloVariante = queEtiqueta(limpia);
+    if (soloVariante === 'shiny' || soloVariante === 'alpha') { out[soloVariante] = true; continue; }
 
     // Sexo pegado al nombre: "Chimchar ♀"
     const sexoSuelto = limpia.match(/[♀♂]/);

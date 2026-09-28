@@ -1228,6 +1228,85 @@ await paso('el 31 en Defensa del Gible se dice, y se puede conservar', async () 
   await pagina.evaluate(() => localStorage.removeItem('crianza-pokemmo:inventario:v1'));
 });
 
+await paso('un inicial de señuelo lo dice en Capturas y en el presupuesto', async () => {
+  // Chimchar sólo sale en encuentros de señuelo, así que Infernape arrastra esa
+  // vía entera: la app no puede proponerlo como si fuera una captura normal.
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie', { timeout: 10000 });
+  // Chimchar sólo vive en Sinnoh, y una prueba anterior deja regiones apagadas.
+  await abrir('Regiones desbloqueadas');
+  for (const r of ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova']) await pagina.check(`#region-${r}`);
+  await pagina.fill('#especie', 'Infernape');
+  await confirmarCampo('#especie');
+  await pagina.check('#iv-ataque');
+  await pagina.check('#iv-velocidad');
+  await pagina.waitForTimeout(400);
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(500);
+  const cap = await pagina.textContent('#vista');
+  if (!/sólo con señuelo/.test(cap)) throw new Error('Capturas no marca que hace falta señuelo');
+  if (!/consumible/.test(cap)) throw new Error('no dice que el señuelo se gasta');
+
+  await pagina.click('button[data-vista="plan"]');
+  await pagina.waitForTimeout(500);
+  const plan = await pagina.textContent('#vista');
+  if (!/Señuelos:/.test(plan)) throw new Error('el presupuesto no trae el bloque de señuelos');
+  if (!/600 PokéYen/.test(plan)) throw new Error('no dice lo que cuesta un señuelo');
+  if (!/No entra en el total/.test(plan)) throw new Error('no dice por qué queda fuera del total');
+  console.log('       Chimchar: señuelo marcado en Capturas y con precio en el presupuesto');
+});
+
+await paso('Alpha y variocolor cambian el árbol entero, y se dice dónde', async () => {
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForSelector('#especie', { timeout: 10000 });
+  await pagina.fill('#especie', 'Gible');
+  await confirmarCampo('#especie');
+  await pagina.waitForTimeout(400);
+
+  // Alpha: Garchomp está en los enjambres, así que es posible y sale la nota.
+  await pagina.check('#var-alpha');
+  await pagina.waitForTimeout(500);
+  const conAlpha = await pagina.textContent('#vista');
+  if (!/dos padres de cada cruce tienen que ser Alpha/.test(conAlpha))
+    throw new Error('Objetivo no explica la regla de los dos padres Alpha');
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(500);
+  const capAlpha = await pagina.textContent('#vista');
+  if (!/enjambres/.test(capAlpha)) throw new Error('Capturas no manda a los enjambres');
+  if (!/tasa de captura 10/.test(capAlpha)) throw new Error('no dice que la tasa no es la de la especie');
+
+  // Variocolor: cada captura pasa a costar los 24.000 encuentros.
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForTimeout(300);
+  await pagina.uncheck('#var-alpha');
+  await pagina.check('#var-shiny');
+  await pagina.waitForTimeout(500);
+  const conShiny = await pagina.textContent('#vista');
+  if (!/24.000 encuentros/.test(conShiny)) throw new Error(`Objetivo no dice el coste: ${conShiny.slice(0, 200)}`);
+
+  await pagina.click('button[data-vista="capturas"]');
+  await pagina.waitForTimeout(500);
+  const capShiny = await pagina.textContent('#vista');
+  if (!/no cría con uno que no lo es/.test(capShiny))
+    throw new Error('Capturas no explica por qué toda la cadena es variocolor');
+
+  // Y una línea que sólo se repartió una vez no es una vía: se dice y no se planea.
+  await pagina.click('button[data-vista="objetivo"]');
+  await pagina.waitForTimeout(300);
+  await pagina.uncheck('#var-shiny');
+  await pagina.fill('#especie', 'Venusaur');
+  await confirmarCampo('#especie');
+  await pagina.check('#var-alpha');
+  await pagina.waitForTimeout(600);
+  const imposible = await pagina.textContent('#vista');
+  if (!/una sola vez/.test(imposible)) throw new Error('no avisa de que Venusaur Alpha no vuelve');
+  await pagina.uncheck('#var-alpha');
+  await pagina.waitForTimeout(300);
+  console.log('       Gible Alpha a los enjambres, variocolor a 24.000, y Venusaur Alpha dicho como imposible');
+});
+
 async function contarInventario() {
   const t = await pagina.textContent('.inventario-lista');
   return Number((t.match(/Tu inventario · (\d+)/) ?? [0, 0])[1]);
