@@ -87,6 +87,13 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
     ? elegirRelleno(objetivo.especie, datos, regionesDisponibles, cuando).slice(0, 6).map((c) => c.especie)
     : (requisito.especiesValidas ?? [requisito.especieSugerida]);
 
+  // Cuando el hueco tiene que pasar un movimiento huevo, el plan ya trae quién
+  // puede saberlo y por qué vía: se engancha a cada opción para que la vista
+  // pueda decir CÓMO se consigue el movimiento, no sólo a quién capturar.
+  const comoSabeElMovimiento = new Map(
+    (requisito.padresDelMovimiento ?? []).map((c) => [c.especie, c]),
+  );
+
   for (const especie of candidatas) {
     const p = pokedex[especie];
     if (!p) continue;
@@ -100,9 +107,17 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
       : requisito.sexo === SEXOS.MACHO ? (p.genero?.macho ?? 0)
       : 100;
 
+    const conMovimiento = comoSabeElMovimiento.get(especie) ?? null;
+
     opciones.push({
       especie,
       esObjetivo: especie === objetivo.especie,
+      // Los movimientos que este hueco tiene que pasar, y cómo los sabe esta
+      // especie: «nivel 36», «MT/MO» o, lo peor, «sólo de huevo» — que abre otra
+      // cadena de crianza.
+      movimientos: requisito.movimientos ?? [],
+      comoLoSabe: conMovimiento?.comoLoSabe ?? null,
+      comoSabeCada: conMovimiento?.comoSabeCada ?? null,
       gruposEnComun: gruposEnComun(pokedex[objetivo.especie], p),
       sinGenero: sinGenero(p),
       noCria,
@@ -125,7 +140,10 @@ export function comoConseguir(requisito, datos, regionesDisponibles, objetivo, c
   // Una especie que ahora mismo no aparece en ningún sitio va detrás de otra
   // que sí, aunque sea algo más rara: lo primero es poder ir hoy.
   viables.sort((a, b) =>
-    (b.zonasAhora > 0) - (a.zonasAhora > 0)
+    // Un padre que sólo sabe el movimiento DE HUEVO abre otra cadena entera:
+    // va detrás de cualquiera que lo aprenda por nivel, MT o tutor.
+    ((a.comoLoSabe?.via === 'huevo') - (b.comoLoSabe?.via === 'huevo'))
+    || (b.zonasAhora > 0) - (a.zonasAhora > 0)
     || a.intentos - b.intentos
     // Con los mismos intentos, mejor el que ya cría que el que hay que
     // evolucionar antes.
@@ -160,7 +178,9 @@ export function planDeCapturas(plan, datos, regionesDisponibles, cuando = CUANDO
   if (!plan?.ok) return [];
   const mapa = new Map();
   for (const req of plan.pasos.conseguir) {
-    const clave = JSON.stringify([req.stats, req.naturaleza, req.sexo, req.especieLibre]);
+    // Los movimientos entran en la clave: «31 en Defensa ♂» y «31 en Defensa ♂
+    // con Neblina» no son el mismo hueco, aunque lo demás coincida.
+    const clave = JSON.stringify([req.stats, req.naturaleza, req.sexo, req.especieLibre, req.movimientos ?? []]);
     if (mapa.has(clave)) { mapa.get(clave).cuantos++; continue; }
     mapa.set(clave, { cuantos: 1, ...comoConseguir(req, datos, regionesDisponibles, plan.objetivo, cuando) });
   }

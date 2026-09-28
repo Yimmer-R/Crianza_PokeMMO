@@ -51,6 +51,12 @@ sólo fuerza un IV en vez de dos, y la hoja de sólo naturaleza entra por abajo 
 árbol. El lado bueno: media cadena queda sin naturaleza, y ahí encaja cualquier
 Pokémon que ya tengas aunque la suya no sea la buena.
 
+**Los movimientos huevo llegan hasta la captura.** Si pides un movimiento que
+sólo se hereda, el plan no se limita a avisarte: marca cuál de las capturas tiene
+que traerlo, la pone ♂ —el movimiento lo pasa el padre—, propone las especies que
+de verdad pueden saberlo y te dice cómo lo aprende cada una. Y si lo único que
+obliga a criar es el movimiento, se cría igual: por un huevo es la única vía.
+
 **Las seis características, con barra.** En Objetivo, debajo de la especie: la base
 del Pokémon y, en el mismo trazo, lo que suman los IVs y los EVs, más el número
 final al nivel al que juegas y con la naturaleza aplicada. Los dos tramos están
@@ -285,7 +291,7 @@ herramientas/
   comprobar-datos.mjs     valida datos/ sin necesitar la wiki
   generar-iconos.mjs      los iconos de la app, en PNG y SVG
   servir.mjs              servidor estático mínimo
-pruebas/                304 pruebas unitarias + una de navegador
+pruebas/                318 pruebas unitarias + una de navegador
 docs/                   el modelo, las fuentes, el formato y el despliegue
 ```
 

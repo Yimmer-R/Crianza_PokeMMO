@@ -412,7 +412,13 @@ function bloqueAhora(plan, objetivo, datos) {
                 : (f.especiesValidas?.length ?? 0) > 1
                   ? el('span.chip.ojo.con-sprite', {}, [
                       sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),
-                      el('span', { texto: `${f.especieSugerida} o su línea` }),
+                      // Con un movimiento huevo las otras opciones NO son su
+                      // línea evolutiva: son otras especies que lo saben.
+                      el('span', {
+                        texto: (f.movimientos ?? []).length
+                          ? `${f.especieSugerida} u otro que lo sepa`
+                          : `${f.especieSugerida} o su línea`,
+                      }),
                     ])
                   : el('span.con-sprite', {}, [
                       sprite(f.especieSugerida, { tam: 'mini', sexo: f.sexo }),

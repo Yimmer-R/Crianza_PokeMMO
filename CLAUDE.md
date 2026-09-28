@@ -77,7 +77,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Diecisiete cosas que no son evidentes leyendo un archivo suelto:
+Dieciocho cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -237,6 +237,26 @@ Diecisiete cosas que no son evidentes leyendo un archivo suelto:
    Sustituye al viejo «pasarlo al formulario», que sólo salía con UN Pokémon en
    la tanda y obligaba a reescribirlo entero.
 
+18. **Un movimiento huevo tiene que llegar hasta una CAPTURA.** Lo pasa el padre,
+   y el padre del cruce final casi nunca se captura: es a su vez una cría. Así
+   que la marca baja por la rama paterna hasta una hoja (`bajarMovimientosHuevo()`),
+   que es el único sitio donde el movimiento puede entrar de verdad. Antes se
+   quedaba en un nodo de tipo `cruce`, donde no la mira nadie —`cumple()` sólo la
+   comprueba al colocar un ejemplar y `loQueFalta()` sólo la enseña en los huecos
+   por conseguir—, y el plan de un Milotic con Neblina salía con cuatro capturas
+   y ninguna pedía el movimiento. Tres consecuencias más:
+   **un hueco con movimiento deja de ser de especie libre** (`padresQuePasanTodos()`
+   dice quién puede saberlo, y con dos movimientos es la INTERSECCIÓN: un huevo
+   tiene un solo padre); **obliga a criar aunque el objetivo se capturase entero**,
+   porque un movimiento huevo sólo entra por un huevo — de ahí
+   `raizParaMovimientoHuevo()`, que envuelve en un cruce un objetivo de 1×31 o de
+   ninguno; y **Capturas dice cómo lo sabe** cada especie que vale («lo aprende al
+   nivel 36», «se le enseña con la MT/MO», «sólo de huevo: hace falta criarlo
+   aparte»), que es lo que decide a quién buscar.
+   Y ojo con el punto 6: `mejorVia()` miraba `vias()` en vez de `viasEnLaLinea()`
+   y por eso decía «Milotic no aprende Neblina» — el movimiento es de **Feebas**.
+   La misma trampa, en otro archivo.
+
 ## El aspecto
 
 La **forma** sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
@@ -341,7 +361,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 304 pruebas unitarias
+node pruebas/ejecutar.mjs             # 318 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```
