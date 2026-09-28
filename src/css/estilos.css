@@ -346,11 +346,72 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
 
 /* La cabecera de Objetivo: el Pokémon a la izquierda y sus etiquetas al lado. */
 .ficha-especie { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
-.ficha-especie .etiquetas { flex: 1; }
+.ficha-especie .etiquetas { flex: 1; min-width: 0; }
+/* En el móvil el sprite grande se come el ancho que necesitan los chips, que
+   van en `nowrap` a propósito, y la página acababa con scroll horizontal:
+   «Grupo huevo: Monstruo / Dragón» mide 271 px y sólo le quedaban 248. */
+@media (max-width: 560px) {
+  .ficha-especie .sprite-grande { width: 56px; height: 56px; }
+}
 /* `.chip` va más abajo y fija `display: inline-block`; aquí hace falta el flex
    para que el sprite y el texto se alineen, y por eso la regla es más
    específica en vez de ir arriba con las demás. */
 .chip.con-sprite { display: inline-flex; padding: 2px 9px 2px 2px; gap: 6px; }
+
+/* ------------------------------------------------------- características */
+
+/* Una fila por característica: nombre, base, barra y el número final.
+   La rejilla es fija a los lados y elástica en el medio, que es lo que deja
+   que la barra encoja en el móvil sin que se desalineen las columnas. */
+.stats { display: grid; gap: 7px; margin: 12px 0 10px; }
+.stat {
+  display: grid; align-items: center; gap: 10px;
+  grid-template-columns: minmax(78px, 112px) 30px 1fr 44px;
+}
+.stat-nombre {
+  font: var(--rotulo); letter-spacing: var(--espaciado-rotulo);
+  text-transform: uppercase; color: var(--texto-tenue);
+}
+/* La flecha de la naturaleza, en la misma línea del nombre: sólo sale en las
+   dos características que toca, así que una columna propia sería aire. */
+.stat-nat.sube { color: var(--terciario); }
+.stat-nat.baja { color: var(--mal); }
+
+.stat-base-num { font: var(--mono); font-size: 0.78rem; color: var(--texto-tenue); text-align: right; }
+.stat-cifra { font-size: 0.95rem; text-align: right; }
+
+/* La barra: la BASE en gris y encima, en la insignia blanca, lo que suman los
+   IVs y los EVs. Los dos tramos van en la misma unidad —puntos de base— y eso
+   es exacto, no un apaño: ver nucleo/estadisticas.js.
+   El carmesí no entra aquí. Es el color de las acciones, y una barra de datos
+   no lo es; la imagen de referencia graduaba el color por valor (rojo, verde,
+   azul) y esa escala no existe en esta paleta. */
+.stat-barra {
+  display: flex; height: 14px; background: var(--elevada);
+  border: 1px solid var(--borde-sutil); overflow: hidden;
+}
+.stat-tramo-base { background: var(--texto-tenue); }
+.stat-tramo-bono { background: var(--terciario); }
+
+.leyenda { font-size: 0.78rem; color: var(--texto-tenue); margin: 0 0 12px; }
+.muestra {
+  display: inline-block; width: 22px; height: 9px; vertical-align: middle;
+  border: 1px solid var(--borde-sutil); margin-right: 3px;
+}
+.muestra.base { background: var(--texto-tenue); }
+.muestra.bono { background: var(--terciario); }
+
+/* En el móvil el nombre no cabe al lado de la barra: se va arriba, a lo ancho,
+   y debajo quedan la base, la barra y la cifra. */
+@media (max-width: 560px) {
+  .stat { grid-template-columns: 30px 1fr 42px; }
+  .stat-nombre { grid-column: 1 / -1; }
+}
+
+/* Cada IV de regalo, en su bloque: qué es, quién lo trae y qué hacer con él. */
+.regalo { border-top: 1px solid var(--borde-sutil); padding: 10px 0 2px; }
+.regalo:first-of-type { border-top: 0; }
+.fila-regalo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* La línea evolutiva de Entrenamiento: las caras en fila con su flecha. */
 .linea-evolutiva { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 10px; }
@@ -399,6 +460,9 @@ textarea { min-height: 90px; font-family: var(--mono); font-size: 0.8rem; }
   color: var(--sobre-mal-suave);
 }
 .nota { margin: 8px 0 14px; font-size: 0.84rem; color: var(--texto-tenue); }
+/* La misma nota, pero al lado de un botón: sin márgenes verticales, que ahí
+   separan el botón de su explicación en dos líneas. */
+span.nota { margin: 0; }
 .error ul, .aviso ul, .nota ul { margin: 6px 0 0; padding-left: 20px; }
 
 .cargando { color: var(--texto-tenue); }

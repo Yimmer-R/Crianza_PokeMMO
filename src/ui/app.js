@@ -8,6 +8,7 @@
 import { cargarDatos } from '../datos/cargador.js';
 import { obtener, suscribir, fijar, fijarYGuardar, restaurar } from './estado.js';
 import { planear } from '../nucleo/planificador.js';
+import { regalosConPrecio } from '../nucleo/regalos.js';
 import { el } from './componentes.js';
 import { vistaObjetivo } from './vista-objetivo.js';
 import { vistaPlan } from './vista-plan.js';
@@ -53,8 +54,24 @@ function recalcular() {
     }
   }
 
+  // Los IVs de regalo con su precio, SÓLO de la crianza activa: cada uno cuesta
+  // un `planear()` entero y son los únicos que se van a enseñar. Con las cinco
+  // crianzas abiertas, hacerlo para todas multiplicaría por seis el recálculo de
+  // cada tecla para no pintar nada.
+  const activa = crianzas.find((c) => c.id === crianzaActiva);
+  let regalos = { candidatos: [], conservados: [] };
+  try {
+    if (activa && planes[crianzaActiva]?.ok)
+      regalos = regalosConPrecio(planes[crianzaActiva], activa.objetivo, datos, {
+        inventario, regionesDisponibles, cuando,
+      });
+  } catch { /* un regalo que no se puede medir no rompe el plan */ }
+
   recalculando = true;
-  fijar({ planes, plan: planes[crianzaActiva] ?? null, disputados: buscarDisputados(crianzas, planes) });
+  fijar({
+    planes, plan: planes[crianzaActiva] ?? null, regalos,
+    disputados: buscarDisputados(crianzas, planes),
+  });
   recalculando = false;
 }
 

@@ -845,6 +845,25 @@ function sexoCompatibleConHermano(nodo, padre, ejemplar, pokedex) {
 }
 
 /**
+ * Cuántos IVs que NADIE pidió comparte este ejemplar con su pareja de cruce.
+ *
+ * Es el único sitio donde un IV de regalo se puede conservar **gratis**: un
+ * cruce garantiza los 31 que tienen los DOS padres, así que si el hermano de
+ * este hueco ya está ocupado por alguien con 31 en Defensa y este candidato
+ * también lo trae, la Defensa sale garantizada sin gastar ni un objeto ni un
+ * cruce de más. No fuerza nada: sólo desempata entre candidatos que ya costaban
+ * lo mismo. Ver nucleo/regalos.js para lo que cuesta cuando NO sale gratis.
+ */
+function regalosQueComparteConElHermano(nodo, padre, ejemplar, pedidos) {
+  if (!padre) return 0;
+  const hermano = padre.hijos.find((h) => h !== nodo);
+  if (hermano?.tipo !== 'inventario') return 0;
+  const suyos = perfectos(ejemplar.ivs ?? {});
+  const delHermano = perfectos(hermano.ejemplar?.ivs ?? {});
+  return [...suyos].filter((st) => !pedidos.includes(st) && delHermano.has(st)).length;
+}
+
+/**
  * Coloca el inventario sobre el árbol ya construido.
  *
  * Se elige siempre la pareja (ejemplar, hueco) que más capturas ahorra, no la
@@ -856,6 +875,7 @@ function sexoCompatibleConHermano(nodo, padre, ejemplar, pokedex) {
  */
 export function asignarInventario(arbol, ctx) {
   const { datos, objetivo, inventarioLibre } = ctx;
+  const pedidos = statsPedidos(objetivo);
 
   for (;;) {
     if (!inventarioLibre.length) break;
@@ -874,6 +894,7 @@ export function asignarInventario(arbol, ctx) {
           // Cuántos de los IVs que pide el hueco los cubre con un 30 en vez de
           // con un 31. Cuantos menos, mejor.
           pseudo: (r.pseudo ?? []).length,
+          regalosCompartidos: regalosQueComparteConElHermano(nodo, padre, e, pedidos),
         });
       }
       for (const h of nodo.hijos) recorre(h, nodo);
@@ -884,7 +905,16 @@ export function asignarInventario(arbol, ctx) {
     // Primero el que tapa más árbol; después, a igualdad, el que lo hace con
     // 31 de verdad —los 30 sólo cuando no hay otra cosa, que es la regla— y ya
     // por último el que menos 31 desperdicia en un hueco pequeño.
-    candidatos.sort((a, b) => b.ahorro - a.ahorro || a.pseudo - b.pseudo || a.perfectos - b.perfectos);
+    //
+    // Y sólo cuando todo lo anterior empata, el que comparte con su pareja algún
+    // 31 que el objetivo no pedía: eso lo regala el cruce sin coste. Va el
+    // ÚLTIMO a propósito — por delante de él está `perfectos`, que es lo que
+    // evita quemar un 3×31 en un hueco de 1×31, y conservar un regalo nunca
+    // vale eso.
+    candidatos.sort((a, b) => b.ahorro - a.ahorro
+      || a.pseudo - b.pseudo
+      || a.perfectos - b.perfectos
+      || b.regalosCompartidos - a.regalosCompartidos);
     const mejor = candidatos[0];
 
     mejor.nodo.tipo = 'inventario';
@@ -1056,7 +1086,11 @@ export function comparaPlanes(a, b) {
   return cortos(a) - cortos(b)
     || esfuerzo(a) - esfuerzo(b)
     || cruces(a) - cruces(b)
-    || (a.sobrantes?.length ?? 0) - (b.sobrantes?.length ?? 0);
+    || (a.sobrantes?.length ?? 0) - (b.sobrantes?.length ?? 0)
+    // Y a igualdad de todo, el que conserva más IVs de los que nadie pidió. Es
+    // el único sitio donde los regalos deciden algo, y sólo cuando salen gratis:
+    // por encima de esta línea el plan ya cuesta lo mismo.
+    || (b.regaloEntregado ?? 0) - (a.regaloEntregado ?? 0);
 }
 
 /** Monta el árbol entero con una forma concreta de repartir la Piedraeterna. */
@@ -1117,7 +1151,16 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
 
   // Lo que el árbol entrega de verdad. Con todo a 31 es lo pedido; con algún 30
   // del inventario, el suelo baja y aparecen los cruces a suerte.
-  const entrega = ivsDelArbol(arbol, objetivo, { colocarObjetos: true });
+  //
+  // Se miden también los IVs que NADIE ha pedido pero que alguien del inventario
+  // trae de regalo —el 31 en Defensa de un Gible que sólo estaba ahí por ser la
+  // hembra de la especie—. No cambian el plan: se miden para poder decir si
+  // llegan solos, si se juegan a una tirada o si se pierden, y para ofrecer
+  // conservarlos. Sólo se miran los que de verdad hay en la caja: medir los seis
+  // siempre sería contar ceros.
+  const deRegalo = STATS.filter((st) =>
+    !pedidos.includes(st) && inventario.some((e) => (e.ivs?.[st] ?? 0) >= IV_PSEUDO));
+  const entrega = ivsDelArbol(arbol, objetivo, { colocarObjetos: true, tambien: deRegalo });
   const avisos = [...(validacion.avisos ?? [])];
   if (entrega.cortos.length)
     avisos.push(
@@ -1151,6 +1194,12 @@ function montarPlan(objetivo, datos, { inventario, regionesDisponibles, cuando, 
     suerte: entrega.suerte,
     ivsCortos: entrega.cortos,
     objetosRecolocados: entrega.objetosRecolocados,
+    // Los IVs que no se pidieron y que el inventario sí trae: qué hace el plan
+    // con ellos. `regaloEntregado` es cuántos salen garantizados, y es el último
+    // desempate entre planes que por lo demás cuestan lo mismo.
+    regalo: deRegalo,
+    suerteRegalo: entrega.suerteExtra,
+    regaloEntregado: deRegalo.filter((st) => entrega.ivs[st] >= IV_PSEUDO).length,
     ...validacion,
     avisos,
   };
@@ -1350,8 +1399,9 @@ export function criaDe(nodo, objetivo, datos) {
  * Para componerlo habría que arrastrar la distribución entera por cada nodo y
  * no compensa.
  */
-export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false } = {}) {
+export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false, tambien = [] } = {}) {
   const suerte = [];
+  const suerteExtra = [];
   const cambios = [];
 
   const deNodo = (nodo) => {
@@ -1387,13 +1437,18 @@ export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false } = {}) {
     }
 
     const ivs = ivsVacios();
-    for (const st of nodo.stats) {
+    // `tambien` son IVs que el objetivo NO pide pero que alguien del inventario
+    // trae de regalo. Se miden igual que los pedidos —el mismo suelo y la misma
+    // tabla— pero van a su propia lista: un regalo que no llega no es un aviso
+    // del plan, es información. Sin `tambien` esto hace exactamente lo de antes.
+    for (const st of [...nodo.stats, ...tambien.filter((x) => !nodo.stats.includes(x))]) {
+      const pedido = nodo.stats.includes(st);
       const d = distribucionDe(st, a, b, nodo.objetos?.madre, nodo.objetos?.padre);
       ivs[st] = Math.min(...d.map((x) => x.valor));
       const p = d.filter((x) => x.valor >= IV_MAX).reduce((acc, x) => acc + x.probabilidad, 0);
       if (p > 0 && p < 1) {
-        suerte.push({ nodo: nodo.id, stat: st, probabilidad: p, suelo: ivs[st] });
-        if (colocarObjetos)
+        (pedido ? suerte : suerteExtra).push({ nodo: nodo.id, stat: st, probabilidad: p, suelo: ivs[st] });
+        if (colocarObjetos && pedido)
           nodo.explicacion += ` En ${NOMBRE_STAT[st]} un padre trae 30 y el otro 31: aquí no hay `
             + `garantía, sale 31 el ${Math.round(p * 100)} % de las veces y ${ivs[st]} el resto.`;
       }
@@ -1406,6 +1461,9 @@ export function ivsDelArbol(arbol, objetivo, { colocarObjetos = false } = {}) {
   return {
     ivs,
     suerte,
+    // Lo mismo pero de los IVs que nadie pidió: dónde se juegan y con qué
+    // probabilidad. No genera avisos; lo lee la tarjeta de regalos.
+    suerteExtra,
     // Cruces donde se han intercambiado los dos Recios para no forzar un 30
     // teniendo un 31 en el otro padre.
     objetosRecolocados: cambios,

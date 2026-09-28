@@ -71,7 +71,7 @@ precio de mercado con fecha (`NO_SE_VENDE_EN_TIENDA` y `PRECIO_GTL_OBSERVADO` en
 
 ## Cómo está montada la app
 
-Catorce cosas que no son evidentes leyendo un archivo suelto:
+Dieciséis cosas que no son evidentes leyendo un archivo suelto:
 
 1. **Hay varias crianzas y un solo inventario.** `estado.crianzas` es la lista,
    `estado.objetivo` es un espejo de la activa que `fijar()` propaga: las vistas
@@ -185,6 +185,43 @@ Catorce cosas que no son evidentes leyendo un archivo suelto:
    pegado al nombre en tablas y sugerencias, y dos letras de más bastaron para que
    una opción dejara de decir «Rattata» y dijera «RARattata».
 
+15. **Un IV que no se pide NO se conserva, y eso no es un fallo.** Un cruce
+   garantiza los 31 que comparten los DOS padres más los que fuerce un Recio, y
+   los Recios de un plan ya están todos comprometidos con lo pedido —uno de los
+   dos huecos se lo lleva la Piedraeterna cuando hay naturaleza—. Así que el 31
+   en Defensa de un Gible que está ahí sólo por poner la especie sale por una de
+   tres vías, y ninguna se puede fabricar: **gratis** si los dos padres de ese
+   cruce lo tienen (lo recoge el suelo de `ivsDelArbol()`), **por suerte** con la
+   probabilidad de la rama alta, o **pidiéndolo**, y entonces el objetivo pasa de
+   n×31 a (n+1)×31 y el árbol dobla. `src/nucleo/regalos.js` mide las tres y la
+   vista Plan las enseña con el precio delante; `objetivo.conservados` recuerda
+   cuáles se pidieron así para poder soltarlos. No añadas una heurística que
+   «intente conservarlos»: no existe tal cosa, y prometerla sería mentir.
+   Dos derivadas: el «o 30 en su defecto» **no es un modo aparte** —se pide a 31,
+   `cumple()` acepta el 30 como pseudo si es lo mejor que hay y el plan dice a qué
+   valor lo deja (`saldriaA`)—; y lo único gratis que sí se hace es un desempate,
+   el último de `asignarInventario()`: entre candidatos que ya costaban lo mismo
+   gana el que comparte un regalo con su pareja de cruce. Va el último a
+   propósito, detrás de `perfectos`: conservar un regalo nunca vale quemar un
+   3×31 en un hueco de 1×31.
+
+16. **Las características van en Objetivo, y son una inferencia declarada.** La
+   tarjeta «Estadísticas» está en Objetivo y no en Entrenamiento porque **todo
+   lo que entra en el número se toca en esa misma página** —especie, IVs,
+   naturaleza, EVs y nivel—: ahí es el resultado de lo de arriba y se mueve
+   mientras juegas con los mandos. Entrenamiento responde a otra pregunta, que
+   es dónde farmear esos EVs. Dos cosas del dibujo: una sola barra por
+   característica con **dos tramos** —la base en gris y encima, en blanco, lo
+   que suman IVs y EVs—, y los dos tramos están en la MISMA unidad porque eso
+   sale de la fórmula, no de un apaño: un IV y unos EVs valen exactamente
+   `(IV + ⌊EV/4⌋)/2` puntos de base, y **no depende del nivel**, porque el nivel
+   multiplica al paréntesis entero. El carmesí no entra en la barra: es de las
+   acciones. Y lo importante, que es la regla 2: la fórmula de característica
+   **no está verificada** —`wiki/mecanicas/IVs.md` lo dice en «Qué falta aquí»—,
+   así que la tarjeta lo avisa en su propia línea. Los IVs que se usan son los
+   que la crianza entrega de verdad (`plan.ivsFinales`), y los que no se piden
+   cuentan como 0, que es el suelo honesto.
+
 ## El aspecto
 
 La **forma** sale de una plantilla que pasó el usuario (un PSD de 1440×8000, «UI
@@ -282,7 +319,7 @@ node herramientas/extraer-wiki.mjs    # regenera datos/ desde ../PokeMMO
 node herramientas/comprobar-datos.mjs # valida datos/ sin la wiki (corre en CI)
 node herramientas/generar-iconos.mjs  # regenera iconos/
 node herramientas/medir-ordenes.mjs   # por qué NO se busca el orden de los IVs
-node pruebas/ejecutar.mjs             # 272 pruebas unitarias
+node pruebas/ejecutar.mjs             # 304 pruebas unitarias
 node pruebas/navegador.mjs            # prueba de navegador (necesita Playwright)
 OCR=1 node pruebas/navegador.mjs      # incluye el OCR (descarga ~8 MB)
 ```
